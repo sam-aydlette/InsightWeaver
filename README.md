@@ -12,8 +12,11 @@ An app that curates information from a wide range of reputable sources and creat
 
 ## Setup
 
-1. Install dependencies:
+
+1. Create virtual environment and install dependencies:
    ```bash
+   python3 -m venv venv
+   source venv/bin/activate
    pip install -r requirements.txt
    ```
 
