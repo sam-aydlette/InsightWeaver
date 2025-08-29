@@ -52,3 +52,7 @@ The system collects from reputable sources including:
 ## Database
 
 Articles are stored in SQLite with automatic deduplication. The system keeps the last 30 days of articles.
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details. Free to use with attribution.
