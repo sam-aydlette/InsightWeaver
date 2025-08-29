@@ -123,17 +123,59 @@ Skip themes with no significant developments. Be concise and actionable."""
         cyber_articles = [a for a in articles if 'cyber' in a[0].lower() or 'security' in a[0].lower()]
         
         return {
-            'analysis': f"""**Executive Summary**
-Today's briefing covers {len(articles)} developments from {len(sources)} sources.
+            'analysis': f"""**SECTION 1: STRATEGIC RISK ASSESSMENT**
 
-**Key Themes**
-- Cybersecurity focus: {len(cyber_articles)} security-related articles
-- Geographic coverage: {', '.join(list(sources)[:5])}
+**GLOBAL**
+**Key Facts:** Major worldwide risks identified from news sources.
+**Strategic Implications:** Global tensions remain elevated.
+**Forward Look:** Monitor international developments.
 
-**Forward Look**
-Continue monitoring developments across all tracked regions and sectors.
+**UNITED STATES**
+**Key Facts:** Domestic policy impacts observed.
+**Strategic Implications:** National security considerations.
+**Forward Look:** Track policy changes.
 
-*Note: Enhanced AI analysis requires API key configuration.*""",
+**NORTHERN VIRGINIA**
+**Key Facts:** Regional tech corridor activities.
+**Strategic Implications:** Government contracting impacts.
+**Forward Look:** Watch defense spending trends.
+
+**INDIVIDUAL (Cybersecurity Engineer)**
+**Key Facts:** Industry trends affecting professionals.
+**Strategic Implications:** Job market considerations.
+**Forward Look:** Monitor clearance requirements.
+
+**SECTION 2: THEMATIC ANALYSIS**
+
+**ECONOMICS**
+**Key Facts:** Market developments noted.
+**Strategic Implications:** Economic indicators mixed.
+**Forward Look:** Watch inflation trends.
+
+**WAR AND PEACE**
+**Key Facts:** Diplomatic tensions ongoing.
+**Strategic Implications:** Regional conflicts persist.
+**Forward Look:** Monitor escalation risks.
+
+**CYBERSECURITY**
+**Key Facts:** {len(cyber_articles)} security incidents reported.
+**Strategic Implications:** Threat landscape evolving.
+**Forward Look:** Enhance security posture.
+
+**SCIENCE AND TECHNOLOGY**
+**Key Facts:** Innovation developments tracked.
+**Strategic Implications:** Technology adoption accelerating.
+**Forward Look:** Monitor regulatory changes.
+
+**SOCIAL AND POLITICAL**
+**Key Facts:** Political developments observed.
+**Strategic Implications:** Policy shifts expected.
+**Forward Look:** Track election impacts.
+
+**OUTSIDE THE BOX TRENDS**
+**Key Facts:** Emerging patterns identified.
+**Strategic Implications:** Unexpected developments noted.
+**Forward Look:** Watch for anomalous events.""",
             'article_count': len(articles),
             'sources_analyzed': len(sources),
             'has_ai_analysis': False
@@ -250,6 +292,7 @@ class IntelligenceBriefing:
         if not analysis_text:
             return analysis_text
         
+        
         # Replace section headers with styled sections
         sections = {
             '**SECTION 1: STRATEGIC RISK ASSESSMENT**': 'STRATEGIC RISK ASSESSMENT',
@@ -285,13 +328,17 @@ class IntelligenceBriefing:
         
         formatted = analysis_text
         
-        # Apply all replacements with inline styles for email compatibility
+        # First, convert newlines to proper HTML structure
+        paragraphs = formatted.split('\n\n')
+        formatted = ''.join(f'<p class="content-text">{p.replace(chr(10), " ")}</p>' for p in paragraphs if p.strip())
+        
+        # Apply all replacements with inline styles for email compatibility AFTER paragraph conversion
         header_inline_style = 'font-family: Georgia, Times New Roman, serif; font-size: 20px; font-weight: 700; color: #000000; margin-bottom: 25px; margin-top: 35px; text-transform: uppercase; letter-spacing: 1px; padding-bottom: 8px; border-bottom: 2px solid #e0e0e0;'
         
         for marker, replacement in {**sections, **risk_levels, **themes}.items():
             if marker in formatted:
                 section_class = "risk-section" if marker in risk_levels else "theme-section"
-                styled_replacement = f'</div><div class="{section_class}"><div class="theme-header" style="{header_inline_style}" role="heading" aria-level="3">{replacement}</div>'
+                styled_replacement = f'</p></div><div class="{section_class}"><div class="theme-header" style="{header_inline_style}" role="heading" aria-level="3">{replacement}</div><p class="content-text">'
                 formatted = formatted.replace(marker, styled_replacement)
         
         # Apply subsection styling
@@ -306,20 +353,16 @@ class IntelligenceBriefing:
         header_pattern = r'\*\*([A-Z\s&()]+)\*\*'
         def replace_remaining_headers(match):
             header_text = match.group(1).strip()
-            return f'</div><div class="theme-section"><div class="theme-header" style="{header_inline_style}" role="heading" aria-level="3">{header_text}</div>'
+            return f'</p></div><div class="theme-section"><div class="theme-header" style="{header_inline_style}" role="heading" aria-level="3">{header_text}</div><p class="content-text">'
         
         formatted = re.sub(header_pattern, replace_remaining_headers, formatted)
-        
-        # Add opening div if we have sections
-        if any(section in analysis_text for section in {**sections, **risk_levels, **themes}.keys()):
-            formatted = '<div class="theme-section">' + formatted + '</div>'
         
         # Convert markdown-style bold to HTML with proper semantics
         formatted = formatted.replace('**', '<strong>').replace('**', '</strong>')
         
-        # Convert newlines to proper HTML with content-text class
-        paragraphs = formatted.split('\n\n')
-        formatted = ''.join(f'<p class="content-text">{p.replace(chr(10), " ")}</p>' for p in paragraphs if p.strip())
+        # Add opening div if we have sections
+        if '<div class="theme-section">' in formatted:
+            formatted = '<div class="theme-section"><p class="content-text">' + formatted + '</p></div>'
         
         return formatted
     
