@@ -45,10 +45,62 @@ An app that curates information from a wide range of reputable sources and creat
 
 ## News Sources
 
-The system collects from reputable sources including:
-- Reuters, AP, BBC (Western perspective)
-- Al Jazeera, SCMP, Deutsche Welle (International perspectives)  
-- Krebs Security (Cybersecurity focus)
+The system collects from a comprehensive range of reputable sources:
+
+### Western/US Perspective
+- **Reuters** - International news and analysis
+- **AP International** - Associated Press global coverage
+- **BBC World** - British Broadcasting Corporation world news
+- **Foreign Policy** - International affairs magazine
+- **Foreign Affairs** - Global affairs and policy analysis
+- **CFR** - Council on Foreign Relations publications
+- **CSIS** - Center for Strategic and International Studies
+- **The Economist World** - International news and analysis
+- **Chatham House** - UK-based international affairs think tank
+- **Carnegie Endowment** - Global policy research
+- **International Crisis Group** - Conflict prevention and resolution
+
+### Non-Western Perspectives
+- **Al Jazeera** - Middle Eastern and international news
+- **SCMP** - South China Morning Post (Hong Kong/China focus)
+- **The Hindu International** - Indian perspective on global affairs
+- **Deutsche Welle** - German international broadcaster
+- **France24** - French international news
+- **Americas Quarterly** - Latin American affairs
+- **Council on Hemispheric Affairs** - Western Hemisphere analysis
+- **AllAfrica** - African news and perspectives
+- **ISS Africa** - Institute for Security Studies Africa
+- **The Diplomat** - Asia-Pacific affairs
+- **East Asia Forum** - Regional Asian analysis
+- **Arab News** - Middle Eastern perspectives
+- **Haaretz English** - Israeli news and analysis
+
+### Cybersecurity & Technology
+- **Krebs Security** - Cybersecurity investigations and analysis
+- **Hacker News** - Technology and security discussions
+- **Threatpost** - Cybersecurity threat intelligence
+- **Bellingcat** - Open source investigations
+- **CISA Alerts** - US Cybersecurity and Infrastructure Security Agency
+- **CISA News** - Government cybersecurity updates
+
+### Defense & Military
+- **Defense News** - Military and defense industry coverage
+- **Military.com** - Military affairs and news
+- **Jane's Defence** - Defense intelligence and analysis
+- **CSBA** - Center for Strategic and Budgetary Assessments
+
+### Alternative Analysis
+- **Carnegie Moscow** - Russian perspectives and analysis
+- **PONARS Eurasia** - Post-Soviet and Eurasian studies
+- **Quincy Institute** - Responsible statecraft and diplomacy
+- **CNAS** - Center for a New American Security
+
+### Institutional Sources
+- **UN News** - United Nations official news
+- **World Bank** - Global development and economic analysis
+
+### Economic Intelligence
+- **Financial Times World** - Global financial and economic news
 
 ## Database
 
