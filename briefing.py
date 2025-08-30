@@ -30,15 +30,55 @@ RSS_FEEDS = {
     "AP International": "https://feeds.apnews.com/rss/apf-intlnews",
     "BBC World": "https://feeds.bbci.co.uk/news/world/rss.xml",
     "Foreign Policy": "https://foreignpolicy.com/feed/",
+    "Foreign Affairs": "https://www.foreignaffairs.com/rss.xml",
+    "CFR": "https://feeds.cfr.org/publication/global",
+    "CSIS": "https://www.csis.org/analysis.xml",
     "The Economist World": "https://www.economist.com/international/rss.xml",
+    "Chatham House": "https://www.chathamhouse.org/rss/publications",
+    "Carnegie Endowment": "https://carnegieendowment.org/rss/publications",
+    "International Crisis Group": "https://www.crisisgroup.org/rss/publications",
     
-    # Non-Western Perspectives
+    # Non-Western Perspectives  
     "Al Jazeera": "https://www.aljazeera.com/xml/rss/all.xml",
     "SCMP": "https://www.scmp.com/rss/91/feed",
+    "The Hindu International": "https://www.thehindu.com/news/international/feeder/default.rss",
     "Deutsche Welle": "https://rss.dw.com/rss/en-world",
+    "France24": "https://www.france24.com/en/rss",
+    "Americas Quarterly": "https://www.americasquarterly.org/fullfeed/",
+    "Council on Hemispheric Affairs": "https://www.coha.org/feed/",
+    "AllAfrica": "https://allafrica.com/tools/headlines/rdf/africa/headlines.rdf",
+    "ISS Africa": "https://issafrica.org/rss.xml",
+    "The Diplomat": "https://thediplomat.com/feed/",
+    "East Asia Forum": "https://www.eastasiaforum.org/feed/",
+    "Arab News": "https://www.arabnews.com/rss.xml",
+    "Haaretz English": "https://www.haaretz.com/cmlink/1.628752",
     
     # Cybersecurity
     "Krebs Security": "https://krebsonsecurity.com/feed/",
+    "Hacker News": "https://feeds.feedburner.com/hn/frontpage",
+    "Threatpost": "https://threatpost.com/feed/",
+    "Bellingcat": "https://www.bellingcat.com/feed/",
+    "CISA Alerts": "https://www.cisa.gov/cybersecurity-advisories/rss.xml",
+    "CISA News": "https://www.cisa.gov/news/rss.xml",
+    
+    # Defense/Military
+    "Defense News": "https://www.defensenews.com/arc/outboundfeeds/rss/category/global/?outputType=xml",
+    "Military.com": "https://www.military.com/rss/news",
+    "Jane's Defence": "https://www.janes.com/feeds/all-content",
+    "CSBA": "https://csbaonline.org/rss.xml",
+    
+    # Alternative Analysis
+    "Carnegie Moscow": "https://carnegie.ru/publications/?lang=en&fa=rss",
+    "PONARS Eurasia": "https://www.ponarseurasia.org/rss/",
+    "Quincy Institute": "https://quincyinst.org/feed/",
+    "CNAS": "https://www.cnas.org/rss/publications",
+    
+    # Institutional
+    "UN News": "https://news.un.org/feed/subscribe/en/news/all/rss.xml",
+    "World Bank": "https://www.worldbank.org/en/news/rss",
+    
+    # Economic Intelligence
+    "Financial Times World": "https://www.ft.com/world?format=rss"
 }
 
 class InsightAnalyzer:
@@ -60,39 +100,63 @@ class InsightAnalyzer:
                 max_tokens=1500,
                 messages=[{
                     "role": "user",
-                    "content": f"""Analyze these news articles and provide strategic insights in two main sections:
+                    "content": f"""Analyze these news articles and provide strategic insights in three main categories:
 
 {article_text}
 
-**SECTION 1: STRATEGIC RISK ASSESSMENT**
-Provide a holistic risk assessment across these geographic levels:
+Generate a comprehensive intelligence analysis with proper HTML formatting. Use the following structure exactly:
 
-**GLOBAL**: Major worldwide risks, systemic threats, international stability
-**UNITED STATES**: National-level risks, domestic policy impacts, economic vulnerabilities  
-**NORTHERN VIRGINIA**: Regional risks affecting DC metro area, government contracting, tech corridor
-**INDIVIDUAL**: Specific risks for a cybersecurity engineer in American tech industry with family (job market, security clearances, industry trends, family safety considerations)
+**FORMATTING REQUIREMENTS:**
+- Use proper HTML headers: `<h2>` for main sections, `<h3>` for subsections
+- Use `<p>` tags for paragraphs
+- Use `<strong>` for emphasis on key points
+- Use `<em>` for analytical assessments and predictions
+- Ensure proper spacing between sections with `<br>` tags
+- Use `<ul>` and `<li>` for any bullet points
 
-For each level:
-- **Key Facts:** Current risk factors based on articles
-- **Strategic Implications:** Analysis of impact and significance
-- **Forward Look:** Risk trajectory and mitigation strategies
+**ANALYSIS STRUCTURE:**
+For each category below, provide two substantive sections with proper HTML formatting:
 
-**SECTION 2: THEMATIC ANALYSIS**
-Provide narrative updates for themes with significant developments:
+```html
+<h2>GLOBAL ANALYSIS</h2>
+<h3>Narrative</h3>
+<p>[1-2 paragraphs of meaningful analysis based on current events, connecting multiple sources and identifying patterns. Focus on strategic implications rather than just summarizing news. Highlight <strong>key developments</strong> that signal broader trends.]</p>
 
-**WAR AND PEACE**: Military conflicts, diplomatic tensions, defense developments, peace processes
-**ECONOMICS**: Markets, trade, sanctions, economic policy, financial systems  
-**CYBERSECURITY**: Cyber attacks, data breaches, tech security, digital warfare
-**SOCIAL AND POLITICAL**: Elections, governance, civil unrest, policy changes
-**SCIENCE AND TECHNOLOGY**: Innovation, research breakthroughs, tech policy
-**OUTSIDE THE BOX TRENDS**: Unexpected patterns, emerging issues, unconventional developments
+<h3>Forward Look</h3>
+<p><em>ASSESSMENT:</em> [1-2 paragraphs of trajectory analysis and strategic implications. Clearly label predictions as analytical projections. Identify potential flashpoints, escalation risks, and decision points in the next 30-90 days.]</p>
 
-For each theme:
-- **Key Facts:** Start with verified information from articles
-- **Strategic Implications:** Analysis of broader meaning
-- **Forward Look:** Reasonable predictions (clearly labeled as analysis)
+<h2>LOCAL ANALYSIS</h2>
+<h3>Narrative</h3>
+<p>[Focus specifically on Northern Virginia and DC metro area developments, including government contracting impacts, federal and state policy effects on the region, local government decisions, environmental considerations, and public schools. Connect local developments to broader national trends.]</p>
 
-Skip themes with no significant developments. Be concise and actionable."""
+<h3>Forward Look</h3>
+<p><em>ASSESSMENT:</em> [Regional trajectory analysis with focus on how federal policy changes, contracting cycles, and economic trends will impact the local area. Include implications for professionals in the cybersecurity and government contracting sectors.]</p>
+
+<h2>CYBERSECURITY ANALYSIS</h2>
+<h3>Narrative</h3>
+<p>[Examine cyber threats, data breaches, digital warfare, and technology security developments. Analyze cybersecurity policy developments (particularly FedRAMP, GovRAMP, TXRAMP, CMMC) and industry-specific trends. Connect cyber incidents to geopolitical context and nation-state activities.]</p>
+
+<h3>Forward Look</h3>
+<p><em>ASSESSMENT:</em> [Strategic implications for cybersecurity professionals. Identify emerging threat vectors, policy changes that will affect compliance requirements, and industry trends that will shape career opportunities and business decisions.]</p>
+```
+
+**ANALYSIS QUALITY STANDARDS:**
+- Base all analysis strictly on factual information from the provided articles
+- Connect dots between seemingly separate events to identify patterns
+- Provide strategic context that explains WHY events matter, not just WHAT happened
+- When making forward-looking assessments, use phrases like "Assessment indicates..." or "Analysis suggests..." 
+- Include confidence levels when appropriate ("High confidence," "Moderate confidence," "Low confidence")
+- Cite specific sources when referencing particular claims
+- Avoid speculation beyond what the evidence supports
+- Each narrative section should synthesize information across multiple sources
+- Forward Look sections should identify specific indicators to monitor and decision points ahead
+
+**SUBSTANTIVE REQUIREMENTS:**
+- Each section should be 150-250 words of meaningful analysis
+- Focus on implications for decision-makers rather than just description
+- Identify second and third-order effects of developments
+- Connect local, national, and international trends where relevant
+- Provide actionable intelligence that helps readers understand strategic implications"""
                 }]
             )
             
@@ -123,59 +187,7 @@ Skip themes with no significant developments. Be concise and actionable."""
         cyber_articles = [a for a in articles if 'cyber' in a[0].lower() or 'security' in a[0].lower()]
         
         return {
-            'analysis': f"""**SECTION 1: STRATEGIC RISK ASSESSMENT**
-
-**GLOBAL**
-**Key Facts:** Major worldwide risks identified from news sources.
-**Strategic Implications:** Global tensions remain elevated.
-**Forward Look:** Monitor international developments.
-
-**UNITED STATES**
-**Key Facts:** Domestic policy impacts observed.
-**Strategic Implications:** National security considerations.
-**Forward Look:** Track policy changes.
-
-**NORTHERN VIRGINIA**
-**Key Facts:** Regional tech corridor activities.
-**Strategic Implications:** Government contracting impacts.
-**Forward Look:** Watch defense spending trends.
-
-**INDIVIDUAL (Cybersecurity Engineer)**
-**Key Facts:** Industry trends affecting professionals.
-**Strategic Implications:** Job market considerations.
-**Forward Look:** Monitor clearance requirements.
-
-**SECTION 2: THEMATIC ANALYSIS**
-
-**ECONOMICS**
-**Key Facts:** Market developments noted.
-**Strategic Implications:** Economic indicators mixed.
-**Forward Look:** Watch inflation trends.
-
-**WAR AND PEACE**
-**Key Facts:** Diplomatic tensions ongoing.
-**Strategic Implications:** Regional conflicts persist.
-**Forward Look:** Monitor escalation risks.
-
-**CYBERSECURITY**
-**Key Facts:** {len(cyber_articles)} security incidents reported.
-**Strategic Implications:** Threat landscape evolving.
-**Forward Look:** Enhance security posture.
-
-**SCIENCE AND TECHNOLOGY**
-**Key Facts:** Innovation developments tracked.
-**Strategic Implications:** Technology adoption accelerating.
-**Forward Look:** Monitor regulatory changes.
-
-**SOCIAL AND POLITICAL**
-**Key Facts:** Political developments observed.
-**Strategic Implications:** Policy shifts expected.
-**Forward Look:** Track election impacts.
-
-**OUTSIDE THE BOX TRENDS**
-**Key Facts:** Emerging patterns identified.
-**Strategic Implications:** Unexpected developments noted.
-**Forward Look:** Watch for anomalous events.""",
+            'analysis': "AI content is unavailable.",
             'article_count': len(articles),
             'sources_analyzed': len(sources),
             'has_ai_analysis': False
@@ -292,37 +304,21 @@ class IntelligenceBriefing:
         if not analysis_text:
             return analysis_text
         
+        # Handle simple fallback messages
+        if analysis_text == "AI content is unavailable.":
+            return f'<div class="content-text">{analysis_text}</div>'
         
-        # Replace section headers with styled sections
-        sections = {
-            '**SECTION 1: STRATEGIC RISK ASSESSMENT**': 'STRATEGIC RISK ASSESSMENT',
-            '**SECTION 2: THEMATIC ANALYSIS**': 'THEMATIC ANALYSIS'
-        }
         
-        # Replace geographic risk levels
-        risk_levels = {
-            '**GLOBAL**': 'GLOBAL',
-            '**UNITED STATES**': 'UNITED STATES',
-            '**NORTHERN VIRGINIA**': 'NORTHERN VIRGINIA',
-            '**INDIVIDUAL**': 'INDIVIDUAL',
-            '**INDIVIDUAL (Cybersecurity Engineer)**': 'INDIVIDUAL (CYBERSECURITY ENGINEER)'
-        }
-        
-        # Replace theme headers (including variations Claude might return)
-        themes = {
-            '**WAR AND PEACE**': 'WAR AND PEACE',
-            '**ECONOMICS**': 'ECONOMICS', 
-            '**CYBERSECURITY**': 'CYBERSECURITY',
-            '**SOCIAL AND POLITICAL**': 'SOCIAL AND POLITICAL',
-            '**SCIENCE AND TECHNOLOGY**': 'SCIENCE AND TECHNOLOGY',
-            '**OUTSIDE THE BOX TRENDS**': 'OUTSIDE THE BOX TRENDS',
-            '**OUT OF THE BOX TRENDS**': 'OUTSIDE THE BOX TRENDS'
+        # Replace analysis category headers with enhanced styling
+        categories = {
+            '**GLOBAL ANALYSIS**': '<div class="category-header" role="heading" aria-level="3">GLOBAL ANALYSIS</div>',
+            '**LOCAL ANALYSIS**': '<div class="category-header" role="heading" aria-level="3">LOCAL ANALYSIS</div>',
+            '**CYBERSECURITY ANALYSIS**': '<div class="category-header" role="heading" aria-level="3">CYBERSECURITY ANALYSIS</div>'
         }
         
         # Replace subsection headers with enhanced styling
         subsections = {
-            '**Key Facts:**': '<div class="subsection-header" role="heading" aria-level="4">Key Facts</div>',
-            '**Strategic Implications:**': '<div class="subsection-header" role="heading" aria-level="4">Strategic Implications</div>',
+            '**Narrative:**': '<div class="subsection-header" role="heading" aria-level="4">Narrative</div>',
             '**Forward Look:**': '<div class="subsection-header forward-look" role="heading" aria-level="4">Forward Look</div>'
         }
         
@@ -332,13 +328,12 @@ class IntelligenceBriefing:
         paragraphs = formatted.split('\n\n')
         formatted = ''.join(f'<p class="content-text">{p.replace(chr(10), " ")}</p>' for p in paragraphs if p.strip())
         
-        # Apply all replacements with inline styles for email compatibility AFTER paragraph conversion
-        header_inline_style = 'font-family: Georgia, Times New Roman, serif; font-size: 20px; font-weight: 700; color: #000000; margin-bottom: 25px; margin-top: 35px; text-transform: uppercase; letter-spacing: 1px; padding-bottom: 8px; border-bottom: 2px solid #e0e0e0;'
+        # Apply all replacements with enhanced inline styles for email compatibility AFTER paragraph conversion
+        header_inline_style = 'font-family: Georgia, Times New Roman, serif; font-size: 22px; font-weight: 700; color: #1a1a1a; margin-bottom: 30px; margin-top: 40px; text-transform: uppercase; letter-spacing: 1.5px; padding: 12px 0; border-bottom: 3px solid #000000; background: linear-gradient(135deg, #f8f8f8 0%, #e8e8e8 100%); text-align: center; border-radius: 4px;'
         
-        for marker, replacement in {**sections, **risk_levels, **themes}.items():
+        for marker, replacement in categories.items():
             if marker in formatted:
-                section_class = "risk-section" if marker in risk_levels else "theme-section"
-                styled_replacement = f'</p></div><div class="{section_class}"><div class="theme-header" style="{header_inline_style}" role="heading" aria-level="3">{replacement}</div><p class="content-text">'
+                styled_replacement = f'</p></div><div class="analysis-section">{replacement}<p class="content-text">'
                 formatted = formatted.replace(marker, styled_replacement)
         
         # Apply subsection styling
@@ -361,8 +356,8 @@ class IntelligenceBriefing:
         formatted = formatted.replace('**', '<strong>').replace('**', '</strong>')
         
         # Add opening div if we have sections
-        if '<div class="theme-section">' in formatted:
-            formatted = '<div class="theme-section"><p class="content-text">' + formatted + '</p></div>'
+        if '<div class="analysis-section">' in formatted:
+            formatted = '<div class="analysis-section"><p class="content-text">' + formatted + '</p></div>'
         
         return formatted
     
@@ -380,9 +375,8 @@ class IntelligenceBriefing:
         <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Strategic Intelligence Brief - {datetime.now().strftime('%B %d, %Y')}</title>
+            <title>InsightWeaver - {datetime.now().strftime('%B %d, %Y')}</title>
             <style>
-                /* Clean newspaper-style design */
                 * {{ 
                     margin: 0; 
                     padding: 0; 
@@ -458,14 +452,7 @@ class IntelligenceBriefing:
                     margin-bottom: 30px;
                 }}
                 
-                .theme-section {{
-                    background: #ffffff;
-                    border: 1px solid #d0d0d0;
-                    padding: 30px;
-                    margin-bottom: 25px;
-                }}
-                
-                .risk-section {{
+                .analysis-section {{
                     background: #ffffff;
                     border: 1px solid #d0d0d0;
                     padding: 30px;
@@ -485,6 +472,21 @@ class IntelligenceBriefing:
                     border-bottom: 2px solid #e0e0e0;
                 }}
                 
+                .category-header {{
+                    font-family: 'Georgia', 'Times New Roman', serif;
+                    font-size: 22px;
+                    font-weight: 700;
+                    color: #1a1a1a;
+                    margin: 40px 0 30px 0;
+                    text-transform: uppercase;
+                    letter-spacing: 1.5px;
+                    padding: 12px 0;
+                    border-bottom: 3px solid #000000;
+                    background: linear-gradient(135deg, #f8f8f8 0%, #e8e8e8 100%);
+                    text-align: center;
+                    border-radius: 4px;
+                }}
+                
                 .subsection-header {{
                     font-family: 'Georgia', 'Times New Roman', serif;
                     font-size: 16px;
@@ -498,8 +500,8 @@ class IntelligenceBriefing:
                 .content-text {{
                     font-family: 'Times New Roman', 'Georgia', 'Baskerville', serif;
                     color: #2a2a2a;
-                    line-height: 1.9;
-                    margin-bottom: 20px;
+                    line-height: 1.8;
+                    margin-bottom: 18px;
                     font-size: 18px;
                     font-weight: 400;
                 }}
@@ -508,15 +510,6 @@ class IntelligenceBriefing:
                     margin-bottom: 0;
                 }}
                 
-                /* Override any inherited styling for text following subsection headers */
-                .subsection-header + .content-text {{
-                    font-family: 'Times New Roman', 'Georgia', 'Baskerville', serif;
-                    color: #2a2a2a;
-                    font-size: 18px;
-                    font-weight: 400;
-                    text-transform: none;
-                    letter-spacing: normal;
-                }}
                 
                 .article {{
                     background: #ffffff;
@@ -553,9 +546,12 @@ class IntelligenceBriefing:
                 }}
                 
                 .article p {{
-                    color: #404040;
-                    line-height: 1.7;
-                    font-size: 17px;
+                    font-family: 'Times New Roman', 'Georgia', 'Baskerville', serif;
+                    color: #2a2a2a;
+                    line-height: 1.8;
+                    font-size: 18px;
+                    font-weight: 400;
+                    margin-bottom: 18px;
                 }}
                 
                 .footer {{
@@ -570,18 +566,6 @@ class IntelligenceBriefing:
                     font-size: 14px;
                     margin-bottom: 6px;
                     font-style: italic;
-                }}
-                
-                .ai-badge {{
-                    display: inline-block;
-                    background: #1a1a1a;
-                    color: #ffffff;
-                    padding: 6px 16px;
-                    font-size: 12px;
-                    font-weight: 600;
-                    letter-spacing: 0.5px;
-                    text-transform: uppercase;
-                    font-family: 'Arial', sans-serif;
                 }}
                 
                 strong {{
@@ -620,43 +604,31 @@ class IntelligenceBriefing:
         <body>
             <div class="container">
                 <header class="header">
-                    <h1>Strategic Intelligence Brief</h1>
+                    <h1>InsightWeaver</h1>
                     <div class="header-meta">
                         <p>{datetime.now().strftime('%B %d, %Y')}</p>
                         <p>{analysis['article_count']} articles from {analysis['sources_analyzed']} sources 
-                        {'• AI-Enhanced Analysis' if analysis['has_ai_analysis'] else '• Basic Analysis'}</p>
+                        {'• AI-Enhanced Analysis' if analysis['has_ai_analysis'] else 'No Analysis Generated'}</p>
                     </div>
                 </header>
                 
                 <div class="content">
                     <section class="section" aria-labelledby="strategic-assessment">
-                        <h2 class="section-title" id="strategic-assessment">Strategic Assessment</h2>
+                        <h2 class="section-title" id="strategic-assessment">Key Insights of the Day</h2>
                         <div class="analysis-container" role="region" aria-label="Strategic analysis content">
-                            {self.format_analysis_html(analysis['analysis']) if analysis['has_ai_analysis'] else f'<div class="content-text">{analysis["analysis"]}</div>'}
+                            {self.format_analysis_html(analysis['analysis'])}
                         </div>
                     </section>
                     
-                    <section class="section" aria-labelledby="source-intelligence">
-                        <h2 class="section-title" id="source-intelligence">Source Intelligence</h2>
         """
         
-        for article in articles[:12]:  # Show fewer articles since we have analysis now
-            title, url, source, content, created_at = article
-            html += f"""
-                <article class="article" role="article">
-                    <h3><a href="{url}" target="_blank" rel="noopener noreferrer" aria-label="Read full article: {title}">{title}</a></h3>
-                    <p class="source" aria-label="Source: {source}">{source}</p>
-                    <p>{content[:250]}...</p>
-                </article>
-            """
         
         html += f"""
                     </section>
                 </div>
                 
                 <footer class="footer">
-                    <p><em>Generated by InsightWeaver</em></p>
-                    {f'<p class="ai-badge">Strategic analysis powered by Claude AI</p>' if analysis['has_ai_analysis'] else ''}
+                    <p><em>Generated by InsightWeaver and Claude AI</em></p>
                 </footer>
             </div>
         </body>
@@ -669,7 +641,7 @@ class IntelligenceBriefing:
         """Send briefing via email"""
         try:
             msg = MIMEMultipart('alternative')
-            msg['Subject'] = f"Daily Insights - {datetime.now().strftime('%B %d, %Y')}"
+            msg['Subject'] = f"Daily Insights by InsightWeaver- {datetime.now().strftime('%B %d, %Y')}"
             msg['From'] = smtp_config['from_email']
             msg['To'] = recipient_email
             

@@ -39,6 +39,7 @@ An app that curates information from a wide range of reputable sources and creat
    - `EMAIL_PASSWORD` (your Gmail App Password)
    - `FROM_EMAIL` (your Gmail address)
    - `RECIPIENT_EMAIL` (where to send briefings)
+   - `ANTHROPIC_API_KEY` (authenticating to a Claude API account)
 
 2. The workflow runs daily at 8 AM UTC automatically
 
