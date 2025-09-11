@@ -86,7 +86,9 @@ RSS_FEEDS = {
     "Azure DevOps Blog": "https://devblogs.microsoft.com/devops/feed/",
     "InfoWorld": "https://www.infoworld.com/devops/feed/",
     "Rapid7": "https://www.rapid7.com/blog/tag/devops/rss",
-    "HackerNews": "http://thehackernews.com/feeds/posts/default"
+    "HackerNews": "http://thehackernews.com/feeds/posts/default",
+    "Stack Overflow": "https://stackoverflow.blog/feed/",
+    "CNCF Blog": "https://www.cncf.io/feed/"
 }
 
 class InsightAnalyzer:
@@ -164,7 +166,7 @@ For each category below, provide two substantive sections with proper HTML forma
 
 <h2>Job Seeker</h2>
 <h3>Narrative</h3>
-<p>[Focus specifically on what a job seeker should be looking for in this time. What opprotunities are arrising for a DevOps, SysAdmin or IT manager/director. How should I be preparing for new roles, what industries should I look at deeper. Do have any job postings to share?]</p>>
+<p>[Focus on DevOps job market trends: What tools and skills are most in-demand? Which companies are hiring or expanding their DevOps teams? What salary trends, certification requirements, or emerging technologies should I prioritize for career advancement? Include any major industry changes affecting DevOps roles.]</p>
 
 <h3>Forward Look</h3>
 <p><em>ASSESSMENT:</em> [Include implications for professionals in the IT, devops and sysadmin sectors. I'm a remote IT, DevOps, Sysadmin engineer and people manager. What should I be focusing on next? Guide me to the next job or career opprotunity.]</p>
@@ -343,7 +345,10 @@ class IntelligenceBriefing:
         categories = {
             '**GLOBAL ANALYSIS**': '<div class="category-header" role="heading" aria-level="3">GLOBAL ANALYSIS</div>',
             '**LOCAL ANALYSIS**': '<div class="category-header" role="heading" aria-level="3">LOCAL ANALYSIS</div>',
-            '**CYBERSECURITY ANALYSIS**': '<div class="category-header" role="heading" aria-level="3">CYBERSECURITY ANALYSIS</div>'
+            '**CYBERSECURITY ANALYSIS**': '<div class="category-header" role="heading" aria-level="3">CYBERSECURITY ANALYSIS</div>',
+            '**MY STUFF**': '<div class="category-header" role="heading" aria-level="3">MY STUFF</div>',
+            '**DevOps**': '<div class="category-header" role="heading" aria-level="3">DevOps</div>',
+            '**Job Seeker**': '<div class="category-header" role="heading" aria-level="3">Job Seeker</div>'
         }
         
         # Replace subsection headers with enhanced styling
