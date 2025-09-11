@@ -78,7 +78,15 @@ RSS_FEEDS = {
     "World Bank": "https://www.worldbank.org/en/news/rss",
     
     # Economic Intelligence
-    "Financial Times World": "https://www.ft.com/world?format=rss"
+    "Financial Times World": "https://www.ft.com/world?format=rss",
+
+    # DevOps
+    "DevOps.com": "https://devops.com/feed/",
+    "The New Stack.io": "https://thenewstack.io/devops/feed",
+    "Azure DevOps Blog": "https://devblogs.microsoft.com/devops/feed/",
+    "InfoWorld": "https://www.infoworld.com/devops/feed/",
+    "Rapid7": "https://www.rapid7.com/blog/tag/devops/rss",
+    "HackerNews": "http://thehackernews.com/feeds/posts/default"
 }
 
 class InsightAnalyzer:
