@@ -161,6 +161,13 @@ For each category below, provide two substantive sections with proper HTML forma
 
 <h3>Forward Look</h3>
 <p><em>ASSESSMENT:</em> [Regional trajectory analysis with focus on and economic trends will impact the local area. Include implications for professionals in the devops and sysadmin sectors.]</p>
+
+<h2>Job Seeker</h2>
+<h3>Narrative</h3>
+<p>[Focus specifically on what a job seeker should be looking for in this time. What opprotunities are arrising for a DevOps, SysAdmin or IT manager/director. How should I be preparing for new roles, what industries should I look at deeper. Do have any job postings to share?]</p>>
+
+<h3>Forward Look</h3>
+<p><em>ASSESSMENT:</em> [Include implications for professionals in the IT, devops and sysadmin sectors. I'm a remote IT, DevOps, Sysadmin engineer and people manager. What should I be focusing on next? Guide me to the next job or career opprotunity.]</p>
 ```
 
 **ANALYSIS QUALITY STANDARDS:**
