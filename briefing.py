@@ -78,7 +78,17 @@ RSS_FEEDS = {
     "World Bank": "https://www.worldbank.org/en/news/rss",
     
     # Economic Intelligence
-    "Financial Times World": "https://www.ft.com/world?format=rss"
+    "Financial Times World": "https://www.ft.com/world?format=rss",
+
+    # DevOps
+    "DevOps.com": "https://devops.com/feed/",
+    "The New Stack.io": "https://thenewstack.io/devops/feed",
+    "Azure DevOps Blog": "https://devblogs.microsoft.com/devops/feed/",
+    "InfoWorld": "https://www.infoworld.com/devops/feed/",
+    "Rapid7": "https://www.rapid7.com/blog/tag/devops/rss",
+    "HackerNews": "http://thehackernews.com/feeds/posts/default",
+    "Stack Overflow": "https://stackoverflow.blog/feed/",
+    "CNCF Blog": "https://www.cncf.io/feed/"
 }
 
 class InsightAnalyzer:
@@ -138,6 +148,28 @@ For each category below, provide two substantive sections with proper HTML forma
 
 <h3>Forward Look</h3>
 <p><em>ASSESSMENT:</em> [Strategic implications for cybersecurity professionals. Identify emerging threat vectors, policy changes that will affect compliance requirements, and industry trends that will shape career opportunities and business decisions.]</p>
+
+
+<h2>MY STUFF</h2>
+<h3>Narrative</h3>
+<p>[Focus specifically on Chippewa Valley of Wisconsin and the area developments, including government contracting impacts, federal and state policy effects on the region, local government decisions, environmental considerations, and public schools. Connect local developments to broader national trends.]</p>
+
+<h3>Forward Look</h3>
+<p><em>ASSESSMENT:</em> [Regional trajectory analysis with focus on how federal policy changes, contracting cycles, and economic trends will impact the local area. Include implications for professionals in the cybersecurity and government contracting sectors.]</p>
+
+<h2>DevOps</h2>
+<h3>Narrative</h3>
+<p>[Focus specifically on DevOps job market and jobs market overall. Here in the Chippewa Valley of Wisconsin and how it impacts remote work.t. Connect the developments to broader national trends.]</p>
+
+<h3>Forward Look</h3>
+<p><em>ASSESSMENT:</em> [Regional trajectory analysis with focus on and economic trends will impact the local area. Include implications for professionals in the devops and sysadmin sectors.]</p>
+
+<h2>Job Seeker</h2>
+<h3>Narrative</h3>
+<p>[Focus on DevOps job market trends: What tools and skills are most in-demand? Which companies are hiring or expanding their DevOps teams? What salary trends, certification requirements, or emerging technologies should I prioritize for career advancement? Include any major industry changes affecting DevOps roles.]</p>
+
+<h3>Forward Look</h3>
+<p><em>ASSESSMENT:</em> [Include implications for professionals in the IT, devops and sysadmin sectors. I'm a remote IT, DevOps, Sysadmin engineer and people manager. What should I be focusing on next? Guide me to the next job or career opprotunity.]</p>
 ```
 
 **ANALYSIS QUALITY STANDARDS:**
@@ -313,7 +345,10 @@ class IntelligenceBriefing:
         categories = {
             '**GLOBAL ANALYSIS**': '<div class="category-header" role="heading" aria-level="3">GLOBAL ANALYSIS</div>',
             '**LOCAL ANALYSIS**': '<div class="category-header" role="heading" aria-level="3">LOCAL ANALYSIS</div>',
-            '**CYBERSECURITY ANALYSIS**': '<div class="category-header" role="heading" aria-level="3">CYBERSECURITY ANALYSIS</div>'
+            '**CYBERSECURITY ANALYSIS**': '<div class="category-header" role="heading" aria-level="3">CYBERSECURITY ANALYSIS</div>',
+            '**MY STUFF**': '<div class="category-header" role="heading" aria-level="3">MY STUFF</div>',
+            '**DevOps**': '<div class="category-header" role="heading" aria-level="3">DevOps</div>',
+            '**Job Seeker**': '<div class="category-header" role="heading" aria-level="3">Job Seeker</div>'
         }
         
         # Replace subsection headers with enhanced styling

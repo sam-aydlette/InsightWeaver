@@ -30,4 +30,5 @@ jobs:
         EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
         FROM_EMAIL: ${{ secrets.FROM_EMAIL }}
         RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
+        ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       run: python briefing.py
