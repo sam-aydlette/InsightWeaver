@@ -1,0 +1,45 @@
+# Environment variables
+.env
+
+# Database files
+*.db
+
+# Generated briefings and reports
+briefing_*.html
+enhanced_briefing_*.html
+cyber_*.html
+
+# Reports directory (but keep directory structure)
+/reports/*.html
+/reports/*.json
+/reports/*.txt
+/reports/*.csv
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+env/
+ENV/
