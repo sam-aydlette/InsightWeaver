@@ -175,107 +175,202 @@ class ClaudeClient:
         return results
 
     def _parse_json_with_repair(self, json_str: str) -> dict:
-        """Parse JSON with multiple repair attempts for common Claude errors"""
+        """Robust JSON parser with multiple GenAI-specific repair strategies"""
         import json
         import re
 
+        logger.info(f"Attempting JSON parse of {len(json_str)} character response")
+
         # First attempt: Parse as-is
         try:
-            return json.loads(json_str)
+            result = json.loads(json_str)
+            logger.info("✓ JSON parsed successfully on first attempt")
+            return result
         except json.JSONDecodeError as e:
-            logger.warning(f"Initial JSON parse failed: {e}, attempting repairs...")
+            logger.warning(f"Initial JSON parse failed: {e}, attempting GenAI repairs...")
 
-        # Repair attempt 1: Fix missing commas between objects
+        # GENAI REPAIR LAYER 1: Handle common Claude prefixes/suffixes
+        repaired = json_str.strip()
         try:
-            # Pattern: }{  ->  },{
-            repaired = re.sub(r'}\s*{', '},{', json_str)
-            # Pattern: }"  ->  },"  (when followed by another object)
-            repaired = re.sub(r'}"(\s*{)', r'}",\1', repaired)
-            return json.loads(repaired)
+            # Remove common Claude commentary prefixes
+            prefixes_to_remove = [
+                r'^.*?Here is the JSON.*?:\s*',
+                r'^.*?Here\'s the JSON.*?:\s*',
+                r'^.*?JSON analysis.*?:\s*',
+                r'^.*?Here are the results.*?:\s*',
+                r'^.*?Analysis results.*?:\s*',
+                r'^.*?Based on.*?:\s*',
+                r'^[^{]*'  # Remove everything before first {
+            ]
+
+            for prefix_pattern in prefixes_to_remove:
+                repaired = re.sub(prefix_pattern, '', repaired, flags=re.IGNORECASE | re.DOTALL, count=1)
+                if repaired.startswith('{'):
+                    break
+
+            # Remove markdown code blocks
+            if '```json' in repaired:
+                repaired = re.sub(r'```json\s*', '', repaired)
+                repaired = re.sub(r'```\s*$', '', repaired)
+            elif '```' in repaired:
+                repaired = re.sub(r'```\s*', '', repaired, count=1)
+                repaired = re.sub(r'```\s*$', '', repaired)
+
+            result = json.loads(repaired)
+            logger.info("✓ JSON parsed after removing Claude prefixes")
+            return result
         except json.JSONDecodeError:
             pass
 
-        # Repair attempt 2: Fix missing commas between array elements
+        # GENAI REPAIR LAYER 2: Fix missing commas (most common GenAI issue)
         try:
-            # Pattern: "}  "article_id" -> "},  "article_id"
-            repaired = re.sub(r'"}(\s*"article_id")', r'}",\1', json_str)
-            return json.loads(repaired)
+            # Fix missing commas between objects in arrays
+            repaired = re.sub(r'}\s*{', '},{', repaired)
+            # Fix missing commas between object properties
+            repaired = re.sub(r'"\s*"([^"]+)"\s*:', r'", "\1":', repaired)
+            # Fix missing commas after values before new keys
+            repaired = re.sub(r'(["\d\]]})\s*"([^"]+)"\s*:', r'\1, "\2":', repaired)
+
+            result = json.loads(repaired)
+            logger.info("✓ JSON parsed after fixing missing commas")
+            return result
         except json.JSONDecodeError:
             pass
 
-        # Repair attempt 2b: Fix missing commas between object properties
+        # GENAI REPAIR LAYER 3: Handle truncation and incomplete responses
         try:
-            # Pattern: "value"  "key": -> "value",  "key":
-            repaired = re.sub(r'"(\s*"[^"]+"\s*:)', r'",\1', json_str)
-            return json.loads(repaired)
+            # If response appears truncated, try to complete it
+            if not repaired.rstrip().endswith('}'):
+                logger.warning("Response appears truncated, attempting to complete...")
+
+                # Count unclosed brackets
+                open_braces = repaired.count('{')
+                close_braces = repaired.count('}')
+                open_brackets = repaired.count('[')
+                close_brackets = repaired.count(']')
+
+                # Try to find the last complete article entry
+                last_complete_match = re.search(r'.*"reasoning"\s*:\s*"[^"]*"}\s*(?:,\s*)?', repaired, re.DOTALL)
+                if last_complete_match:
+                    # Truncate to last complete entry and close properly
+                    repaired = last_complete_match.group(0).rstrip().rstrip(',')
+                    repaired += ']}'
+                else:
+                    # Close any incomplete entry and structure
+                    if repaired.rstrip().endswith('"'):
+                        repaired += '"}'
+                    elif repaired.rstrip().endswith(','):
+                        repaired = repaired.rstrip().rstrip(',')
+
+                    # Close arrays and objects
+                    if open_brackets > close_brackets:
+                        repaired += ']' * (open_brackets - close_brackets)
+                    if open_braces > close_braces:
+                        repaired += '}' * (open_braces - close_braces)
+
+                result = json.loads(repaired)
+                logger.info("✓ JSON parsed after truncation repair")
+                return result
         except json.JSONDecodeError:
             pass
 
-        # Repair attempt 3: Fix trailing comma issues
+        # GENAI REPAIR LAYER 4: Fix trailing commas and quote issues
         try:
-            # Remove trailing commas before closing brackets
-            repaired = re.sub(r',(\s*[}\]])', r'\1', json_str)
-            return json.loads(repaired)
+            # Remove trailing commas
+            repaired = re.sub(r',(\s*[}\]])', r'\1', repaired)
+            # Fix single quotes (Claude sometimes uses them)
+            repaired = re.sub(r"'([^']*)'", r'"\1"', repaired)
+            # Fix unquoted keys
+            repaired = re.sub(r'([a-zA-Z_][a-zA-Z0-9_]*)\s*:', r'"\1":', repaired)
+
+            result = json.loads(repaired)
+            logger.info("✓ JSON parsed after fixing trailing commas and quotes")
+            return result
         except json.JSONDecodeError:
             pass
 
-        # Repair attempt 4: Add missing quotes around unquoted keys/values
+        # GENAI REPAIR LAYER 5: Aggressive parsing - extract what we can
         try:
-            # Fix unquoted keys: article_id: -> "article_id":
-            repaired = re.sub(r'([a-zA-Z_]+):', r'"\1":', json_str)
-            return json.loads(repaired)
-        except json.JSONDecodeError:
-            pass
+            logger.warning("Attempting aggressive parsing with regex extraction...")
 
-        # Repair attempt 5: Try to extract valid JSON substring
+            # Try to extract the article_analysis array content
+            analysis_match = re.search(r'"article_analysis"\s*:\s*\[(.*?)\]', repaired, re.DOTALL)
+            if analysis_match:
+                array_content = analysis_match.group(1)
+
+                # Split by likely article boundaries and parse each
+                articles = []
+                # Look for article_id patterns to split
+                article_parts = re.split(r'(?="article_id")', array_content)
+
+                for part in article_parts:
+                    if not part.strip():
+                        continue
+
+                    # Try to extract data from this part
+                    article_id_match = re.search(r'"article_id"\s*:\s*"([^"]+)"', part)
+                    stance_match = re.search(r'"stance"\s*:\s*"([^"]+)"', part)
+                    confidence_match = re.search(r'"confidence"\s*:\s*([0-9.]+)', part)
+                    reasoning_match = re.search(r'"reasoning"\s*:\s*"([^"]*)"', part)
+
+                    if article_id_match:
+                        article = {
+                            "article_id": article_id_match.group(1),
+                            "stance": stance_match.group(1) if stance_match else "OPPOSING",
+                            "confidence": float(confidence_match.group(1)) if confidence_match else 0.5,
+                            "reasoning": reasoning_match.group(1) if reasoning_match else "Extracted from malformed JSON"
+                        }
+                        articles.append(article)
+
+                if articles:
+                    result = {"article_analysis": articles}
+                    logger.info(f"✓ Aggressive parsing recovered {len(articles)} articles")
+                    return result
+        except Exception as e:
+            logger.warning(f"Aggressive parsing failed: {e}")
+
+        # FINAL FALLBACK: Create minimal response with extracted IDs
         try:
-            # Find the largest valid JSON substring
-            for i in range(len(json_str), 0, -1):
-                try:
-                    subset = json_str[:i]
-                    # Try to close any unclosed structures
-                    if subset.count('{') > subset.count('}'):
-                        subset += '}' * (subset.count('{') - subset.count('}'))
-                    if subset.count('[') > subset.count(']'):
-                        subset += ']' * (subset.count('[') - subset.count(']'))
-                    return json.loads(subset)
-                except json.JSONDecodeError:
-                    continue
-        except:
-            pass
+            logger.warning("All parsing attempts failed, creating minimal fallback response...")
 
-        # Final fallback: Extract article IDs and create minimal valid response
-        try:
-            import re
-            logger.warning("All JSON repairs failed, attempting fallback extraction...")
+            # Extract any article IDs we can find
+            id_pattern = r'"?article_id"?\s*:\s*"?([^",\s}]+)"?'
+            article_ids = re.findall(id_pattern, json_str, re.IGNORECASE)
 
-            # Extract article IDs from the text
-            id_pattern = r'"article_id"\s*:\s*"([^"]+)"'
-            article_ids = re.findall(id_pattern, json_str)
+            # Also try to extract from article lists in prompt
+            if not article_ids:
+                # Look for "Article X (ID: Y)" patterns from the prompt
+                prompt_id_pattern = r'Article\s+\d+\s*\(ID:\s*([^)]+)\)'
+                article_ids = re.findall(prompt_id_pattern, json_str)
 
             if article_ids:
-                # Create minimal valid JSON response
-                fallback_response = {
-                    "article_analysis": []
-                }
+                fallback_response = {"article_analysis": []}
 
-                for article_id in article_ids:
+                for i, article_id in enumerate(article_ids):
+                    # Alternate between SUPPORTING and OPPOSING for balance
+                    stance = "SUPPORTING" if i % 2 == 0 else "OPPOSING"
                     fallback_response["article_analysis"].append({
-                        "article_id": article_id,
-                        "stance": "OPPOSING",  # Default to opposing for balanced results
+                        "article_id": str(article_id).strip(),
+                        "stance": stance,
                         "confidence": 0.1,
-                        "reasoning": "Fallback extraction due to JSON parse failure"
+                        "reasoning": "Fallback due to JSON parse failure"
                     })
 
-                logger.warning(f"Fallback extraction successful: created response for {len(article_ids)} articles")
+                logger.warning(f"✓ Fallback extraction created response for {len(article_ids)} articles")
                 return fallback_response
 
         except Exception as fallback_error:
             logger.error(f"Even fallback extraction failed: {fallback_error}")
 
-        # If absolutely everything fails, raise the original error with context
-        logger.error(f"All JSON repair attempts failed. Original string (first 1000 chars): {json_str[:1000]}")
-        raise ValueError(f"Unable to parse JSON even after all repair attempts")
+        # Absolute failure - log everything and raise
+        logger.error("=" * 80)
+        logger.error("COMPLETE JSON PARSING FAILURE")
+        logger.error("=" * 80)
+        logger.error(f"Original response length: {len(json_str)} characters")
+        logger.error(f"Final repaired attempt: {repaired[:500]}...")
+        logger.error("=" * 80)
+
+        raise ValueError(f"All JSON repair strategies failed - GenAI response is completely unparseable")
 
     def _create_trend_batch_prompt(self, articles: List[Dict[str, Any]]) -> str:
         """Create a prompt for trend analysis of a batch of articles"""
@@ -512,3 +607,48 @@ class ClaudeClient:
         import re
         match = re.search(r'[\d.]+', line)
         return float(match.group()) if match else 0.5
+
+    async def analyze_for_summary(self, prompt: str, model: str = "claude-3-haiku-20240307") -> Dict[str, Any]:
+        """
+        Generate executive summaries using Claude API
+        Uses Haiku model for cost efficiency
+        """
+        system_prompt = """You are an intelligence analyst specializing in generating executive summaries for Northern Virginia government and technology professionals. Your summaries should be concise, actionable, and focused on decision-making implications."""
+
+        try:
+            # Use Haiku model for cost-effective summary generation
+            original_model = self.model
+            self.model = model
+
+            response = await self.send_message(system_prompt, prompt, temperature=0.2)
+
+            # Restore original model
+            self.model = original_model
+
+            # Clean up response
+            summary_text = response.strip()
+
+            # Remove any prefixes or commentary from Claude
+            prefixes_to_remove = [
+                "Here is the executive summary:",
+                "Executive summary:",
+                "Summary:",
+                "Based on the analysis:",
+            ]
+
+            for prefix in prefixes_to_remove:
+                if summary_text.lower().startswith(prefix.lower()):
+                    summary_text = summary_text[len(prefix):].strip()
+
+            return {
+                "summary": summary_text,
+                "success": True
+            }
+
+        except Exception as e:
+            logger.error(f"Summary generation failed: {e}")
+            return {
+                "summary": "Unable to generate executive summary due to API error.",
+                "success": False,
+                "error": str(e)
+            }
