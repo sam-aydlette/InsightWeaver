@@ -5,7 +5,7 @@ Foundation for all InsightWeaver AI agents
 
 import logging
 from abc import ABC, abstractmethod
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
 
@@ -30,7 +30,7 @@ class BaseAgent(ABC):
             analysis_run = AnalysisRun(
                 run_type=run_type,
                 status="started",
-                started_at=datetime.utcnow(),
+                started_at=datetime.now(timezone.utc),
                 analysis_metadata={
                     "agent_name": self.agent_name,
                     "agent_version": self.agent_version,
@@ -51,7 +51,7 @@ class BaseAgent(ABC):
             analysis_run = db.query(AnalysisRun).filter(AnalysisRun.id == run_id).first()
             if analysis_run:
                 analysis_run.status = "failed" if error_message else "completed"
-                analysis_run.completed_at = datetime.utcnow()
+                analysis_run.completed_at = datetime.now(timezone.utc)
                 analysis_run.articles_processed = articles_processed
                 if error_message:
                     analysis_run.error_message = error_message
@@ -65,7 +65,7 @@ class BaseAgent(ABC):
         Get recent articles for analysis
         """
         from datetime import timedelta
-        cutoff_time = datetime.utcnow() - timedelta(hours=hours)
+        cutoff_time = datetime.now(timezone.utc) - timedelta(hours=hours)
 
         with get_db() as db:
             query = db.query(Article).filter(

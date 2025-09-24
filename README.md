@@ -73,25 +73,33 @@ python tests/test_prioritization_agent.py
 python tests/run_tests.py
 ```
 
-### 6. Run Components
+### 6. Usage
+
+InsightWeaver provides a unified command-line interface:
 
 ```bash
-# Load RSS feeds into database
-python -c "from src.feed_manager import setup_feeds; setup_feeds()"
+# Initial setup: create database and load RSS feeds
+python main.py --setup
 
-# Fetch all RSS feeds (parallel with rate limiting)
-python -c "
-import asyncio
-from src.rss.parallel_fetcher import fetch_all_active_feeds
-asyncio.run(fetch_all_active_feeds())
-"
+# Run full pipeline (fetch → deduplicate → prioritize)
+python main.py
 
-# Run article prioritization (requires ANTHROPIC_API_KEY)
-python src/cli/prioritize.py
+# Run individual components
+python main.py --fetch        # Only fetch RSS feeds
+python main.py --prioritize   # Only run prioritization (requires ANTHROPIC_API_KEY)
 
-# Query prioritized articles
-sqlite3 data/insightweaver.db 'SELECT title, priority_score FROM articles WHERE priority_score IS NOT NULL ORDER BY priority_score DESC LIMIT 10;'
+# Query results
+python main.py --query                  # Show top priority articles
+python main.py --query --min 0.7        # Show only high priority (≥0.7)
+python main.py --query --min 0.8 --limit 20  # Show top 20 with score ≥0.8
 ```
+
+The full pipeline automatically:
+1. Fetches all 112 configured RSS feeds in parallel
+2. Deduplicates articles to remove redundant content
+3. Prioritizes articles using Claude API (if configured)
+
+This ensures fresh, unique, prioritized content with each run.
 
 ## GitHub Actions Setup
 

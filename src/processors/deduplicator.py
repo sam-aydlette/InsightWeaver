@@ -177,16 +177,130 @@ class ArticleDeduplicator:
 
         return hash1 == hash2 and hash1 != ""
 
+    def _stage1_url_duplicates(self, db: Session, unprocessed_ids: List[int], time_cutoff: datetime) -> Dict[str, int]:
+        """
+        Stage 1: Quick URL duplicate detection - instant wins
+        Groups articles by URL and marks later ones as duplicates
+        """
+        # Get all articles with URLs in a single query
+        articles_with_urls = db.query(Article).filter(
+            and_(
+                Article.id.in_(unprocessed_ids),
+                Article.url.isnot(None),
+                Article.url != ""
+            )
+        ).order_by(Article.fetched_at.asc()).all()
+
+        # Group by URL and mark duplicates
+        url_groups = {}
+        for article in articles_with_urls:
+            if article.url not in url_groups:
+                url_groups[article.url] = []
+            url_groups[article.url].append(article)
+
+        url_duplicates = 0
+        for url, articles in url_groups.items():
+            if len(articles) > 1:
+                # Keep the earliest, mark others as duplicates
+                original = articles[0]
+                for duplicate in articles[1:]:
+                    # Skip if already marked as duplicate
+                    if duplicate.priority_metadata and duplicate.priority_metadata.get('is_duplicate'):
+                        continue
+                    self.mark_as_duplicate(original, duplicate, db)
+                    unprocessed_ids.remove(duplicate.id)  # Remove from further processing
+                    url_duplicates += 1
+
+        return {'url_duplicates': url_duplicates}
+
+    def _stage2_exact_duplicates(self, db: Session, unprocessed_ids: List[int], time_cutoff: datetime) -> Dict[str, int]:
+        """
+        Stage 2: Exact content hash matches - fast hash-based detection
+        Only processes articles that survived Stage 1
+        """
+        # Get articles that need content hash comparison
+        remaining_articles = db.query(Article).filter(
+            and_(
+                Article.id.in_(unprocessed_ids),
+                Article.title.isnot(None),
+                Article.normalized_content.isnot(None)
+            )
+        ).order_by(Article.fetched_at.asc()).all()
+
+        # Group by content hash
+        hash_groups = {}
+        for article in remaining_articles:
+            # Skip if already marked as duplicate
+            if article.priority_metadata and article.priority_metadata.get('is_duplicate'):
+                continue
+
+            content_hash = self.generate_content_hash(article.title, article.normalized_content)
+            if content_hash:
+                if content_hash not in hash_groups:
+                    hash_groups[content_hash] = []
+                hash_groups[content_hash].append(article)
+
+        exact_duplicates = 0
+        for content_hash, articles in hash_groups.items():
+            if len(articles) > 1:
+                # Keep the earliest, mark others as duplicates
+                original = articles[0]
+                for duplicate in articles[1:]:
+                    self.mark_as_duplicate(original, duplicate, db)
+                    if duplicate.id in unprocessed_ids:
+                        unprocessed_ids.remove(duplicate.id)  # Remove from further processing
+                    exact_duplicates += 1
+
+        return {'exact_duplicates': exact_duplicates}
+
+    def _stage3_title_similarity(self, db: Session, unprocessed_ids: List[int], time_cutoff: datetime) -> Dict[str, int]:
+        """
+        Stage 3: Title similarity analysis - slowest but most thorough
+        Only processes articles that survived Stages 1 & 2
+        """
+        # Get remaining articles that need title similarity comparison
+        remaining_articles = db.query(Article).filter(
+            and_(
+                Article.id.in_(unprocessed_ids),
+                Article.title.isnot(None)
+            )
+        ).order_by(Article.fetched_at.asc()).all()
+
+        # Group by title hash for similarity detection
+        title_hash_groups = {}
+        for article in remaining_articles:
+            # Skip if already marked as duplicate
+            if article.priority_metadata and article.priority_metadata.get('is_duplicate'):
+                continue
+
+            title_hash = self.generate_title_hash(article.title)
+            if title_hash:
+                if title_hash not in title_hash_groups:
+                    title_hash_groups[title_hash] = []
+                title_hash_groups[title_hash].append(article)
+
+        title_duplicates = 0
+        for title_hash, articles in title_hash_groups.items():
+            if len(articles) > 1:
+                # Keep the earliest or most reliable source
+                original = articles[0]
+                for duplicate in articles[1:]:
+                    self.mark_as_duplicate(original, duplicate, db)
+                    title_duplicates += 1
+
+        return {'title_duplicates': title_duplicates}
+
     def deduplicate_recent_articles(self, hours: int = 24) -> Dict[str, int]:
         """
-        Process recent articles for deduplication
-        Returns statistics about duplicates found
+        Staged deduplication processing for optimal performance:
+        Stage 1: Quick URL duplicate detection
+        Stage 2: Exact content hash matches
+        Stage 3: Title similarity analysis
         """
         time_cutoff = datetime.utcnow() - timedelta(hours=hours)
 
         with get_db() as db:
             # Get recent articles that haven't been processed for duplicates
-            # Use more efficient query - only get what we need initially
             recent_articles_data = db.query(
                 Article.id, Article.priority_metadata
             ).filter(
@@ -199,67 +313,36 @@ class ArticleDeduplicator:
                 if not article_data.priority_metadata or not article_data.priority_metadata.get('is_duplicate'):
                     unprocessed_ids.append(article_data.id)
 
-            # Limit processing for test scenarios - only process most recent articles
-            if len(unprocessed_ids) > 200:
-                unprocessed_ids = unprocessed_ids[:200]
-                logger.info(f"Limited deduplication to {len(unprocessed_ids)} most recent articles for performance")
+            logger.info(f"Starting staged deduplication of {len(unprocessed_ids)} articles")
 
-            # Get full article objects only for unprocessed articles
-            recent_articles = db.query(Article).filter(
-                Article.id.in_(unprocessed_ids)
-            ).order_by(Article.fetched_at.desc()).all()
+            # STAGE 1: Quick URL duplicate detection (instant wins)
+            stage1_stats = self._stage1_url_duplicates(db, unprocessed_ids, time_cutoff)
+            logger.info(f"Stage 1 complete: {stage1_stats['url_duplicates']} URL duplicates found")
 
-            exact_duplicates = 0
-            near_duplicates = 0
-            processed = 0
+            # STAGE 2: Exact content hash matches (fast)
+            stage2_stats = self._stage2_exact_duplicates(db, unprocessed_ids, time_cutoff)
+            logger.info(f"Stage 2 complete: {stage2_stats['exact_duplicates']} exact duplicates found")
 
-            for article in recent_articles:
-                # Skip articles that got marked as duplicates during this run
-                if article.priority_metadata and article.priority_metadata.get('is_duplicate'):
-                    continue
-
-                # Find exact duplicates
-                exact_dups = self.find_exact_duplicates(article, db)
-                if exact_dups:
-                    # Keep the earliest article as original
-                    all_articles = [article] + exact_dups
-                    all_articles.sort(key=lambda a: a.fetched_at)
-                    original = all_articles[0]
-
-                    for dup in all_articles[1:]:
-                        self.mark_as_duplicate(original, dup, db)
-                        exact_duplicates += 1
-
-                # Find near duplicates (if not already marked as exact duplicate)
-                if not article.priority_metadata or not article.priority_metadata.get('is_duplicate'):
-                    near_dups = self.find_near_duplicates(article, db)
-                    if near_dups:
-                        # Keep the article from the more reliable source (for now, keep the first)
-                        for dup in near_dups:
-                            if not dup.priority_metadata or not dup.priority_metadata.get('is_duplicate'):
-                                self.mark_as_duplicate(article, dup, db)
-                                near_duplicates += 1
-
-                processed += 1
-
-                # Commit periodically to avoid large transactions
-                if processed % 20 == 0:
-                    db.commit()
-                    # Progress indicator for long-running operations
-                    if processed % 100 == 0:
-                        logger.info(f"Deduplication progress: {processed} articles processed...")
+            # STAGE 3: Title similarity analysis (slower, but fewer candidates)
+            stage3_stats = self._stage3_title_similarity(db, unprocessed_ids, time_cutoff)
+            logger.info(f"Stage 3 complete: {stage3_stats['title_duplicates']} title duplicates found")
 
             # Final commit
             db.commit()
 
-            logger.info(f"Deduplication complete: {processed} articles processed, "
-                       f"{exact_duplicates} exact duplicates, {near_duplicates} near duplicates found")
+            total_duplicates = (stage1_stats['url_duplicates'] +
+                              stage2_stats['exact_duplicates'] +
+                              stage3_stats['title_duplicates'])
+
+            logger.info(f"Staged deduplication complete: {len(unprocessed_ids)} articles processed, "
+                       f"{total_duplicates} total duplicates found")
 
             return {
-                'processed_articles': processed,
-                'exact_duplicates': exact_duplicates,
-                'near_duplicates': near_duplicates,
-                'total_duplicates': exact_duplicates + near_duplicates
+                'processed_articles': len(unprocessed_ids),
+                'url_duplicates': stage1_stats['url_duplicates'],
+                'exact_duplicates': stage2_stats['exact_duplicates'],
+                'title_duplicates': stage3_stats['title_duplicates'],
+                'total_duplicates': total_duplicates
             }
 
     def get_duplicate_statistics(self) -> Dict[str, int]:

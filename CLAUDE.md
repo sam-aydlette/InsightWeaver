@@ -23,6 +23,7 @@
 - Classify changes as small, medium or large
 - If my request is unclear, ask me before proceeding
 - If my request is vague, help me establish clarity before proceeding
+- If my request does not adhere to software development best practices, push back before proceeding
 
 ## InsightWeaver North Star
 
