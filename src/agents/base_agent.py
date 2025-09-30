@@ -62,7 +62,7 @@ class BaseAgent(ABC):
 
     def get_recent_articles(self, hours: int = 48, limit: Optional[int] = None) -> List[Article]:
         """
-        Get recent articles for analysis
+        Get recent articles for analysis (excludes filtered articles)
         """
         from datetime import timedelta
         cutoff_time = datetime.now(timezone.utc) - timedelta(hours=hours)
@@ -71,7 +71,8 @@ class BaseAgent(ABC):
             query = db.query(Article).filter(
                 Article.fetched_at >= cutoff_time,
                 Article.title.isnot(None),
-                Article.normalized_content.isnot(None)
+                Article.normalized_content.isnot(None),
+                Article.filtered == False  # Exclude filtered articles
             ).order_by(Article.fetched_at.desc())
 
             if limit:

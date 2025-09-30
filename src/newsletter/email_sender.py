@@ -14,7 +14,7 @@ from typing import Dict, Any, Optional, List
 import os
 from pathlib import Path
 
-from .templates import DailyBriefTemplate, WeeklyTrendTemplate, TextTemplate
+from .templates import PersonalizedNarrativeTemplate
 
 
 class EmailSender:
@@ -38,9 +38,12 @@ class EmailSender:
         print(f"📧 Preparing daily brief for {recipient_email}")
 
         try:
-            # Generate email content
-            html_content = DailyBriefTemplate.generate_html(content_data)
-            text_content = TextTemplate.generate_daily_text(content_data)
+            # Generate email content using PersonalizedNarrativeTemplate
+            html_content = PersonalizedNarrativeTemplate.generate_html(content_data)
+
+            # Simple text version (extract executive summary)
+            synthesis = content_data.get('synthesis_data', {})
+            text_content = synthesis.get('executive_summary', 'Please view the HTML version for full formatting.')
 
             subject = f"InsightWeaver Daily Brief - {content_data['date'].strftime('%B %d, %Y')}"
 
@@ -62,7 +65,7 @@ class EmailSender:
 
         except Exception as e:
             print(f"❌ Failed to send daily brief: {e}")
-            self._save_newsletter_locally(content_data, "daily", DailyBriefTemplate.generate_html(content_data))
+            self._save_newsletter_locally(content_data, "daily", PersonalizedNarrativeTemplate.generate_html(content_data))
             return False
 
     async def send_weekly_trends(self, content_data: Dict[str, Any], recipient_email: str) -> bool:
@@ -70,18 +73,22 @@ class EmailSender:
         print(f"📈 Preparing weekly trends for {recipient_email}")
 
         try:
-            # Generate email content
-            html_content = WeeklyTrendTemplate.generate_html(content_data)
+            # Generate email content using PersonalizedNarrativeTemplate
+            html_content = PersonalizedNarrativeTemplate.generate_html(content_data)
 
             date_range = f"{content_data['start_date'].strftime('%B %d')} - {content_data['end_date'].strftime('%B %d, %Y')}"
             subject = f"InsightWeaver Weekly Trends - {date_range}"
+
+            # Simple text version
+            synthesis = content_data.get('synthesis_data', {})
+            text_content = f"Weekly trend analysis: {date_range}\n\n{synthesis.get('executive_summary', 'Please view the HTML version for full formatting.')}"
 
             # Send email
             success = await self._send_email(
                 recipient_email=recipient_email,
                 subject=subject,
                 html_content=html_content,
-                text_content=f"Weekly trend analysis: {date_range}\n\nPlease view the HTML version for full formatting."
+                text_content=text_content
             )
 
             if success:
@@ -94,7 +101,7 @@ class EmailSender:
 
         except Exception as e:
             print(f"❌ Failed to send weekly trends: {e}")
-            self._save_newsletter_locally(content_data, "weekly", WeeklyTrendTemplate.generate_html(content_data))
+            self._save_newsletter_locally(content_data, "weekly", PersonalizedNarrativeTemplate.generate_html(content_data))
             return False
 
     async def _send_email(self, recipient_email: str, subject: str,

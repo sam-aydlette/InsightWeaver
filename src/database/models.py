@@ -48,6 +48,10 @@ class Article(Base):
     fetched_at = Column(DateTime, default=datetime.utcnow)
     created_at = Column(DateTime, default=datetime.utcnow)
 
+    # Content filtering
+    filtered = Column(Boolean, default=False)  # True if filtered out by content preferences
+    filter_reason = Column(String(200))  # Why it was filtered (e.g., "sports", "clickbait")
+
     # Analysis results (to be populated by agents)
     priority_score = Column(Float)
     priority_metadata = Column(JSON)
@@ -99,3 +103,20 @@ class Prediction(Base):
     timeframe = Column(String(50))  # e.g., "2-4 weeks"
     supporting_evidence = Column(JSON)  # References to trends and articles
     created_at = Column(DateTime, default=datetime.utcnow)
+
+class NarrativeSynthesis(Base):
+    __tablename__ = "narrative_syntheses"
+
+    id = Column(Integer, primary_key=True)
+    analysis_run_id = Column(Integer, ForeignKey("analysis_runs.id"))
+    user_profile_version = Column(String(50))  # Track which profile version was used
+    synthesis_data = Column(JSON)  # Full structured narrative output
+    executive_summary = Column(Text)  # Extracted for quick display
+    articles_analyzed = Column(Integer)
+    trends_analyzed = Column(Integer)
+    temporal_scope = Column(String(100))  # "immediate,near,medium,long"
+    generated_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_narrative_generated_at', 'generated_at'),
+    )

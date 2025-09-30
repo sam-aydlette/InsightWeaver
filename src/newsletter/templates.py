@@ -1,10 +1,11 @@
 """
-Newsletter Templates for InsightWeaver
-HTML and text templates for intelligent briefings
+Personalized Narrative Newsletter Templates for InsightWeaver
+Story-driven, temporal-layered intelligence briefings
 """
 
 from datetime import datetime
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
+
 
 class NewsletterTemplate:
     """Base newsletter template class"""
@@ -21,70 +22,239 @@ class NewsletterTemplate:
             return start_date.strftime("%B %d, %Y")
         return f"{start_date.strftime('%B %d')} - {end_date.strftime('%B %d, %Y')}"
 
-class DailyBriefTemplate(NewsletterTemplate):
-    """Daily Intelligence Brief Template"""
+
+class PersonalizedNarrativeTemplate(NewsletterTemplate):
+    """Personalized narrative-driven intelligence brief template"""
 
     @staticmethod
     def generate_html(data: Dict[str, Any]) -> str:
-        """Generate HTML version of daily brief"""
+        """
+        Generate HTML version of personalized narrative brief
+
+        Args:
+            data: Must contain 'synthesis_data' from NarrativeSynthesisAgent
+        """
+        synthesis = data.get('synthesis_data', {})
+        metadata = synthesis.get('metadata', {})
+        temporal_layers = synthesis.get('temporal_layers', {})
+        cross_domain = synthesis.get('cross_domain_insights', [])
+        priority_actions = synthesis.get('priority_actions', [])
+        executive_summary = synthesis.get('executive_summary', 'No narrative synthesis available.')
+
+        # Get user context for personalization
+        user_context = data.get('user_context', {})
+        location = user_context.get('location', {})
+        location_str = f"{location.get('city', 'Your')}, {location.get('state', 'Area')}"
+
         html = f"""
 <!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8">
-    <title>InsightWeaver Daily Brief - {NewsletterTemplate.format_date(data['date'])}</title>
+    <title>Your Intelligence Brief - {PersonalizedNarrativeTemplate.format_date(data.get('date', datetime.now()))}</title>
     <style>
-        body {{ font-family: 'Georgia', serif; line-height: 1.6; color: #333; max-width: 800px; margin: 0 auto; padding: 20px; }}
-        .header {{ background: #2c3e50; color: white; padding: 20px; text-align: center; margin-bottom: 30px; }}
-        .header h1 {{ margin: 0; font-size: 28px; }}
-        .header .subtitle {{ font-size: 14px; margin-top: 5px; opacity: 0.8; }}
-        .executive-summary {{ background: #f8f9fa; border-left: 4px solid #3498db; padding: 20px; margin-bottom: 30px; }}
-        .executive-summary h2 {{ margin-top: 0; color: #2c3e50; }}
-        .executive-summary p {{ font-size: 16px; line-height: 1.7; }}
-        .section {{ margin-bottom: 25px; }}
-        .section h3 {{ color: #2c3e50; border-bottom: 2px solid #ecf0f1; padding-bottom: 5px; }}
-        .priority-item {{ background: #fff; border: 1px solid #e1e8ed; padding: 15px; margin-bottom: 15px; border-radius: 5px; }}
-        .priority-score {{ float: right; background: #3498db; color: white; padding: 2px 8px; border-radius: 3px; font-size: 12px; }}
-        .article-title {{ font-weight: bold; color: #2c3e50; margin-bottom: 5px; }}
-        .article-source {{ color: #7f8c8d; font-size: 12px; }}
-        .article-summary {{ margin-top: 8px; font-size: 14px; }}
-        .trend-item {{ margin-bottom: 10px; padding: 10px; background: #f8f9fa; border-radius: 3px; }}
-        .trend-direction {{ font-weight: bold; }}
-        .trend-direction.up {{ color: #27ae60; }}
-        .trend-direction.down {{ color: #e74c3c; }}
-        .trend-direction.stable {{ color: #f39c12; }}
-        .footer {{ text-align: center; color: #7f8c8d; font-size: 12px; margin-top: 40px; padding-top: 20px; border-top: 1px solid #ecf0f1; }}
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.7;
+            color: #1a202c;
+            max-width: 700px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f7fafc;
+        }}
+        .container {{ background: white; padding: 40px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }}
+        .header {{
+            border-bottom: 3px solid #3182ce;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }}
+        .header h1 {{
+            margin: 0 0 8px 0;
+            font-size: 32px;
+            color: #2d3748;
+            font-weight: 700;
+        }}
+        .header .meta {{
+            color: #718096;
+            font-size: 14px;
+        }}
+        .executive-summary {{
+            background: #ebf8ff;
+            border-left: 4px solid #3182ce;
+            padding: 24px;
+            margin-bottom: 36px;
+            border-radius: 4px;
+        }}
+        .executive-summary h2 {{
+            margin: 0 0 12px 0;
+            color: #2c5282;
+            font-size: 20px;
+        }}
+        .executive-summary p {{
+            font-size: 16px;
+            line-height: 1.8;
+            margin: 12px 0;
+            color: #2d3748;
+        }}
+        .temporal-section {{
+            margin-bottom: 36px;
+            border-left: 3px solid #e2e8f0;
+            padding-left: 20px;
+        }}
+        .temporal-section.immediate {{ border-left-color: #fc8181; }}
+        .temporal-section.near {{ border-left-color: #f6ad55; }}
+        .temporal-section.medium {{ border-left-color: #68d391; }}
+        .temporal-section.long {{ border-left-color: #63b3ed; }}
+        .temporal-section h3 {{
+            margin: 0 0 12px 0;
+            color: #2d3748;
+            font-size: 22px;
+            font-weight: 600;
+        }}
+        .temporal-section .timeline {{
+            display: inline-block;
+            background: #edf2f7;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            color: #4a5568;
+            margin-left: 8px;
+            font-weight: 500;
+        }}
+        .narrative {{
+            font-size: 16px;
+            line-height: 1.8;
+            margin: 16px 0;
+            color: #2d3748;
+        }}
+        .implications {{
+            background: #f7fafc;
+            padding: 16px;
+            border-radius: 4px;
+            margin: 16px 0;
+        }}
+        .implications h4 {{
+            margin: 0 0 8px 0;
+            color: #4a5568;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 600;
+        }}
+        .implications ul {{
+            margin: 0;
+            padding-left: 20px;
+        }}
+        .implications li {{
+            margin: 6px 0;
+            color: #2d3748;
+        }}
+        .cross-domain {{
+            background: #fffaf0;
+            border: 1px solid #fbd38d;
+            border-radius: 6px;
+            padding: 20px;
+            margin: 24px 0;
+        }}
+        .cross-domain h4 {{
+            margin: 0 0 12px 0;
+            color: #744210;
+            font-size: 18px;
+        }}
+        .cross-domain .narrative {{
+            font-size: 15px;
+            color: #2d3748;
+        }}
+        .cross-domain .personal-impact {{
+            background: white;
+            padding: 12px;
+            border-radius: 4px;
+            margin-top: 12px;
+            font-style: italic;
+            color: #744210;
+        }}
+        .actions-section {{
+            background: #f0fff4;
+            border: 2px solid #9ae6b4;
+            border-radius: 6px;
+            padding: 24px;
+            margin: 36px 0;
+        }}
+        .actions-section h3 {{
+            margin: 0 0 16px 0;
+            color: #22543d;
+            font-size: 22px;
+        }}
+        .action-item {{
+            background: white;
+            padding: 16px;
+            margin: 12px 0;
+            border-radius: 4px;
+            border-left: 4px solid #48bb78;
+        }}
+        .action-item.immediate {{ border-left-color: #fc8181; }}
+        .action-item.near {{ border-left-color: #f6ad55; }}
+        .action-item.medium {{ border-left-color: #68d391; }}
+        .action-item.long {{ border-left-color: #63b3ed; }}
+        .action-item .urgency {{
+            display: inline-block;
+            background: #48bb78;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 11px;
+            text-transform: uppercase;
+            font-weight: 600;
+            margin-right: 8px;
+        }}
+        .action-item .action-text {{
+            font-weight: 600;
+            color: #2d3748;
+            font-size: 15px;
+        }}
+        .action-item .reasoning {{
+            color: #4a5568;
+            font-size: 14px;
+            margin-top: 6px;
+        }}
+        .footer {{
+            text-align: center;
+            color: #a0aec0;
+            font-size: 12px;
+            margin-top: 48px;
+            padding-top: 24px;
+            border-top: 1px solid #e2e8f0;
+        }}
+        .footer a {{ color: #3182ce; text-decoration: none; }}
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1>InsightWeaver Daily Brief</h1>
-        <div class="subtitle">{NewsletterTemplate.format_date(data['date'])} | Northern Virginia Intelligence</div>
-    </div>
+    <div class="container">
+        <div class="header">
+            <h1>Your Intelligence Brief</h1>
+            <div class="meta">
+                {PersonalizedNarrativeTemplate.format_date(data.get('date', datetime.now()))} |
+                Personalized for {location_str} |
+                {metadata.get('articles_analyzed', 0)} sources analyzed
+            </div>
+        </div>
 
-    <div class="executive-summary">
-        <h2>Executive Summary</h2>
-        <p>{data.get('executive_summary', 'Today\'s analysis reveals key developments across government, technology, and regional affairs...')}</p>
-    </div>
+        <div class="executive-summary">
+            <h2>What You Need to Know</h2>
+            {PersonalizedNarrativeTemplate._render_executive_summary(executive_summary)}
+        </div>
 
-    <div class="section">
-        <h3>Priority Intelligence ({len(data.get('priority_articles', []))} items)</h3>
-        {DailyBriefTemplate._render_priority_articles(data.get('priority_articles', []))}
-    </div>
+        {PersonalizedNarrativeTemplate._render_temporal_layers(temporal_layers)}
 
-    <div class="section">
-        <h3>Trend Indicators</h3>
-        {DailyBriefTemplate._render_trends(data.get('trends', []))}
-    </div>
+        {PersonalizedNarrativeTemplate._render_cross_domain_insights(cross_domain)}
 
-    <div class="section">
-        <h3>Regional Focus</h3>
-        {DailyBriefTemplate._render_regional_focus(data.get('regional_articles', []))}
-    </div>
+        {PersonalizedNarrativeTemplate._render_priority_actions(priority_actions)}
 
-    <div class="footer">
-        Generated by InsightWeaver | {data.get('article_count', 0)} sources analyzed |
-        Processing time: {data.get('processing_time', 'N/A')}
+        <div class="footer">
+            Generated by <a href="#">InsightWeaver</a> |
+            Synthesis ID: {metadata.get('synthesis_id', 'N/A')[:8]}... |
+            {metadata.get('generated_at', 'Unknown time')}
+        </div>
     </div>
 </body>
 </html>
@@ -92,263 +262,198 @@ class DailyBriefTemplate(NewsletterTemplate):
         return html.strip()
 
     @staticmethod
-    def _render_priority_articles(articles: List[Dict]) -> str:
-        """Render priority articles section"""
-        if not articles:
-            return "<p>No priority articles identified for this period.</p>"
-
-        html_items = []
-        for article in articles[:10]:  # Top 10 priority items
-            score_class = "priority-score"
-            html_items.append(f"""
-            <div class="priority-item">
-                <div class="priority-score">{article.get('priority_score', 0):.2f}</div>
-                <div class="article-title">{article.get('title', 'Untitled')}</div>
-                <div class="article-source">{article.get('source', 'Unknown')} | {article.get('category', 'General')}</div>
-                <div class="article-summary">{article.get('ai_summary', article.get('summary', 'No summary available'))[:200]}...</div>
-            </div>
-            """)
-
-        return "".join(html_items)
+    def _render_executive_summary(summary: str) -> str:
+        """Render executive summary with paragraph breaks"""
+        paragraphs = summary.split('\n\n')
+        return '\n'.join([f'<p>{p.strip()}</p>' for p in paragraphs if p.strip()])
 
     @staticmethod
-    def _render_trends(trends: List[Dict]) -> str:
-        """Render trends section"""
-        if not trends:
-            return "<p>No significant trends detected in this period.</p>"
+    def _render_temporal_layers(temporal_layers: Dict[str, Any]) -> str:
+        """Render temporal sections with narratives"""
+        if not temporal_layers:
+            return ""
 
-        html_items = []
-        for trend in trends[:8]:  # Top 8 trends
-            direction = trend.get('direction', 'stable').lower()
-            direction_class = f"trend-direction {direction}"
-            direction_symbol = "↑" if direction == "up" else "↓" if direction == "down" else "→"
+        sections_html = []
 
-            html_items.append(f"""
-            <div class="trend-item">
-                <span class="{direction_class}">{direction_symbol} {trend.get('name', 'Unknown Trend')}</span>
-                ({trend.get('article_count', 0)} articles, {trend.get('confidence', 0):.0f}% confidence)
-                <br><small>{trend.get('description', 'No description available')[:150]}...</small>
+        # Order and labels for temporal horizons
+        horizons = [
+            ('immediate', 'Immediate Focus', '0-48 hours'),
+            ('near_term', 'Near-Term Watch', '1-2 weeks'),
+            ('medium_term', 'Medium-Term Planning', '1-3 months'),
+            ('long_term', 'Long-Term Positioning', '6+ months')
+        ]
+
+        for horizon_key, horizon_label, timeline in horizons:
+            layer = temporal_layers.get(horizon_key, {})
+            if not layer or not layer.get('narrative'):
+                continue
+
+            narrative = layer.get('narrative', '')
+            implications = layer.get('key_implications', [])
+            actions = layer.get('recommended_actions', [])
+
+            section_html = f"""
+        <div class="temporal-section {horizon_key}">
+            <h3>{horizon_label}<span class="timeline">{timeline}</span></h3>
+            <div class="narrative">{narrative}</div>
+            """
+
+            if implications:
+                section_html += """
+            <div class="implications">
+                <h4>Why This Matters to You</h4>
+                <ul>
+                """
+                for impl in implications:
+                    section_html += f"<li>{impl}</li>\n"
+                section_html += """
+                </ul>
             </div>
-            """)
+                """
 
-        return "".join(html_items)
+            section_html += "</div>\n"
+            sections_html.append(section_html)
+
+        return '\n'.join(sections_html)
 
     @staticmethod
-    def _render_regional_focus(articles: List[Dict]) -> str:
-        """Render regional focus section"""
-        if not articles:
-            return "<p>No significant regional developments identified.</p>"
+    def _render_cross_domain_insights(insights: List[Dict[str, Any]]) -> str:
+        """Render cross-domain connections"""
+        if not insights:
+            return ""
 
-        html_items = []
-        for article in articles[:5]:  # Top 5 regional items
-            html_items.append(f"""
-            <div class="priority-item">
-                <div class="article-title">{article.get('title', 'Untitled')}</div>
-                <div class="article-source">{article.get('source', 'Unknown')} | Regional Impact</div>
-                <div class="article-summary">{article.get('ai_summary', article.get('summary', 'No summary available'))[:150]}...</div>
-            </div>
-            """)
+        html = '<div class="section">\n'
 
-        return "".join(html_items)
+        for insight in insights[:3]:  # Limit to top 3 insights
+            theme = insight.get('theme', 'Connection')
+            narrative = insight.get('narrative', '')
+            personal_impact = insight.get('personal_impact', '')
 
-class WeeklyTrendTemplate(NewsletterTemplate):
-    """Weekly Trend Analysis Template"""
+            html += f"""
+        <div class="cross-domain">
+            <h4>🔗 {theme}</h4>
+            <div class="narrative">{narrative}</div>
+            {f'<div class="personal-impact">For you: {personal_impact}</div>' if personal_impact else ''}
+        </div>
+            """
+
+        html += '</div>\n'
+        return html
 
     @staticmethod
-    def generate_html(data: Dict[str, Any]) -> str:
-        """Generate HTML version of weekly trend report"""
-        html = f"""
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <title>InsightWeaver Weekly Trends - {NewsletterTemplate.format_time_range(data['start_date'], data['end_date'])}</title>
-    <style>
-        body {{ font-family: 'Georgia', serif; line-height: 1.6; color: #333; max-width: 800px; margin: 0 auto; padding: 20px; }}
-        .header {{ background: #8e44ad; color: white; padding: 20px; text-align: center; margin-bottom: 30px; }}
-        .header h1 {{ margin: 0; font-size: 28px; }}
-        .header .subtitle {{ font-size: 14px; margin-top: 5px; opacity: 0.8; }}
-        .executive-summary {{ background: #f8f9fa; border-left: 4px solid #8e44ad; padding: 20px; margin-bottom: 30px; }}
-        .executive-summary h2 {{ margin-top: 0; color: #2c3e50; }}
-        .executive-summary p {{ font-size: 16px; line-height: 1.7; }}
-        .section {{ margin-bottom: 25px; }}
-        .section h3 {{ color: #2c3e50; border-bottom: 2px solid #ecf0f1; padding-bottom: 5px; }}
-        .trend-analysis {{ background: #fff; border: 1px solid #e1e8ed; padding: 20px; margin-bottom: 20px; border-radius: 5px; }}
-        .trend-name {{ font-size: 18px; font-weight: bold; color: #2c3e50; margin-bottom: 10px; }}
-        .trend-momentum {{ float: right; padding: 5px 10px; border-radius: 3px; font-size: 12px; font-weight: bold; }}
-        .trend-momentum.strong-up {{ background: #27ae60; color: white; }}
-        .trend-momentum.moderate-up {{ background: #2ecc71; color: white; }}
-        .trend-momentum.stable {{ background: #f39c12; color: white; }}
-        .trend-momentum.moderate-down {{ background: #e67e22; color: white; }}
-        .trend-momentum.strong-down {{ background: #e74c3c; color: white; }}
-        .trend-evidence {{ margin-top: 15px; }}
-        .evidence-item {{ margin-bottom: 8px; font-size: 14px; }}
-        .prediction-box {{ background: #3498db; color: white; padding: 20px; border-radius: 5px; margin: 20px 0; }}
-        .prediction-box h4 {{ margin: 0 0 10px 0; }}
-        .footer {{ text-align: center; color: #7f8c8d; font-size: 12px; margin-top: 40px; padding-top: 20px; border-top: 1px solid #ecf0f1; }}
-    </style>
-</head>
-<body>
-    <div class="header">
-        <h1>InsightWeaver Weekly Trends</h1>
-        <div class="subtitle">{NewsletterTemplate.format_time_range(data['start_date'], data['end_date'])} | Strategic Intelligence Analysis</div>
-    </div>
+    def _render_priority_actions(actions: List[Dict[str, Any]]) -> str:
+        """Render priority actions section"""
+        if not actions:
+            return ""
 
-    <div class="executive-summary">
-        <h2>Weekly Intelligence Summary</h2>
-        <p>{data.get('executive_summary', 'This week\'s analysis reveals significant developments across multiple domains...')}</p>
-    </div>
-
-    <div class="section">
-        <h3>Trend Analysis ({len(data.get('trends', []))} trends tracked)</h3>
-        {WeeklyTrendTemplate._render_trend_analyses(data.get('trends', []))}
-    </div>
-
-    <div class="prediction-box">
-        <h4>Forward Indicators</h4>
-        <p>{data.get('predictions', 'Based on current trend momentum, key developments to monitor include emerging patterns in technology policy, regional economic indicators, and geopolitical shifts affecting the Northern Virginia corridor.')}</p>
-    </div>
-
-    <div class="footer">
-        Generated by InsightWeaver | {data.get('total_articles', 0)} articles analyzed |
-        Analysis period: {NewsletterTemplate.format_time_range(data['start_date'], data['end_date'])}
-    </div>
-</body>
-</html>
+        html = """
+        <div class="actions-section">
+            <h3>What You Should Do</h3>
         """
-        return html.strip()
 
-    @staticmethod
-    def _render_trend_analyses(trends: List[Dict]) -> str:
-        """Render detailed trend analyses"""
-        if not trends:
-            return "<p>No significant trends identified for this period.</p>"
+        for action in actions:
+            action_text = action.get('action', '')
+            urgency = action.get('urgency', 'medium')
+            reasoning = action.get('reasoning', '')
 
-        html_items = []
-        for trend in trends:
-            momentum = trend.get('momentum', 'stable')
-            momentum_class = f"trend-momentum {momentum.replace('_', '-')}"
-            momentum_label = momentum.replace('_', ' ').title()
-
-            html_items.append(f"""
-            <div class="trend-analysis">
-                <div class="trend-momentum {momentum_class}">{momentum_label}</div>
-                <div class="trend-name">{trend.get('name', 'Unknown Trend')}</div>
-                <p>{trend.get('description', 'No description available')}</p>
-                <div class="trend-evidence">
-                    <strong>Evidence ({trend.get('article_count', 0)} articles):</strong>
-                    {WeeklyTrendTemplate._render_evidence(trend.get('evidence', {}))}
-                </div>
+            html += f"""
+            <div class="action-item {urgency}">
+                <div><span class="urgency">{urgency}</span><span class="action-text">{action_text}</span></div>
+                {f'<div class="reasoning">{reasoning}</div>' if reasoning else ''}
             </div>
-            """)
+            """
 
-        return "".join(html_items)
-
-    @staticmethod
-    def _render_evidence(evidence: Dict) -> str:
-        """Render trend evidence"""
-        supporting = evidence.get('supporting', [])
-        opposing = evidence.get('opposing', [])
-
-        html_parts = []
-
-        if supporting:
-            html_parts.append(f"<div class='evidence-item'><strong>Supporting:</strong> {len(supporting)} articles indicating trend acceleration</div>")
-
-        if opposing:
-            html_parts.append(f"<div class='evidence-item'><strong>Opposing:</strong> {len(opposing)} articles indicating trend deceleration</div>")
-
-        if not html_parts:
-            html_parts.append("<div class='evidence-item'>No clear evidence pattern detected</div>")
-
-        return "".join(html_parts)
-
-class TextTemplate:
-    """Plain text template for email compatibility"""
+        html += """
+        </div>
+        """
+        return html
 
     @staticmethod
-    def generate_daily_text(data: Dict[str, Any]) -> str:
-        """Generate plain text daily brief"""
+    def generate_text(data: Dict[str, Any]) -> str:
+        """Generate plain text version of personalized narrative brief"""
+        synthesis = data.get('synthesis_data', {})
+        temporal_layers = synthesis.get('temporal_layers', {})
+        cross_domain = synthesis.get('cross_domain_insights', [])
+        priority_actions = synthesis.get('priority_actions', [])
+        executive_summary = synthesis.get('executive_summary', 'No narrative synthesis available.')
+
+        user_context = data.get('user_context', {})
+        location = user_context.get('location', {})
+        location_str = f"{location.get('city', 'Your')}, {location.get('state', 'Area')}"
+
         text = f"""
-INSIGHTWEAVER DAILY BRIEF
-{NewsletterTemplate.format_date(data['date'])}
-Northern Virginia Intelligence
-{'='*50}
+═══════════════════════════════════════════════════════════════
+YOUR INTELLIGENCE BRIEF
+{PersonalizedNarrativeTemplate.format_date(data.get('date', datetime.now()))}
+Personalized for {location_str}
+═══════════════════════════════════════════════════════════════
 
-EXECUTIVE SUMMARY
-{data.get('executive_summary', 'Today\'s analysis reveals key developments across government, technology, and regional affairs...')}
+WHAT YOU NEED TO KNOW
+─────────────────────────────────────────────────────────────
 
-PRIORITY INTELLIGENCE ({len(data.get('priority_articles', []))} items)
-{TextTemplate._render_priority_text(data.get('priority_articles', []))}
+{executive_summary}
 
-TREND INDICATORS
-{TextTemplate._render_trends_text(data.get('trends', []))}
+"""
 
-REGIONAL FOCUS
-{TextTemplate._render_regional_text(data.get('regional_articles', []))}
+        # Temporal sections
+        horizons = [
+            ('immediate', 'IMMEDIATE FOCUS (0-48 hours)', '⚠️'),
+            ('near_term', 'NEAR-TERM WATCH (1-2 weeks)', '📅'),
+            ('medium_term', 'MEDIUM-TERM PLANNING (1-3 months)', '📊'),
+            ('long_term', 'LONG-TERM POSITIONING (6+ months)', '🔮')
+        ]
 
-{'='*50}
-Generated by InsightWeaver | {data.get('article_count', 0)} sources analyzed
-Processing time: {data.get('processing_time', 'N/A')}
-        """
+        for horizon_key, horizon_label, emoji in horizons:
+            layer = temporal_layers.get(horizon_key, {})
+            if not layer or not layer.get('narrative'):
+                continue
+
+            text += f"""\n{emoji} {horizon_label}
+─────────────────────────────────────────────────────────────
+
+{layer.get('narrative', '')}
+
+"""
+            implications = layer.get('key_implications', [])
+            if implications:
+                text += "Why this matters to you:\n"
+                for impl in implications:
+                    text += f"  • {impl}\n"
+                text += "\n"
+
+        # Cross-domain insights
+        if cross_domain:
+            text += """\n🔗 CONNECTIONS YOU SHOULD SEE
+─────────────────────────────────────────────────────────────
+
+"""
+            for insight in cross_domain[:3]:
+                text += f"{insight.get('theme', 'Connection')}:\n{insight.get('narrative', '')}\n"
+                if insight.get('personal_impact'):
+                    text += f"For you: {insight.get('personal_impact')}\n"
+                text += "\n"
+
+        # Priority actions
+        if priority_actions:
+            text += """\n✓ WHAT YOU SHOULD DO
+─────────────────────────────────────────────────────────────
+
+"""
+            for action in priority_actions:
+                urgency = action.get('urgency', 'medium').upper()
+                text += f"[{urgency}] {action.get('action', '')}\n"
+                if action.get('reasoning'):
+                    text += f"    → {action.get('reasoning')}\n"
+                text += "\n"
+
+        text += """
+═══════════════════════════════════════════════════════════════
+Generated by InsightWeaver
+═══════════════════════════════════════════════════════════════
+"""
         return text.strip()
 
-    @staticmethod
-    def _render_priority_text(articles: List[Dict]) -> str:
-        """Render priority articles in text format"""
-        if not articles:
-            return "• No priority articles identified for this period."
 
-        text_items = []
-        for i, article in enumerate(articles[:10], 1):
-            score = article.get('priority_score', 0)
-            title = article.get('title', 'Untitled')
-            source = article.get('source', 'Unknown')
-            category = article.get('category', 'General')
-            summary = article.get('ai_summary', article.get('summary', 'No summary available'))
-
-            text_items.append(f"""
-{i}. [{score:.2f}] {title}
-   Source: {source} | Category: {category}
-   {summary[:150]}...
-            """)
-
-        return "".join(text_items)
-
-    @staticmethod
-    def _render_trends_text(trends: List[Dict]) -> str:
-        """Render trends in text format"""
-        if not trends:
-            return "• No significant trends detected in this period."
-
-        text_items = []
-        for trend in trends[:8]:
-            direction = trend.get('direction', 'stable').lower()
-            symbol = "↑" if direction == "up" else "↓" if direction == "down" else "→"
-            name = trend.get('name', 'Unknown Trend')
-            count = trend.get('article_count', 0)
-            confidence = trend.get('confidence', 0)
-
-            text_items.append(f"• {symbol} {name} ({count} articles, {confidence:.0f}% confidence)")
-
-        return "\n".join(text_items)
-
-    @staticmethod
-    def _render_regional_text(articles: List[Dict]) -> str:
-        """Render regional focus in text format"""
-        if not articles:
-            return "• No significant regional developments identified."
-
-        text_items = []
-        for i, article in enumerate(articles[:5], 1):
-            title = article.get('title', 'Untitled')
-            source = article.get('source', 'Unknown')
-            summary = article.get('ai_summary', article.get('summary', 'No summary available'))
-
-            text_items.append(f"""
-{i}. {title}
-   Source: {source} | Regional Impact
-   {summary[:120]}...
-            """)
-
-        return "".join(text_items)
+# Keep legacy template for backward compatibility during transition
+DailyBriefTemplate = PersonalizedNarrativeTemplate
+WeeklyTrendTemplate = PersonalizedNarrativeTemplate

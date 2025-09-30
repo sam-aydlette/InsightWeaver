@@ -1,0 +1,83 @@
+{
+  "profile_metadata": {
+    "created_at": "2025-09-30",
+    "last_updated": "2025-09-30",
+    "version": "1.0",
+    "description": "Personal context profile for InsightWeaver narrative synthesis"
+  },
+  "geographic_context": {
+    "primary_location": {
+      "city": "Arlington",
+      "state": "Virginia",
+      "region": "Northern Virginia"
+    },
+    "geographic_scope_priority": ["local", "regional", "national", "international"],
+    "areas_of_interest": [
+      "Washington DC Metro Area",
+      "Virginia",
+      "Mid-Atlantic region"
+    ]
+  },
+  "professional_context": {
+    "industry": "Technology",
+    "job_role": "Software Engineer",
+    "professional_domains": [
+      "software development",
+      "cybersecurity",
+      "artificial intelligence",
+      "federal contracting",
+      "cloud computing"
+    ],
+    "career_stage": "mid",
+    "work_type": "federal contractor",
+    "education_background": "Computer Science degree, continuous learning in AI/ML"
+  },
+  "civic_interests": {
+    "political_engagement_level": "high",
+    "policy_areas": [
+      "technology policy",
+      "privacy and surveillance",
+      "education policy",
+      "transportation infrastructure",
+      "housing policy"
+    ],
+    "community_focus": [
+      "local government",
+      "public education",
+      "urban development",
+      "civic technology"
+    ]
+  },
+  "personal_priorities": {
+    "life_stage": "mid-career professional, family considerations",
+    "active_decisions": [
+      "career advancement opportunities",
+      "housing market monitoring",
+      "education system quality"
+    ],
+    "priority_topics": [
+      "economic trends",
+      "cost of living",
+      "local infrastructure projects",
+      "technology sector health",
+      "public safety",
+      "education quality"
+    ]
+  },
+  "content_preferences": {
+    "excluded_topics": [
+      "sports",
+      "celebrity news",
+      "entertainment gossip",
+      "clickbait",
+      "viral content"
+    ],
+    "source_preferences": [
+      "official government sources",
+      "investigative journalism",
+      "technical analysis",
+      "policy briefs"
+    ],
+    "complexity_level": "technical"
+  }
+}

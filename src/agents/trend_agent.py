@@ -13,6 +13,7 @@ from src.agents.claude_client import ClaudeClient
 from src.analyzers.trend_analyzer import TrendAnalyzer, GlobalTrend
 from src.database.models import Article
 from src.database.connection import get_db
+from src.utils.profile_loader import get_user_profile
 
 logger = logging.getLogger(__name__)
 
@@ -30,32 +31,110 @@ class TrendAnalysisAgent(BaseAgent):
         self.haiku_client = ClaudeClient(model="claude-3-haiku-20240307")  # Fast, cheap for pro/against
         self.trend_analyzer = TrendAnalyzer()  # Local categorization
 
+        # Load user profile for personalized trend selection
+        try:
+            self.user_profile = get_user_profile()
+            self.logger.info(f"Loaded user profile for trend analysis: {self.user_profile}")
+            # Adjust trend focus based on user profile
+            self._customize_trends()
+        except FileNotFoundError as e:
+            self.logger.warning(f"User profile not found, using default trends: {e}")
+            self.user_profile = None
+
+    def _customize_trends(self):
+        """Customize trend focus based on user profile civic interests and policy areas"""
+        if not self.user_profile:
+            return
+
+        civic_interests = self.user_profile.get_civic_interests()
+        policy_areas = civic_interests.get('policy_areas', [])
+
+        # Map policy areas to relevant trends (boost priority)
+        self.priority_trends = []
+
+        policy_trend_mapping = {
+            'technology policy': [GlobalTrend.DIGITAL_CENTRALIZATION_VS_DECENTRALIZATION,
+                                 GlobalTrend.AUTOMATION_VS_HUMAN_LABOR,
+                                 GlobalTrend.SECURITY_VS_PRIVACY],
+            'privacy and surveillance': [GlobalTrend.SECURITY_VS_PRIVACY,
+                                         GlobalTrend.DIGITAL_CENTRALIZATION_VS_DECENTRALIZATION],
+            'education policy': [GlobalTrend.DEMOGRAPHIC_TRANSITION],
+            'transportation infrastructure': [GlobalTrend.URBANIZATION_VS_DISTRIBUTED_LIVING,
+                                             GlobalTrend.ENERGY_TRANSITION],
+            'housing policy': [GlobalTrend.URBANIZATION_VS_DISTRIBUTED_LIVING],
+            'economic policy': [GlobalTrend.ECONOMIC_GROWTH_VS_STAGNATION,
+                               GlobalTrend.DEBT_EXPANSION_VS_FISCAL_RESTRAINT],
+            'environmental policy': [GlobalTrend.ENERGY_TRANSITION,
+                                    GlobalTrend.CLIMATE_ACTION_VS_ECONOMIC_PRIORITIES],
+            'climate change': [GlobalTrend.ENERGY_TRANSITION,
+                              GlobalTrend.CLIMATE_ACTION_VS_ECONOMIC_PRIORITIES],
+            'foreign policy': [GlobalTrend.GEOPOLITICAL_FRAGMENTATION_VS_COOPERATION,
+                              GlobalTrend.SCIENTIFIC_OPENNESS_VS_COMPETITION],
+            'trade policy': [GlobalTrend.GEOPOLITICAL_FRAGMENTATION_VS_COOPERATION,
+                           GlobalTrend.ECONOMIC_GROWTH_VS_STAGNATION]
+        }
+
+        # Collect priority trends based on user's policy interests
+        for policy_area in policy_areas:
+            policy_lower = policy_area.lower()
+            for policy_key, trends in policy_trend_mapping.items():
+                if policy_key in policy_lower:
+                    self.priority_trends.extend(trends)
+
+        # Remove duplicates
+        self.priority_trends = list(set(self.priority_trends))
+
+        if self.priority_trends:
+            self.logger.info(f"Prioritizing {len(self.priority_trends)} trends based on user interests: "
+                           f"{[t.value for t in self.priority_trends]}")
+
     def _create_pro_against_prompt(self, trend_name: str, trend_description: str) -> str:
         """Create prompt for Haiku to determine pro/against for specific trend"""
-        return f"""BINARY CLASSIFICATION: Classify each article as SUPPORTING or OPPOSING this trend:
 
-{trend_description}
+        # Add user context if analyzing priority trend
+        context_note = ""
+        if self.user_profile and hasattr(self, 'priority_trends'):
+            # Check if this is a priority trend
+            from src.analyzers.trend_analyzer import GlobalTrend
+            trend_enum = None
+            for t in GlobalTrend:
+                if t.value == trend_name:
+                    trend_enum = t
+                    break
+
+            if trend_enum and trend_enum in self.priority_trends:
+                location = self.user_profile.get_primary_location()
+                policy_areas = self.user_profile.get_civic_interests().get('policy_areas', [])
+                context_note = f"\n\nNOTE: This trend is of HIGH INTEREST to user in {location.get('city', '')}, {location.get('state', '')} with policy interests in: {', '.join(policy_areas[:3])}"
+
+        return f"""TREND STANCE CLASSIFICATION: Classify each article's relationship to this trend:
+
+{trend_description}{context_note}
 
 Return EXACTLY this JSON format (no extra text):
 
 {{
   "article_analysis": [
     {{"article_id": "123", "stance": "SUPPORTING", "confidence": 0.8, "reasoning": "Brief reason"}},
-    {{"article_id": "124", "stance": "OPPOSING", "confidence": 0.7, "reasoning": "Brief reason"}}
+    {{"article_id": "124", "stance": "OPPOSING", "confidence": 0.7, "reasoning": "Brief reason"}},
+    {{"article_id": "125", "stance": "NEUTRAL", "confidence": 0.5, "reasoning": "Brief reason"}}
   ]
 }}
 
 RULES:
-- stance: ONLY "SUPPORTING" or "OPPOSING" (no NEUTRAL)
-- SUPPORTING = trend gaining momentum
-- OPPOSING = trend losing momentum
-- confidence: 0.1 to 1.0
-- reasoning: under 50 characters
-- Return ONLY the JSON, nothing else"""
+- stance: "SUPPORTING", "OPPOSING", or "NEUTRAL"
+  - SUPPORTING = article shows trend gaining momentum/strength
+  - OPPOSING = article shows trend losing momentum/being challenged
+  - NEUTRAL = article mentions trend but shows no clear direction OR is unrelated to this specific trend
+- confidence: 0.1 to 1.0 (how confident you are in the classification)
+- reasoning: under 50 characters explaining why
+- Return ONLY the JSON, nothing else
+- If article is clearly unrelated to this trend, use NEUTRAL with low confidence"""
 
     def get_recent_articles(self, days: int = 30, limit: Optional[int] = None) -> List[Article]:
         """
         Get recent articles for trend analysis (override base method to use days instead of hours)
+        Excludes filtered articles
         """
         from datetime import timedelta
         cutoff_time = datetime.now(timezone.utc) - timedelta(days=days)
@@ -64,7 +143,8 @@ RULES:
             query = db.query(Article).filter(
                 Article.fetched_at >= cutoff_time,
                 Article.title.isnot(None),
-                Article.normalized_content.isnot(None)
+                Article.normalized_content.isnot(None),
+                Article.filtered == False  # Exclude filtered articles
             ).order_by(Article.fetched_at.desc())
 
             if limit:
@@ -232,68 +312,51 @@ RULES:
                     neutral_fallback_count = 0
                     for analysis in result:
                         stance = analysis.get("stance", "MISSING_STANCE")
-                        self.logger.info(f"API returned stance for article {analysis['article_id']}: {stance}")
+                        # Normalize article_id to string for comparison (Claude may return "123" or 123)
+                        article_id_str = str(analysis['article_id']).strip()
+                        self.logger.info(f"API returned stance for article {article_id_str}: {stance}")
 
-                        # ROBUST HANDLING: Convert NEUTRAL to binary choice
+                        # Accept NEUTRAL as valid - articles can be neutral on a trend
                         if stance == "NEUTRAL":
-                            import random
                             neutral_fallback_count += 1
-                            # Log the issue but don't fail - convert to binary choice
-                            original_stance = stance
-                            stance = random.choice(["SUPPORTING", "OPPOSING"])
-                            self.logger.warning(f"Claude returned NEUTRAL for article {analysis['article_id']} despite binary prompt - randomly assigned {stance}")
+                            self.logger.info(f"Article {article_id_str} has NEUTRAL stance for {trend_name}")
 
-                            # Update the reasoning to reflect this was a fallback
-                            analysis["reasoning"] = f"Fallback assignment (was NEUTRAL): {analysis.get('reasoning', '')}"[:100]
+                        if stance not in ["SUPPORTING", "OPPOSING", "NEUTRAL"]:
+                            raise ValueError(f"Invalid stance '{stance}' for article {article_id_str} - must be SUPPORTING, OPPOSING, or NEUTRAL")
 
-                        if stance not in ["SUPPORTING", "OPPOSING"]:
-                            raise ValueError(f"Invalid stance '{stance}' for article {analysis['article_id']} - must be SUPPORTING or OPPOSING")
-
-                        stance_lookup[analysis["article_id"]] = {
+                        stance_lookup[article_id_str] = {
                             "stance": stance,
                             "confidence": analysis.get("confidence", 0.0),
                             "reasoning": analysis.get("reasoning", "")
                         }
 
                     # Combine article data with stance analysis
+                    # IMPORTANT: Only include articles that were successfully analyzed
+                    # DO NOT assign random stances to missing articles
                     articles_with_stance = []
                     missing_count = 0
                     for article in articles:
-                        if article["id"] in stance_lookup:
-                            article_stance = stance_lookup[article["id"]]
+                        # Normalize article ID to string for lookup
+                        article_id_str = str(article["id"]).strip()
+                        if article_id_str in stance_lookup:
+                            article_stance = stance_lookup[article_id_str]
+                            articles_with_stance.append({
+                                **article,
+                                **article_stance
+                            })
                         else:
                             missing_count += 1
-                            # Handle missing articles gracefully - likely due to API response truncation
-                            import random
-                            fallback_stance = random.choice(["SUPPORTING", "OPPOSING"])
-                            self.logger.warning(f"Article {article['id']} missing from API response (likely truncation) - assigned fallback stance: {fallback_stance}")
+                            self.logger.warning(f"Article {article['id']} missing from API response - EXCLUDING from trend analysis")
 
-                            article_stance = {
-                                "stance": fallback_stance,
-                                "confidence": 0.1,  # Low confidence for fallback
-                                "reasoning": "Fallback assignment (missing from API response)"
-                            }
+                    # Warn if significant data loss
+                    if missing_count > 0:
+                        exclusion_rate = (missing_count / len(articles)) * 100
+                        self.logger.warning(f"Excluded {missing_count}/{len(articles)} articles ({exclusion_rate:.1f}%) from {trend_name} due to missing API responses")
 
-                        articles_with_stance.append({
-                            **article,
-                            **article_stance
-                        })
-
-                    # Report comprehensive fallback statistics
-                    total_fallbacks = neutral_fallback_count + missing_count
-                    if total_fallbacks > 0:
-                        neutral_rate = (neutral_fallback_count / len(articles)) * 100 if neutral_fallback_count > 0 else 0
-                        missing_rate = (missing_count / len(articles)) * 100 if missing_count > 0 else 0
-                        total_rate = (total_fallbacks / len(articles)) * 100
-
-                        self.logger.warning(f"Fallback summary for {trend_name}:")
-                        if neutral_fallback_count > 0:
-                            self.logger.warning(f"  • NEUTRAL responses: {neutral_fallback_count}/{len(articles)} ({neutral_rate:.1f}%)")
-                        if missing_count > 0:
-                            self.logger.warning(f"  • Missing from API: {missing_count}/{len(articles)} ({missing_rate:.1f}%)")
-                        self.logger.warning(f"  • Total fallbacks: {total_fallbacks}/{len(articles)} ({total_rate:.1f}%)")
-                    else:
-                        self.logger.info(f"Perfect API response for {trend_name}: all {len(articles)} articles classified correctly")
+                    # Report neutral fallback statistics
+                    if neutral_fallback_count > 0:
+                        neutral_rate = (neutral_fallback_count / len(articles)) * 100
+                        self.logger.info(f"NEUTRAL stances: {neutral_fallback_count}/{len(articles)} ({neutral_rate:.1f}%) for {trend_name}")
 
                     trend_stances[trend_name] = articles_with_stance
                     self.logger.info(f"Added {len(articles_with_stance)} articles with stance for {trend_name}")

@@ -29,9 +29,16 @@ class ClaudeClient:
     async def send_message(self,
                           system_prompt: str,
                           user_prompt: str,
-                          temperature: float = 0.1) -> str:
+                          temperature: float = 0.1,
+                          timeout: float = 60.0) -> str:
         """
         Send a message to Claude API and return the response
+
+        Args:
+            system_prompt: System instructions for Claude
+            user_prompt: User message/query
+            temperature: Sampling temperature (0.0-1.0)
+            timeout: Request timeout in seconds (default 60s)
         """
         headers = {
             "Content-Type": "application/json",
@@ -53,7 +60,7 @@ class ClaudeClient:
         }
 
         try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            async with httpx.AsyncClient(timeout=timeout) as client:
                 response = await client.post(
                     self.api_url,
                     headers=headers,
@@ -68,10 +75,22 @@ class ClaudeClient:
                 result = response.json()
 
                 if "content" not in result or not result["content"]:
+                    logger.error(f"Empty content in API response. Full response keys: {result.keys()}")
                     raise Exception("Empty response from Claude API")
 
                 # Extract the text content from the response
-                content = result["content"][0]["text"] if result["content"] else ""
+                content_array = result.get("content", [])
+                logger.debug(f"Content array length: {len(content_array)}")
+
+                # Concatenate all text blocks (Claude may return multiple content blocks)
+                content = ""
+                for block in content_array:
+                    if isinstance(block, dict) and block.get("type") == "text":
+                        content += block.get("text", "")
+
+                if not content:
+                    logger.error(f"No text content extracted from response")
+                    logger.error(f"Content array: {content_array}")
 
                 logger.debug(f"Claude API response received: {len(content)} characters")
                 return content
@@ -343,21 +362,8 @@ class ClaudeClient:
                 prompt_id_pattern = r'Article\s+\d+\s*\(ID:\s*([^)]+)\)'
                 article_ids = re.findall(prompt_id_pattern, json_str)
 
-            if article_ids:
-                fallback_response = {"article_analysis": []}
-
-                for i, article_id in enumerate(article_ids):
-                    # Alternate between SUPPORTING and OPPOSING for balance
-                    stance = "SUPPORTING" if i % 2 == 0 else "OPPOSING"
-                    fallback_response["article_analysis"].append({
-                        "article_id": str(article_id).strip(),
-                        "stance": stance,
-                        "confidence": 0.1,
-                        "reasoning": "Fallback due to JSON parse failure"
-                    })
-
-                logger.warning(f"✓ Fallback extraction created response for {len(article_ids)} articles")
-                return fallback_response
+            # DO NOT CREATE FAKE DATA - removed fallback mechanism that invented stances
+            pass
 
         except Exception as fallback_error:
             logger.error(f"Even fallback extraction failed: {fallback_error}")
@@ -520,18 +526,10 @@ class ClaudeClient:
         if results:
             logger.info(f"Regex extraction recovered {len(results)} analyses")
         else:
-            # Last resort: assign 50/50 supporting/opposing when parsing fails
-            logger.warning("Regex extraction failed, returning balanced stances as fallback")
-            import random
-            for i, article in enumerate(articles):
-                # Alternate between supporting and opposing for balance
-                stance = "SUPPORTING" if i % 2 == 0 else "OPPOSING"
-                results.append({
-                    "article_id": article.get("id", "unknown"),
-                    "stance": stance,
-                    "confidence": 0.1,  # Low confidence since it's a fallback
-                    "reasoning": "Fallback stance due to parse error"
-                })
+            # DO NOT CREATE FAKE DATA - fail instead
+            logger.error("Regex extraction failed - cannot recover trend analysis")
+            logger.error(f"Response was: {response[:1000]}")
+            raise ValueError("Failed to parse trend analysis response via both JSON and regex")
 
         return results
 

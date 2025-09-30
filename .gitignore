@@ -1,6 +1,9 @@
 # Environment variables
 .env
 
+# User profile (contains personal information)
+config/user_profile.json
+
 # Database files
 *.db
 

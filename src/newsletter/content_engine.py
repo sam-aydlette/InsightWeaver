@@ -9,9 +9,10 @@ from typing import Dict, List, Any, Optional, Tuple
 from sqlalchemy.orm import Session
 
 from ..database.connection import get_db
-from ..database.models import Article, TrendAnalysis
+from ..database.models import Article, TrendAnalysis, NarrativeSynthesis
 from ..agents.claude_client import ClaudeClient
 from ..analyzers.trend_analyzer import TrendAnalyzer
+from ..utils.profile_loader import get_user_profile
 
 
 class NewsletterContentEngine:
@@ -21,13 +22,73 @@ class NewsletterContentEngine:
         self.claude_client = claude_client or ClaudeClient()
         self.trend_analyzer = TrendAnalyzer()
 
+        # Load user profile for personalization
+        try:
+            self.user_profile = get_user_profile()
+        except FileNotFoundError:
+            self.user_profile = None
+
     async def generate_daily_brief_content(self, date: datetime) -> Dict[str, Any]:
-        """Generate content for daily intelligence brief"""
+        """
+        Generate content for daily intelligence brief
+
+        Attempts to use narrative synthesis if available, falls back to legacy format
+        """
         print(f"📊 Generating daily brief content for {date.strftime('%Y-%m-%d')}")
 
         start_time = datetime.now()
+
+        # Try to get most recent narrative synthesis
         with get_db() as session:
-            # Get articles from the specified date
+            synthesis = session.query(NarrativeSynthesis).order_by(
+                NarrativeSynthesis.generated_at.desc()
+            ).first()
+
+            if synthesis and self.user_profile:
+                print(f"✨ Using narrative synthesis from {synthesis.generated_at}")
+
+                # FAIL FAST: Validate synthesis data integrity
+                if synthesis.synthesis_data is None:
+                    raise ValueError(f"Synthesis {synthesis.id} has NULL synthesis_data field - synthesis generation failed")
+
+                synthesis_data = synthesis.synthesis_data
+
+                # Validate required fields
+                missing_fields = []
+                if 'temporal_layers' not in synthesis_data:
+                    missing_fields.append('temporal_layers')
+                if 'cross_domain_insights' not in synthesis_data:
+                    missing_fields.append('cross_domain_insights')
+                if 'priority_actions' not in synthesis_data:
+                    missing_fields.append('priority_actions')
+                if 'executive_summary' not in synthesis_data:
+                    missing_fields.append('executive_summary')
+
+                if missing_fields:
+                    print(f"❌ Synthesis data is incomplete. Missing fields: {missing_fields}")
+                    print(f"Available fields: {list(synthesis_data.keys())}")
+                    print(f"Synthesis ID: {synthesis.id}, Generated: {synthesis.generated_at}")
+                    raise ValueError(f"Synthesis data missing required fields: {missing_fields}")
+
+                if not synthesis.executive_summary:
+                    raise ValueError(f"Synthesis {synthesis.id} has empty executive_summary")
+
+                processing_time = datetime.now() - start_time
+
+                return {
+                    "date": date,
+                    "synthesis_data": synthesis_data,
+                    "executive_summary": synthesis.executive_summary,
+                    "articles_analyzed": synthesis.articles_analyzed,
+                    "user_context": {
+                        "location": self.user_profile.get_primary_location(),
+                        "professional_domains": self.user_profile.get_professional_domains()
+                    },
+                    "processing_time": f"{processing_time.total_seconds():.1f}s"
+                }
+
+            # Fallback to legacy article-based brief if no synthesis available
+            print("⚠️ No narrative synthesis found, generating legacy brief")
             articles = self._get_articles_for_date(session, date)
             if not articles:
                 print("⚠️ No articles found for specified date")

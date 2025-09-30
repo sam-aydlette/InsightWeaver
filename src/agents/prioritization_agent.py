@@ -13,6 +13,7 @@ from src.agents.claude_client import ClaudeClient
 from src.analyzers.sentiment_analyzer import SentimentAnalyzer
 from src.database.models import Article
 from src.database.connection import get_db
+from src.utils.profile_loader import get_user_profile
 
 logger = logging.getLogger(__name__)
 
@@ -30,23 +31,84 @@ class PrioritizationAgent(BaseAgent):
         self.sonnet_client = ClaudeClient(model="claude-sonnet-4-20250514")  # Detailed analysis
         self.sentiment_analyzer = SentimentAnalyzer()  # Local sentiment analysis
 
+        # Load user profile for personalized analysis
+        try:
+            self.user_profile = get_user_profile()
+            self.logger.info(f"Loaded user profile: {self.user_profile}")
+        except FileNotFoundError as e:
+            self.logger.warning(f"User profile not found, using defaults: {e}")
+            self.user_profile = None
+
     def _create_category_ranking_prompt(self) -> str:
         """Create the prompt for Haiku to rank articles within sentiment categories"""
-        return """You are a news analyst ranking articles within a specific sentiment category for a Northern Virginia resident in government/technology.
+
+        # Build context from user profile
+        if self.user_profile:
+            location = self.user_profile.get_primary_location()
+            location_str = f"{location.get('city', '')}, {location.get('state', '')}"
+            prof_context = self.user_profile.get_professional_context()
+            role = prof_context.get('job_role', 'professional')
+            industry = prof_context.get('industry', 'general')
+            domains = ', '.join(self.user_profile.get_professional_domains()[:3])
+
+            user_context = f"{location_str} resident working as {role} in {industry}"
+            relevance_criteria = f"{domains}, {location_str} region"
+        else:
+            # Fallback to default
+            user_context = "Northern Virginia resident in government/technology"
+            relevance_criteria = "Government policy, technology, or Northern Virginia region"
+
+        return f"""You are a news analyst ranking articles within a specific sentiment category for a {user_context}.
 
 You will receive 3 articles from the same sentiment category. Rank them 1-3 based on:
 - IMPACT: Affects millions of people, major institutions, or billions of dollars
-- RELEVANCE: Government policy, technology, or Northern Virginia region
+- RELEVANCE: {relevance_criteria}
 - URGENCY: Recent and requires immediate awareness/action
 
+RELEVANCE SCORING:
+- Articles directly related to user's professional domains get higher scores
+- Articles affecting user's geographic location get priority
+- Generic news with no personal relevance gets lower scores
+
 Return JSON only:
-{"results": [{"article_id": 123, "rank": 1, "priority_score": 0.85}]}
+{{"results": [{{"article_id": 123, "rank": 1, "priority_score": 0.85}}]}}
 
 Rank 1 = highest priority, 3 = lowest priority within this category."""
 
     def _create_final_selection_prompt(self) -> str:
         """Create the prompt for Sonnet to select the single highest priority article"""
-        return """You are an expert news analyst making the final selection of the single most important article for a Northern Virginia resident who works in government/technology sectors.
+
+        # Build personalized context and scoring criteria
+        if self.user_profile:
+            context_section = self.user_profile.format_for_agent_context()
+
+            # Extract specific relevance factors
+            prof_domains = self.user_profile.get_professional_domains()
+            priority_topics = self.user_profile.get_personal_priorities().get('priority_topics', [])
+            active_decisions = self.user_profile.get_personal_priorities().get('active_decisions', [])
+
+            # Build dynamic scoring criteria
+            relevance_factors = []
+            if prof_domains:
+                relevance_factors.append(f"Professional domains: {', '.join(prof_domains[:3])}")
+            if priority_topics:
+                relevance_factors.append(f"Priority topics: {', '.join(priority_topics[:3])}")
+            if active_decisions:
+                relevance_factors.append(f"Active decisions: {', '.join(active_decisions[:2])}")
+
+            relevance_section = "\n".join([f"- {factor}" for factor in relevance_factors])
+
+        else:
+            # Fallback to default
+            context_section = """USER CONTEXT PROFILE:
+Location: Northern Virginia
+Professional Role: Government/technology sector professional
+Focus: Federal policy, technology, regional developments"""
+            relevance_section = "- Government/technology work in Northern Virginia"
+
+        return f"""You are an expert news analyst making the final selection of the single most important article.
+
+{context_section}
 
 You will receive the top-ranked article from each sentiment category (crisis, opportunity, policy, technology, neutral). Your task is to select the ONE article that deserves the highest priority today.
 
@@ -54,22 +116,31 @@ Consider these criteria:
 1. IMMEDIATE IMPACT: Will this affect the reader's work, decisions, or life in the next 24-48 hours?
 2. STRATEGIC IMPORTANCE: Does this represent a significant shift that requires attention or action?
 3. TIMELINESS: Is this breaking news or time-sensitive information?
-4. RELEVANCE: How directly does this relate to government/technology work in Northern Virginia?
+4. PERSONAL RELEVANCE: How directly does this relate to the user's context?
+
+PERSONAL RELEVANCE FACTORS:
+{relevance_section}
+
+SCORING GUIDANCE:
+- Articles directly impacting user's professional domains: +0.2 to priority_score
+- Articles affecting user's active decisions (e.g., homebuying, job search): +0.15
+- Articles related to priority topics: +0.1
+- Generic news with no personal connection: -0.2
 
 Return your analysis as JSON with this exact format:
-{
-  "selected_article": {
+{{
+  "selected_article": {{
     "article_id": 123,
     "priority_score": 0.95,
-    "reasoning": "Federal AI regulation bill passed - immediate impact on government contractors and tech companies in Northern Virginia",
-    "key_factors": ["federal_policy", "immediate_action_required", "professional_impact"],
+    "reasoning": "Brief explanation of why this is the top priority for this specific user",
+    "key_factors": ["list", "of", "relevance_factors"],
     "category": "policy"
-  },
+  }},
   "runner_ups": [
-    {"article_id": 456, "category": "crisis", "brief_reason": "Cybersecurity breach affects federal systems"},
-    {"article_id": 789, "category": "technology", "brief_reason": "New AWS government cloud contract"}
+    {{"article_id": 456, "category": "crisis", "brief_reason": "Why this matters"}},
+    {{"article_id": 789, "category": "technology", "brief_reason": "Why this matters"}}
   ]
-}
+}}
 
 Select only ONE article as the top priority. Be decisive and provide clear reasoning."""
 

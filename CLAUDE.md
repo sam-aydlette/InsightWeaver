@@ -17,6 +17,7 @@
 - Do not attempt to solve problems by hiding them with fallbacks or mock data
 - When adding comments, be explicit about the reference point with dates
 - If there are ambiguities in the business logic, present them to me and allow me to choose accordingly. DO NOT MAKE ASSUMPTIONS.
+- FAIL FAST. Do not create quick fixes.
 
 ## Talk To Me Like This:
 - After each component, summarize what is done
