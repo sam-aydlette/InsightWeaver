@@ -11,8 +11,7 @@ from typing import Dict, Any, Optional
 from src.rss.parallel_fetcher import fetch_all_active_feeds
 from src.processors.deduplicator import run_deduplication
 from src.processors.content_filter import ContentFilter
-from src.agents.prioritization_agent import PrioritizationAgent
-from src.agents.narrative_synthesis_agent import NarrativeSynthesisAgent
+from src.context.synthesizer import NarrativeSynthesizer
 from src.config.settings import settings
 from src.utils.profile_loader import get_user_profile
 
@@ -42,9 +41,7 @@ class PipelineOrchestrator:
         self.dedup_hours = dedup_hours
         self.prioritize_hours = prioritize_hours
         self.prioritize_limit = prioritize_limit
-        self.prioritization_agent = None
         self.content_filter = None
-        self.narrative_synthesis_agent = None
 
     async def run_full_pipeline(self) -> Dict[str, Any]:
         """
@@ -52,8 +49,7 @@ class PipelineOrchestrator:
         1. Fetch RSS feeds
         2. Deduplicate articles
         3. Filter content (based on user profile)
-        4. Prioritize articles (if API key configured)
-        5. Synthesize narrative (if API key configured)
+        4. Synthesize narrative (if API key configured)
 
         Returns:
             Dictionary with results from each stage
@@ -86,30 +82,17 @@ class PipelineOrchestrator:
             results["stages"]["filtering"] = filter_results
             logger.info(f"Stage 3 complete: {filter_results['filtered_count']} articles filtered")
 
-            # Stage 4: Prioritization (only if API key is configured)
+            # Stage 4: Narrative Synthesis (only if API key configured)
             if settings.anthropic_api_key:
-                logger.info("Starting Stage 4: Article Prioritization")
-                prioritize_results = await self._prioritize_articles()
-                results["stages"]["prioritization"] = prioritize_results
-
-                high_priority = prioritize_results.get("summary", {}).get("high_priority_articles", 0)
-                logger.info(f"Stage 4 complete: {high_priority} high-priority articles identified")
-            else:
-                logger.info("Skipping Stage 4: ANTHROPIC_API_KEY not configured")
-                results["stages"]["prioritization"] = {"skipped": True, "reason": "API key not configured"}
-
-            # Stage 5: Narrative Synthesis (only if API key configured and prioritization ran)
-            if settings.anthropic_api_key and not results["stages"].get("prioritization", {}).get("skipped"):
-                logger.info("Starting Stage 5: Narrative Synthesis")
+                logger.info("Starting Stage 4: Narrative Synthesis")
                 synthesis_results = await self._synthesize_narrative()
                 results["stages"]["synthesis"] = synthesis_results
 
                 articles_synthesized = synthesis_results.get("articles_analyzed", 0)
-                logger.info(f"Stage 5 complete: {articles_synthesized} articles synthesized into narrative")
+                logger.info(f"Stage 4 complete: {articles_synthesized} articles synthesized into narrative")
             else:
-                reason = "API key not configured" if not settings.anthropic_api_key else "No prioritization results"
-                logger.info(f"Skipping Stage 5: {reason}")
-                results["stages"]["synthesis"] = {"skipped": True, "reason": reason}
+                logger.info("Skipping Stage 4: ANTHROPIC_API_KEY not configured")
+                results["stages"]["synthesis"] = {"skipped": True, "reason": "API key not configured"}
 
             # Calculate pipeline summary
             results["pipeline_completed"] = datetime.now(timezone.utc).isoformat()
@@ -197,34 +180,12 @@ class PipelineOrchestrator:
         finally:
             session.close()
 
-    async def _prioritize_articles(self) -> Dict[str, Any]:
-        """Run article prioritization stage"""
-        if not self.prioritization_agent:
-            self.prioritization_agent = PrioritizationAgent()
-
-        # Two-stage analysis handles cost optimization internally
-        return await self.prioritization_agent.run_analysis(
-            hours=self.prioritize_hours,
-            limit=self.prioritize_limit  # Can be None for all articles
-        )
-
     async def _synthesize_narrative(self) -> Dict[str, Any]:
-        """Run narrative synthesis stage"""
-        if not self.narrative_synthesis_agent:
-            try:
-                self.narrative_synthesis_agent = NarrativeSynthesisAgent()
-            except FileNotFoundError as e:
-                logger.error(f"Cannot run narrative synthesis without user profile: {e}")
-                return {
-                    "skipped": True,
-                    "reason": "User profile not found",
-                    "error": str(e)
-                }
-
-        # Synthesize high-priority articles into personalized narrative
-        return await self.narrative_synthesis_agent.run_synthesis(
+        """Run narrative synthesis stage using context-driven approach"""
+        synthesizer = NarrativeSynthesizer()
+        return await synthesizer.synthesize(
             hours=self.prioritize_hours,
-            min_priority_score=0.7  # Only synthesize high-priority articles
+            max_articles=50
         )
 
     def _generate_summary(self, results: Dict[str, Any]) -> Dict[str, Any]:
@@ -248,8 +209,6 @@ class PipelineOrchestrator:
             "duplicates_removed": dedup_stage.get("total_duplicates", 0),
             "articles_filtered": filter_stage.get("filtered_count", 0),
             "articles_kept": filter_stage.get("kept_count", 0),
-            "articles_prioritized": priority_stage.get("articles_processed", 0),
-            "high_priority_articles": priority_stage.get("summary", {}).get("high_priority_articles", 0),
             "articles_synthesized": synthesis_stage.get("articles_analyzed", 0),
             "narrative_generated": synthesis_stage.get("synthesis_id") is not None
         }

@@ -1,0 +1,38 @@
+{
+  "description": "Education feeds - K-12, higher education, policy",
+  "feeds": [
+    {
+      "name": "Fairfax County Public Schools News",
+      "url": "https://www.fcps.edu/feeds/news.rss",
+      "applicability": {
+        "scope": ["local"],
+        "geo_tags": ["northern_virginia", "fairfax"],
+        "domain_tags": ["education", "k12"],
+        "specialty_tags": ["education"]
+      },
+      "relevance_score": 0.95
+    },
+    {
+      "name": "U.S. Department of Education",
+      "url": "https://www.ed.gov/feed",
+      "applicability": {
+        "scope": ["national"],
+        "geo_tags": ["usa"],
+        "domain_tags": ["education", "federal_policy"],
+        "specialty_tags": ["education"]
+      },
+      "relevance_score": 0.80
+    },
+    {
+      "name": "Education Week",
+      "url": "https://www.edweek.org/feed",
+      "applicability": {
+        "scope": ["national"],
+        "geo_tags": ["usa"],
+        "domain_tags": ["education", "k12"],
+        "specialty_tags": ["education"]
+      },
+      "relevance_score": 0.75
+    }
+  ]
+}

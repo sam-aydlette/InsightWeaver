@@ -1,22 +1,32 @@
 """
 Feed Management System for InsightWeaver
 Handles loading, updating, and managing RSS feeds from configuration
+Uses tag-based feed matching to user profiles
 """
 
 import logging
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Optional
 from sqlalchemy.orm import Session
 from src.database.connection import get_db
 from src.database.models import RSSFeed
-from src.config.feeds import get_all_feeds, get_feed_count
+from src.config.feed_matcher import FeedMatcher
+from src.utils.profile_loader import UserProfile, get_user_profile
 
 logger = logging.getLogger(__name__)
 
 class FeedManager:
-    """Manages RSS feed configuration and database operations"""
+    """Manages RSS feed configuration and database operations with modular feed matching"""
 
-    def __init__(self):
-        self.configured_feeds = get_all_feeds()
+    def __init__(self, user_profile: Optional[UserProfile] = None):
+        """
+        Initialize feed manager with user profile for personalized feed selection
+
+        Args:
+            user_profile: UserProfile instance (defaults to global profile)
+        """
+        self.user_profile = user_profile or get_user_profile()
+        self.feed_matcher = FeedMatcher()
+        self.configured_feeds = self.feed_matcher.match_feeds_to_profile(self.user_profile)
 
     def load_feeds_to_database(self) -> Tuple[int, int, int]:
         """
@@ -82,7 +92,7 @@ class FeedManager:
         return deactivated_count
 
     def get_feed_statistics(self) -> Dict:
-        """Get statistics about feeds in the database"""
+        """Get statistics about feeds in the database and matcher"""
         with get_db() as db:
             total_feeds = db.query(RSSFeed).count()
             active_feeds = db.query(RSSFeed).filter(RSSFeed.is_active == True).count()
@@ -94,13 +104,23 @@ class FeedManager:
                 category = feed.category or 'uncategorized'
                 categories[category] = categories.get(category, 0) + 1
 
+            # Get matcher statistics
+            matcher_stats = self.feed_matcher.get_feed_statistics()
+
             return {
-                'total_feeds': total_feeds,
-                'active_feeds': active_feeds,
-                'inactive_feeds': total_feeds - active_feeds,
-                'feeds_with_errors': failed_feeds,
-                'configured_feeds': len(self.configured_feeds),
-                'categories': categories
+                'database': {
+                    'total_feeds': total_feeds,
+                    'active_feeds': active_feeds,
+                    'inactive_feeds': total_feeds - active_feeds,
+                    'feeds_with_errors': failed_feeds,
+                    'categories': categories
+                },
+                'configured': {
+                    'matched_to_user': len(self.configured_feeds),
+                    'total_available': matcher_stats['total_feeds'],
+                    'by_scope': matcher_stats['by_scope'],
+                    'by_domain': matcher_stats['by_domain']
+                }
             }
 
     def reset_error_counts(self) -> int:

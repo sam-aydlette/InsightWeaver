@@ -6,8 +6,13 @@ config/user_profile.json
 
 # Database files
 *.db
+*.db-journal
+*.db-wal
+*.db-shm
 
-# Generated briefings and reports
+# Generated newsletters and reports
+data/newsletters/*.html
+data/newsletters/*.json
 briefing_*.html
 enhanced_briefing_*.html
 cyber_*.html
@@ -17,6 +22,10 @@ cyber_*.html
 /reports/*.json
 /reports/*.txt
 /reports/*.csv
+
+# Logs
+src/logs/*.log
+*.log
 
 # Python
 __pycache__/

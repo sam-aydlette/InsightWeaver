@@ -1,0 +1,60 @@
+{
+  "description": "Core feeds that apply to all users regardless of location or profession",
+  "feeds": [
+    {
+      "name": "Associated Press",
+      "url": "https://feeds.ap.org/rss/apf-topnews.rss",
+      "applicability": {
+        "scope": ["always"],
+        "geo_tags": ["usa", "global"],
+        "domain_tags": ["general_news"],
+        "specialty_tags": []
+      },
+      "relevance_score": 1.0
+    },
+    {
+      "name": "Reuters",
+      "url": "https://feeds.reuters.com/reuters/topNews",
+      "applicability": {
+        "scope": ["always"],
+        "geo_tags": ["global"],
+        "domain_tags": ["general_news", "international"],
+        "specialty_tags": []
+      },
+      "relevance_score": 1.0
+    },
+    {
+      "name": "Federal Register - Public Inspection",
+      "url": "https://www.federalregister.gov/documents/feeds/public-inspection.xml",
+      "applicability": {
+        "scope": ["always"],
+        "geo_tags": ["usa"],
+        "domain_tags": ["federal_policy", "regulatory"],
+        "specialty_tags": []
+      },
+      "relevance_score": 0.9
+    },
+    {
+      "name": "Supreme Court Blog",
+      "url": "https://www.scotusblog.com/feed/",
+      "applicability": {
+        "scope": ["always"],
+        "geo_tags": ["usa"],
+        "domain_tags": ["judicial", "legal"],
+        "specialty_tags": []
+      },
+      "relevance_score": 0.9
+    },
+    {
+      "name": "White House News",
+      "url": "https://www.whitehouse.gov/feed/",
+      "applicability": {
+        "scope": ["always"],
+        "geo_tags": ["usa"],
+        "domain_tags": ["federal_policy", "executive"],
+        "specialty_tags": []
+      },
+      "relevance_score": 0.9
+    }
+  ]
+}

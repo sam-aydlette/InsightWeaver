@@ -1,0 +1,82 @@
+{
+  "description": "Virginia state-level feeds - state government, policy, and regional news",
+  "feeds": [
+    {
+      "name": "Virginia Mercury",
+      "url": "https://www.virginiamercury.com/feed/",
+      "applicability": {
+        "scope": ["regional"],
+        "geo_tags": ["virginia"],
+        "domain_tags": ["state_politics", "state_policy"],
+        "specialty_tags": []
+      },
+      "relevance_score": 0.9
+    },
+    {
+      "name": "Supreme Court of Virginia Opinions",
+      "url": "https://www.vacourts.gov/static/rss/rss_scv_opinions.xml",
+      "applicability": {
+        "scope": ["regional"],
+        "geo_tags": ["virginia"],
+        "domain_tags": ["judicial", "legal"],
+        "specialty_tags": []
+      },
+      "relevance_score": 0.7
+    },
+    {
+      "name": "Virginia Court of Appeals Published Opinions",
+      "url": "https://www.vacourts.gov/static/rss/rss_cav_p_opinions.xml",
+      "applicability": {
+        "scope": ["regional"],
+        "geo_tags": ["virginia"],
+        "domain_tags": ["judicial", "legal"],
+        "specialty_tags": []
+      },
+      "relevance_score": 0.6
+    },
+    {
+      "name": "WAVY Virginia Politics",
+      "url": "https://www.wavy.com/news/politics/virginia-politics/feed/",
+      "applicability": {
+        "scope": ["regional"],
+        "geo_tags": ["virginia"],
+        "domain_tags": ["state_politics", "general_news"],
+        "specialty_tags": []
+      },
+      "relevance_score": 0.7
+    },
+    {
+      "name": "Blue Virginia",
+      "url": "https://bluevirginia.us/feed",
+      "applicability": {
+        "scope": ["regional"],
+        "geo_tags": ["virginia"],
+        "domain_tags": ["state_politics", "progressive_politics"],
+        "specialty_tags": []
+      },
+      "relevance_score": 0.5
+    },
+    {
+      "name": "Bacon's Rebellion",
+      "url": "https://baconsrebellion.com/feed/",
+      "applicability": {
+        "scope": ["regional"],
+        "geo_tags": ["virginia"],
+        "domain_tags": ["state_politics", "policy_analysis"],
+        "specialty_tags": []
+      },
+      "relevance_score": 0.6
+    },
+    {
+      "name": "Cardinal News",
+      "url": "https://cardinalnews.org/feed/",
+      "applicability": {
+        "scope": ["regional"],
+        "geo_tags": ["virginia"],
+        "domain_tags": ["regional_news"],
+        "specialty_tags": []
+      },
+      "relevance_score": 0.5
+    }
+  ]
+}

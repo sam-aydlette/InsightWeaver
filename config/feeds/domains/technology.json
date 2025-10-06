@@ -1,0 +1,82 @@
+{
+  "description": "Technology domain feeds - AI, cloud, software development, tech industry",
+  "feeds": [
+    {
+      "name": "TechCrunch",
+      "url": "https://techcrunch.com/feed/",
+      "applicability": {
+        "scope": ["global"],
+        "geo_tags": [],
+        "domain_tags": ["technology", "startups"],
+        "specialty_tags": ["artificial_intelligence", "venture_capital"]
+      },
+      "relevance_score": 0.8
+    },
+    {
+      "name": "Ars Technica",
+      "url": "https://feeds.arstechnica.com/arstechnica/index",
+      "applicability": {
+        "scope": ["global"],
+        "geo_tags": [],
+        "domain_tags": ["technology"],
+        "specialty_tags": ["software_development", "science"]
+      },
+      "relevance_score": 0.8
+    },
+    {
+      "name": "The Verge",
+      "url": "https://www.theverge.com/rss/index.xml",
+      "applicability": {
+        "scope": ["global"],
+        "geo_tags": [],
+        "domain_tags": ["technology"],
+        "specialty_tags": []
+      },
+      "relevance_score": 0.7
+    },
+    {
+      "name": "Wired",
+      "url": "https://www.wired.com/feed/rss",
+      "applicability": {
+        "scope": ["global"],
+        "geo_tags": [],
+        "domain_tags": ["technology"],
+        "specialty_tags": ["artificial_intelligence", "cybersecurity"]
+      },
+      "relevance_score": 0.7
+    },
+    {
+      "name": "MIT Technology Review",
+      "url": "https://www.technologyreview.com/feed/",
+      "applicability": {
+        "scope": ["global"],
+        "geo_tags": [],
+        "domain_tags": ["technology"],
+        "specialty_tags": ["artificial_intelligence", "research"]
+      },
+      "relevance_score": 0.9
+    },
+    {
+      "name": "Hacker News",
+      "url": "https://news.ycombinator.com/rss",
+      "applicability": {
+        "scope": ["global"],
+        "geo_tags": [],
+        "domain_tags": ["technology", "software_development"],
+        "specialty_tags": ["startups"]
+      },
+      "relevance_score": 0.7
+    },
+    {
+      "name": "AWS News Blog",
+      "url": "https://aws.amazon.com/blogs/aws/feed/",
+      "applicability": {
+        "scope": ["global"],
+        "geo_tags": [],
+        "domain_tags": ["technology", "cloud_computing"],
+        "specialty_tags": []
+      },
+      "relevance_score": 0.6
+    }
+  ]
+}

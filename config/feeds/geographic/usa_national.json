@@ -1,0 +1,60 @@
+{
+  "description": "US national-level feeds - federal government, policy, and national news",
+  "feeds": [
+    {
+      "name": "Congress.gov - House Floor Updates",
+      "url": "https://www.congress.gov/rss/house-floor-today.xml",
+      "applicability": {
+        "scope": ["national"],
+        "geo_tags": ["usa"],
+        "domain_tags": ["legislative", "federal_policy"],
+        "specialty_tags": []
+      },
+      "relevance_score": 0.8
+    },
+    {
+      "name": "Congress.gov - Senate Floor Updates",
+      "url": "https://www.congress.gov/rss/senate-floor-today.xml",
+      "applicability": {
+        "scope": ["national"],
+        "geo_tags": ["usa"],
+        "domain_tags": ["legislative", "federal_policy"],
+        "specialty_tags": []
+      },
+      "relevance_score": 0.8
+    },
+    {
+      "name": "Federal Reserve Press Releases",
+      "url": "https://www.federalreserve.gov/feeds/press_all.xml",
+      "applicability": {
+        "scope": ["national"],
+        "geo_tags": ["usa"],
+        "domain_tags": ["monetary_policy", "economics"],
+        "specialty_tags": []
+      },
+      "relevance_score": 0.7
+    },
+    {
+      "name": "SEC Press Releases",
+      "url": "https://www.sec.gov/news/pressreleases.rss",
+      "applicability": {
+        "scope": ["national"],
+        "geo_tags": ["usa"],
+        "domain_tags": ["financial_regulation", "regulatory"],
+        "specialty_tags": []
+      },
+      "relevance_score": 0.7
+    },
+    {
+      "name": "USAGov Blog",
+      "url": "https://blog.usa.gov/feed",
+      "applicability": {
+        "scope": ["national"],
+        "geo_tags": ["usa"],
+        "domain_tags": ["federal_government", "general_news"],
+        "specialty_tags": []
+      },
+      "relevance_score": 0.6
+    }
+  ]
+}

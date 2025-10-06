@@ -1,0 +1,104 @@
+{
+  "description": "Global international feeds - multi-domain news sources with worldwide coverage",
+  "feeds": [
+    {
+      "name": "BBC News",
+      "url": "https://feeds.bbci.co.uk/news/rss.xml",
+      "applicability": {
+        "scope": ["global"],
+        "geo_tags": ["international", "uk"],
+        "domain_tags": ["general_news", "geopolitics"],
+        "specialty_tags": ["cybersecurity_coverage", "technology_coverage"]
+      },
+      "relevance_score": 0.9
+    },
+    {
+      "name": "Al Jazeera English",
+      "url": "https://www.aljazeera.com/xml/rss/all.xml",
+      "applicability": {
+        "scope": ["global"],
+        "geo_tags": ["international", "middle_east"],
+        "domain_tags": ["general_news", "geopolitics"],
+        "specialty_tags": []
+      },
+      "relevance_score": 0.7
+    },
+    {
+      "name": "France 24 English",
+      "url": "https://www.france24.com/en/rss",
+      "applicability": {
+        "scope": ["global"],
+        "geo_tags": ["international", "europe", "france"],
+        "domain_tags": ["general_news", "geopolitics"],
+        "specialty_tags": []
+      },
+      "relevance_score": 0.80
+    },
+    {
+      "name": "NHK World Japan",
+      "url": "https://www3.nhk.or.jp/nhkworld/en/news/rss.xml",
+      "applicability": {
+        "scope": ["global"],
+        "geo_tags": ["international", "asia", "japan"],
+        "domain_tags": ["general_news", "geopolitics"],
+        "specialty_tags": []
+      },
+      "relevance_score": 0.75
+    },
+    {
+      "name": "Kathimerini English Edition (Greece)",
+      "url": "https://www.ekathimerini.com/rss",
+      "applicability": {
+        "scope": ["global"],
+        "geo_tags": ["international", "europe", "greece"],
+        "domain_tags": ["general_news", "geopolitics"],
+        "specialty_tags": []
+      },
+      "relevance_score": 0.85
+    },
+    {
+      "name": "El Faro English (El Salvador)",
+      "url": "https://elfaro.net/en/feed",
+      "applicability": {
+        "scope": ["global"],
+        "geo_tags": ["international", "latin_america", "el_salvador"],
+        "domain_tags": ["general_news", "investigative_journalism"],
+        "specialty_tags": []
+      },
+      "relevance_score": 0.85
+    },
+    {
+      "name": "United Nations News",
+      "url": "https://news.un.org/feed/subscribe/en/news/all/rss.xml",
+      "applicability": {
+        "scope": ["global"],
+        "geo_tags": ["international"],
+        "domain_tags": ["international_organizations", "geopolitics"],
+        "specialty_tags": []
+      },
+      "relevance_score": 0.6
+    },
+    {
+      "name": "IMF News",
+      "url": "https://www.imf.org/en/News/RSS",
+      "applicability": {
+        "scope": ["global"],
+        "geo_tags": ["international"],
+        "domain_tags": ["international_finance", "economics"],
+        "specialty_tags": []
+      },
+      "relevance_score": 0.5
+    },
+    {
+      "name": "European Union News",
+      "url": "https://www.consilium.europa.eu/en/press/rss/",
+      "applicability": {
+        "scope": ["global"],
+        "geo_tags": ["europe"],
+        "domain_tags": ["international_policy"],
+        "specialty_tags": []
+      },
+      "relevance_score": 0.5
+    }
+  ]
+}

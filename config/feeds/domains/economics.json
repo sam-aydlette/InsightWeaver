@@ -1,0 +1,49 @@
+{
+  "description": "Economic data and analysis feeds - employment, markets, economic indicators",
+  "feeds": [
+    {
+      "name": "Bureau of Labor Statistics - Employment Situation",
+      "url": "https://www.bls.gov/feed/empsit.rss",
+      "applicability": {
+        "scope": ["national"],
+        "geo_tags": ["usa"],
+        "domain_tags": ["economics", "employment"],
+        "specialty_tags": []
+      },
+      "relevance_score": 0.85
+    },
+    {
+      "name": "Bureau of Labor Statistics - News Releases",
+      "url": "https://www.bls.gov/feed/bls_latest.rss",
+      "applicability": {
+        "scope": ["national"],
+        "geo_tags": ["usa"],
+        "domain_tags": ["economics", "employment"],
+        "specialty_tags": []
+      },
+      "relevance_score": 0.80
+    },
+    {
+      "name": "U.S. Census Bureau",
+      "url": "https://www.census.gov/rss/www/census_blog.xml",
+      "applicability": {
+        "scope": ["national"],
+        "geo_tags": ["usa"],
+        "domain_tags": ["economics", "demographics"],
+        "specialty_tags": []
+      },
+      "relevance_score": 0.70
+    },
+    {
+      "name": "World Bank News",
+      "url": "https://www.worldbank.org/en/news/rss",
+      "applicability": {
+        "scope": ["global"],
+        "geo_tags": ["international"],
+        "domain_tags": ["economics", "international_finance"],
+        "specialty_tags": []
+      },
+      "relevance_score": 0.65
+    }
+  ]
+}

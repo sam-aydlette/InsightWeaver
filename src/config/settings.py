@@ -21,17 +21,14 @@ class Settings(BaseSettings):
     # API Keys
     anthropic_api_key: str = os.getenv("ANTHROPIC_API_KEY", "")
 
-    # Redis (for Celery)
-    redis_url: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")
-
     # Application
     debug: bool = os.getenv("DEBUG", "False").lower() == "true"
     log_level: str = os.getenv("LOG_LEVEL", "INFO")
 
     # Paths
-    project_root: Path = Path(__file__).parent.parent
+    project_root: Path = Path(__file__).parent.parent.parent
     data_dir: Path = project_root / "data"
-    logs_dir: Path = project_root / "logs"
+    logs_dir: Path = project_root / "src" / "logs"
 
     class Config:
         env_file = ".env"

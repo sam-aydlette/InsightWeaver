@@ -29,29 +29,54 @@ class PersonalizedNarrativeTemplate(NewsletterTemplate):
     @staticmethod
     def generate_html(data: Dict[str, Any]) -> str:
         """
-        Generate HTML version of personalized narrative brief
+        Generate HTML version of intelligence brief
 
         Args:
-            data: Must contain 'synthesis_data' from NarrativeSynthesisAgent
+            data: Must contain 'synthesis_data' from NarrativeSynthesizer
         """
         synthesis = data.get('synthesis_data', {})
         metadata = synthesis.get('metadata', {})
-        temporal_layers = synthesis.get('temporal_layers', {})
-        cross_domain = synthesis.get('cross_domain_insights', [])
-        priority_actions = synthesis.get('priority_actions', [])
-        executive_summary = synthesis.get('executive_summary', 'No narrative synthesis available.')
+        bottom_line = synthesis.get('bottom_line', {})
+        trends = synthesis.get('trends_and_patterns', {})
+        events = synthesis.get('priority_events', [])
+        predictions = synthesis.get('predictions_scenarios', {})
 
         # Get user context for personalization
         user_context = data.get('user_context', {})
         location = user_context.get('location', {})
-        location_str = f"{location.get('city', 'Your')}, {location.get('state', 'Area')}"
+        location_str = f"{location.get('city', 'Your Area')}, {location.get('state', 'State')}"
+        niche_field = user_context.get('professional_domains', ['Technology'])[0] if user_context.get('professional_domains') else 'Professional Domain'
+
+        # Determine report title and date range based on report type
+        report_type = data.get('report_type', 'daily')
+        duration_hours = data.get('duration_hours', 24)
+
+        if report_type == 'daily':
+            title = "Daily Intelligence Brief"
+        elif report_type == 'weekly':
+            title = "Weekly Intelligence Analysis"
+        elif report_type == 'update':
+            title = "Intelligence Update"
+        else:
+            # Custom duration
+            if duration_hours < 24:
+                title = f"Intelligence Report ({int(duration_hours)}h)"
+            else:
+                days = int(duration_hours / 24)
+                title = f"Intelligence Report ({days}d)"
+
+        # Format date range
+        if 'start_date' in data and 'end_date' in data:
+            date_range = f"{data['start_date'].strftime('%b %d')} - {data['end_date'].strftime('%b %d, %Y')}"
+        else:
+            date_range = data.get('date', datetime.now()).strftime('%B %d, %Y')
 
         html = f"""
 <!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Your Intelligence Brief - {PersonalizedNarrativeTemplate.format_date(data.get('date', datetime.now()))}</title>
+    <title>{title} - {date_range}</title>
     <style>
         body {{
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
@@ -78,23 +103,46 @@ class PersonalizedNarrativeTemplate(NewsletterTemplate):
             color: #718096;
             font-size: 14px;
         }}
-        .executive-summary {{
-            background: #ebf8ff;
-            border-left: 4px solid #3182ce;
+        .bottom-line {{
+            background: #fef5e7;
+            border: 2px solid #f39c12;
             padding: 24px;
             margin-bottom: 36px;
-            border-radius: 4px;
+            border-radius: 6px;
         }}
-        .executive-summary h2 {{
-            margin: 0 0 12px 0;
-            color: #2c5282;
-            font-size: 20px;
+        .bottom-line h2 {{
+            margin: 0 0 16px 0;
+            color: #d68910;
+            font-size: 22px;
+            font-weight: 700;
         }}
-        .executive-summary p {{
-            font-size: 16px;
+        .bottom-line .summary {{
+            font-size: 17px;
             line-height: 1.8;
             margin: 12px 0;
             color: #2d3748;
+            font-weight: 500;
+        }}
+        .bottom-line .actions {{
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid #f39c12;
+        }}
+        .bottom-line .actions h3 {{
+            margin: 0 0 8px 0;
+            font-size: 15px;
+            color: #d68910;
+            text-transform: uppercase;
+            font-weight: 600;
+        }}
+        .bottom-line .actions ul {{
+            margin: 0;
+            padding-left: 20px;
+        }}
+        .bottom-line .actions li {{
+            margin: 6px 0;
+            color: #2d3748;
+            font-weight: 500;
         }}
         .temporal-section {{
             margin-bottom: 36px;
@@ -148,6 +196,54 @@ class PersonalizedNarrativeTemplate(NewsletterTemplate):
         .implications li {{
             margin: 6px 0;
             color: #2d3748;
+        }}
+        .articles-list {{
+            margin: 20px 0;
+        }}
+        .article-card {{
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 16px;
+            margin: 12px 0;
+            transition: box-shadow 0.2s;
+        }}
+        .article-card:hover {{
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }}
+        .article-title {{
+            font-size: 16px;
+            font-weight: 600;
+            color: #2d3748;
+            margin: 0 0 8px 0;
+        }}
+        .article-title a {{
+            color: #2d3748;
+            text-decoration: none;
+        }}
+        .article-title a:hover {{
+            color: #3182ce;
+        }}
+        .article-meta {{
+            font-size: 13px;
+            color: #718096;
+            margin-bottom: 8px;
+        }}
+        .article-excerpt {{
+            font-size: 14px;
+            color: #4a5568;
+            line-height: 1.6;
+        }}
+        .read-more {{
+            display: inline-block;
+            margin-top: 8px;
+            font-size: 13px;
+            color: #3182ce;
+            text-decoration: none;
+            font-weight: 500;
+        }}
+        .read-more:hover {{
+            text-decoration: underline;
         }}
         .cross-domain {{
             background: #fffaf0;
@@ -217,6 +313,169 @@ class PersonalizedNarrativeTemplate(NewsletterTemplate):
             font-size: 14px;
             margin-top: 6px;
         }}
+        .section {{
+            margin-bottom: 48px;
+        }}
+        .section h2 {{
+            margin: 0 0 24px 0;
+            color: #2d3748;
+            font-size: 24px;
+            font-weight: 700;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 12px;
+        }}
+        .trend-scope {{
+            margin-bottom: 24px;
+        }}
+        .trend-scope h3 {{
+            margin: 0 0 12px 0;
+            color: #4a5568;
+            font-size: 18px;
+            font-weight: 600;
+        }}
+        .trend-list {{
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }}
+        .trend-item {{
+            padding: 12px;
+            margin: 8px 0;
+            background: #f7fafc;
+            border-left: 3px solid #3182ce;
+            border-radius: 4px;
+        }}
+        .trend-text {{
+            font-weight: 600;
+            color: #2d3748;
+            font-size: 15px;
+        }}
+        .confidence {{
+            display: inline-block;
+            background: #e6fffa;
+            color: #234e52;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 12px;
+            margin-left: 12px;
+            font-weight: 600;
+        }}
+        .trend-desc {{
+            margin-top: 6px;
+            color: #4a5568;
+            font-size: 14px;
+        }}
+        .events-table {{
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 16px;
+        }}
+        .events-table th {{
+            background: #2d3748;
+            color: white;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 13px;
+        }}
+        .events-table td {{
+            padding: 12px;
+            border-bottom: 1px solid #e2e8f0;
+            font-size: 14px;
+        }}
+        .event-row.impact-critical {{
+            background: #fff5f5;
+        }}
+        .event-row.impact-high {{
+            background: #fffaf0;
+        }}
+        .event-row.impact-medium {{
+            background: #f0fff4;
+        }}
+        .event-row.impact-low {{
+            background: #f7fafc;
+        }}
+        .impact-badge {{
+            font-weight: 700;
+            font-size: 12px;
+        }}
+        .impact-critical .impact-badge {{
+            color: #c53030;
+        }}
+        .impact-high .impact-badge {{
+            color: #dd6b20;
+        }}
+        .impact-medium .impact-badge {{
+            color: #38a169;
+        }}
+        .impact-low .impact-badge {{
+            color: #718096;
+        }}
+        .prediction-category {{
+            margin-bottom: 24px;
+        }}
+        .prediction-category h3 {{
+            margin: 0 0 12px 0;
+            color: #4a5568;
+            font-size: 18px;
+            font-weight: 600;
+        }}
+        .prediction-list {{
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }}
+        .prediction-item {{
+            padding: 16px;
+            margin: 12px 0;
+            background: #f7fafc;
+            border-radius: 6px;
+            border-left: 4px solid #cbd5e0;
+        }}
+        .prediction-item.likelihood-high {{
+            border-left-color: #38a169;
+            background: #f0fff4;
+        }}
+        .prediction-item.likelihood-medium {{
+            border-left-color: #ed8936;
+            background: #fffaf0;
+        }}
+        .prediction-item.likelihood-low {{
+            border-left-color: #cbd5e0;
+            background: #f7fafc;
+        }}
+        .prediction-text {{
+            font-weight: 600;
+            color: #2d3748;
+            font-size: 15px;
+            margin-bottom: 8px;
+        }}
+        .prediction-meta {{
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-top: 8px;
+        }}
+        .prediction-meta span {{
+            display: inline-block;
+            background: white;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }}
+        .likelihood {{
+            color: #2d3748;
+        }}
+        .timeframe {{
+            color: #718096;
+        }}
+        .rationale {{
+            margin-top: 8px;
+            color: #4a5568;
+            font-size: 13px;
+            font-style: italic;
+        }}
         .footer {{
             text-align: center;
             color: #a0aec0;
@@ -231,24 +490,21 @@ class PersonalizedNarrativeTemplate(NewsletterTemplate):
 <body>
     <div class="container">
         <div class="header">
-            <h1>Your Intelligence Brief</h1>
+            <h1>{title}</h1>
             <div class="meta">
-                {PersonalizedNarrativeTemplate.format_date(data.get('date', datetime.now()))} |
+                {date_range} |
                 Personalized for {location_str} |
-                {metadata.get('articles_analyzed', 0)} sources analyzed
+                {data.get('articles_analyzed', metadata.get('articles_analyzed', 0))} sources analyzed
             </div>
         </div>
 
-        <div class="executive-summary">
-            <h2>What You Need to Know</h2>
-            {PersonalizedNarrativeTemplate._render_executive_summary(executive_summary)}
-        </div>
+        {PersonalizedNarrativeTemplate._render_bottom_line(bottom_line)}
 
-        {PersonalizedNarrativeTemplate._render_temporal_layers(temporal_layers)}
+        {PersonalizedNarrativeTemplate._render_trends_and_patterns(trends, niche_field)}
 
-        {PersonalizedNarrativeTemplate._render_cross_domain_insights(cross_domain)}
+        {PersonalizedNarrativeTemplate._render_priority_events(events)}
 
-        {PersonalizedNarrativeTemplate._render_priority_actions(priority_actions)}
+        {PersonalizedNarrativeTemplate._render_predictions(predictions, niche_field)}
 
         <div class="footer">
             Generated by <a href="#">InsightWeaver</a> |
@@ -262,198 +518,197 @@ class PersonalizedNarrativeTemplate(NewsletterTemplate):
         return html.strip()
 
     @staticmethod
-    def _render_executive_summary(summary: str) -> str:
-        """Render executive summary with paragraph breaks"""
-        paragraphs = summary.split('\n\n')
-        return '\n'.join([f'<p>{p.strip()}</p>' for p in paragraphs if p.strip()])
-
-    @staticmethod
-    def _render_temporal_layers(temporal_layers: Dict[str, Any]) -> str:
-        """Render temporal sections with narratives"""
-        if not temporal_layers:
+    def _render_bottom_line(bottom_line: Dict[str, Any]) -> str:
+        """Render bottom line section"""
+        if not bottom_line:
             return ""
 
-        sections_html = []
+        summary = bottom_line.get('summary', 'No summary available')
+        actions = bottom_line.get('immediate_actions', [])
 
-        # Order and labels for temporal horizons
-        horizons = [
-            ('immediate', 'Immediate Focus', '0-48 hours'),
-            ('near_term', 'Near-Term Watch', '1-2 weeks'),
-            ('medium_term', 'Medium-Term Planning', '1-3 months'),
-            ('long_term', 'Long-Term Positioning', '6+ months')
-        ]
+        html = f"""
+        <div class="bottom-line">
+            <h2>⚡ BOTTOM LINE</h2>
+            <div class="summary">{summary}</div>
+        """
 
-        for horizon_key, horizon_label, timeline in horizons:
-            layer = temporal_layers.get(horizon_key, {})
-            if not layer or not layer.get('narrative'):
-                continue
-
-            narrative = layer.get('narrative', '')
-            implications = layer.get('key_implications', [])
-            actions = layer.get('recommended_actions', [])
-
-            section_html = f"""
-        <div class="temporal-section {horizon_key}">
-            <h3>{horizon_label}<span class="timeline">{timeline}</span></h3>
-            <div class="narrative">{narrative}</div>
-            """
-
-            if implications:
-                section_html += """
-            <div class="implications">
-                <h4>Why This Matters to You</h4>
+        if actions:
+            html += """
+            <div class="actions">
+                <h3>Immediate Actions</h3>
                 <ul>
-                """
-                for impl in implications:
-                    section_html += f"<li>{impl}</li>\n"
-                section_html += """
+            """
+            for action in actions:
+                html += f"<li>{action}</li>\n"
+            html += """
                 </ul>
             </div>
-                """
-
-            section_html += "</div>\n"
-            sections_html.append(section_html)
-
-        return '\n'.join(sections_html)
-
-    @staticmethod
-    def _render_cross_domain_insights(insights: List[Dict[str, Any]]) -> str:
-        """Render cross-domain connections"""
-        if not insights:
-            return ""
-
-        html = '<div class="section">\n'
-
-        for insight in insights[:3]:  # Limit to top 3 insights
-            theme = insight.get('theme', 'Connection')
-            narrative = insight.get('narrative', '')
-            personal_impact = insight.get('personal_impact', '')
-
-            html += f"""
-        <div class="cross-domain">
-            <h4>🔗 {theme}</h4>
-            <div class="narrative">{narrative}</div>
-            {f'<div class="personal-impact">For you: {personal_impact}</div>' if personal_impact else ''}
-        </div>
             """
 
-        html += '</div>\n'
+        html += "</div>\n"
         return html
 
     @staticmethod
-    def _render_priority_actions(actions: List[Dict[str, Any]]) -> str:
-        """Render priority actions section"""
-        if not actions:
+    def _render_trends_and_patterns(trends: Dict[str, List[Dict[str, Any]]], niche_field: str) -> str:
+        """Render trends organized by geographic scope"""
+        if not trends:
             return ""
 
         html = """
-        <div class="actions-section">
-            <h3>What You Should Do</h3>
+        <div class="section">
+            <h2>📊 TRENDS & PATTERNS</h2>
         """
 
-        for action in actions:
-            action_text = action.get('action', '')
-            urgency = action.get('urgency', 'medium')
-            reasoning = action.get('reasoning', '')
+        # Geographic scopes with labels
+        scopes = [
+            ('local', '🏘️ Local'),
+            ('state_regional', '🗺️ State/Regional'),
+            ('national', '🏛️ National'),
+            ('global', '🌍 Global'),
+            ('niche_field', f'💼 {niche_field}')
+        ]
+
+        for scope_key, scope_label in scopes:
+            scope_trends = trends.get(scope_key, [])
+            if not scope_trends:
+                continue
 
             html += f"""
-            <div class="action-item {urgency}">
-                <div><span class="urgency">{urgency}</span><span class="action-text">{action_text}</span></div>
-                {f'<div class="reasoning">{reasoning}</div>' if reasoning else ''}
+            <div class="trend-scope">
+                <h3>{scope_label}</h3>
+                <ul class="trend-list">
+            """
+
+            for trend in scope_trends:
+                subject = trend.get('subject', '')
+                direction = trend.get('direction', 'stable')
+                quantifier = trend.get('quantifier', '')
+                description = trend.get('description', '')
+
+                # Format trend
+                trend_text = f"{subject} {direction}"
+                if quantifier:
+                    trend_text += f" ({quantifier})"
+
+                html += f"""
+                <li class="trend-item">
+                    <span class="trend-text">{trend_text}</span>
+                    {f'<div class="trend-desc">{description}</div>' if description else ''}
+                </li>
+                """
+
+            html += """
+                </ul>
             </div>
             """
 
+        html += "</div>\n"
+        return html
+
+    @staticmethod
+    def _render_priority_events(events: List[Dict[str, Any]]) -> str:
+        """Render priority events table"""
+        if not events:
+            return ""
+
+        html = """
+        <div class="section">
+            <h2>📅 PRIORITY EVENTS (Next 2-4 Weeks)</h2>
+            <table class="events-table">
+                <thead>
+                    <tr>
+                        <th>Impact</th>
+                        <th>Event</th>
+                        <th>When</th>
+                        <th>Why It Matters</th>
+                        <th>Recommended Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+        """
+
+        for event in events:
+            impact = event.get('impact_level', 'MEDIUM')
+            event_name = event.get('event', '')
+            when = event.get('when', '')
+            why_matters = event.get('why_matters', '')
+            action = event.get('recommended_action', '')
+            confidence = event.get('confidence', 0)
+
+            html += f"""
+                <tr class="event-row impact-{impact.lower()}">
+                    <td class="impact-badge">{impact}</td>
+                    <td>{event_name}</td>
+                    <td>{when}</td>
+                    <td>{why_matters}</td>
+                    <td>{action}</td>
+                </tr>
+            """
+
         html += """
+                </tbody>
+            </table>
         </div>
         """
         return html
 
     @staticmethod
-    def generate_text(data: Dict[str, Any]) -> str:
-        """Generate plain text version of personalized narrative brief"""
-        synthesis = data.get('synthesis_data', {})
-        temporal_layers = synthesis.get('temporal_layers', {})
-        cross_domain = synthesis.get('cross_domain_insights', [])
-        priority_actions = synthesis.get('priority_actions', [])
-        executive_summary = synthesis.get('executive_summary', 'No narrative synthesis available.')
+    def _render_predictions(predictions: Dict[str, List[Dict[str, Any]]], niche_field: str) -> str:
+        """Render predictions with confidence indicators"""
+        if not predictions:
+            return ""
 
-        user_context = data.get('user_context', {})
-        location = user_context.get('location', {})
-        location_str = f"{location.get('city', 'Your')}, {location.get('state', 'Area')}"
+        html = """
+        <div class="section">
+            <h2>🔮 PREDICTIONS & SCENARIOS (2-4 Week Horizon)</h2>
+        """
 
-        text = f"""
-═══════════════════════════════════════════════════════════════
-YOUR INTELLIGENCE BRIEF
-{PersonalizedNarrativeTemplate.format_date(data.get('date', datetime.now()))}
-Personalized for {location_str}
-═══════════════════════════════════════════════════════════════
-
-WHAT YOU NEED TO KNOW
-─────────────────────────────────────────────────────────────
-
-{executive_summary}
-
-"""
-
-        # Temporal sections
-        horizons = [
-            ('immediate', 'IMMEDIATE FOCUS (0-48 hours)', '⚠️'),
-            ('near_term', 'NEAR-TERM WATCH (1-2 weeks)', '📅'),
-            ('medium_term', 'MEDIUM-TERM PLANNING (1-3 months)', '📊'),
-            ('long_term', 'LONG-TERM POSITIONING (6+ months)', '🔮')
+        categories = [
+            ('local_governance', '🏛️ Local Governance/Services'),
+            ('education', '🎓 Education/Schools'),
+            ('niche_field', f'💼 {niche_field}'),
+            ('economic_conditions', '💰 Economic Conditions'),
+            ('infrastructure', '🚧 Infrastructure/Transportation')
         ]
 
-        for horizon_key, horizon_label, emoji in horizons:
-            layer = temporal_layers.get(horizon_key, {})
-            if not layer or not layer.get('narrative'):
+        for cat_key, cat_label in categories:
+            cat_predictions = predictions.get(cat_key, [])
+            if not cat_predictions:
                 continue
 
-            text += f"""\n{emoji} {horizon_label}
-─────────────────────────────────────────────────────────────
+            html += f"""
+            <div class="prediction-category">
+                <h3>{cat_label}</h3>
+                <ul class="prediction-list">
+            """
 
-{layer.get('narrative', '')}
+            for pred in cat_predictions:
+                prediction_text = pred.get('prediction', '')
+                likelihood = pred.get('likelihood', 'medium')
+                confidence = pred.get('confidence', 0)
+                timeframe = pred.get('timeframe', '2-4 weeks')
+                rationale = pred.get('rationale', '')
 
-"""
-            implications = layer.get('key_implications', [])
-            if implications:
-                text += "Why this matters to you:\n"
-                for impl in implications:
-                    text += f"  • {impl}\n"
-                text += "\n"
+                html += f"""
+                <li class="prediction-item likelihood-{likelihood}">
+                    <div class="prediction-text">{prediction_text}</div>
+                    <div class="prediction-meta">
+                        <span class="likelihood">{likelihood.upper()} likelihood</span>
+                        <span class="confidence">{int(confidence * 100)}% confidence</span>
+                        <span class="timeframe">{timeframe}</span>
+                    </div>
+                    {f'<div class="rationale">{rationale}</div>' if rationale else ''}
+                </li>
+                """
 
-        # Cross-domain insights
-        if cross_domain:
-            text += """\n🔗 CONNECTIONS YOU SHOULD SEE
-─────────────────────────────────────────────────────────────
+            html += """
+                </ul>
+            </div>
+            """
 
-"""
-            for insight in cross_domain[:3]:
-                text += f"{insight.get('theme', 'Connection')}:\n{insight.get('narrative', '')}\n"
-                if insight.get('personal_impact'):
-                    text += f"For you: {insight.get('personal_impact')}\n"
-                text += "\n"
-
-        # Priority actions
-        if priority_actions:
-            text += """\n✓ WHAT YOU SHOULD DO
-─────────────────────────────────────────────────────────────
-
-"""
-            for action in priority_actions:
-                urgency = action.get('urgency', 'medium').upper()
-                text += f"[{urgency}] {action.get('action', '')}\n"
-                if action.get('reasoning'):
-                    text += f"    → {action.get('reasoning')}\n"
-                text += "\n"
-
-        text += """
-═══════════════════════════════════════════════════════════════
-Generated by InsightWeaver
-═══════════════════════════════════════════════════════════════
-"""
-        return text.strip()
+        html += "</div>\n"
+        return html
 
 
-# Keep legacy template for backward compatibility during transition
+# Template aliases for backward compatibility
 DailyBriefTemplate = PersonalizedNarrativeTemplate
-WeeklyTrendTemplate = PersonalizedNarrativeTemplate

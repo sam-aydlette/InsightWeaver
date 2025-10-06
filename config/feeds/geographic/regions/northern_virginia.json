@@ -1,0 +1,137 @@
+{
+  "description": "Northern Virginia regional feeds - local news, county/city government, DMV area",
+  "feeds": [
+    {
+      "name": "ARLnow",
+      "url": "https://www.arlnow.com/feed/",
+      "applicability": {
+        "scope": ["local"],
+        "geo_tags": ["northern_virginia", "arlington"],
+        "domain_tags": ["local_news"],
+        "specialty_tags": []
+      },
+      "relevance_score": 0.8
+    },
+    {
+      "name": "Fairfax County Government NewsWire",
+      "url": "https://www.fairfaxcounty.gov/news/rss/all-newswire.htm",
+      "applicability": {
+        "scope": ["local"],
+        "geo_tags": ["northern_virginia", "fairfax"],
+        "domain_tags": ["local_government"],
+        "specialty_tags": []
+      },
+      "relevance_score": 0.95
+    },
+    {
+      "name": "Fairfax County Police News",
+      "url": "https://www.fairfaxcounty.gov/rssfeeds/?show=feedDetails&feedId=911",
+      "applicability": {
+        "scope": ["local"],
+        "geo_tags": ["northern_virginia", "fairfax"],
+        "domain_tags": ["public_safety", "local_government"],
+        "specialty_tags": []
+      },
+      "relevance_score": 0.85
+    },
+    {
+      "name": "Fairfax County Transportation News",
+      "url": "https://www.fairfaxcounty.gov/RSSFeeds/?show=feedDetails&feedId=810",
+      "applicability": {
+        "scope": ["local"],
+        "geo_tags": ["northern_virginia", "fairfax"],
+        "domain_tags": ["transportation", "local_government"],
+        "specialty_tags": []
+      },
+      "relevance_score": 0.75
+    },
+    {
+      "name": "Fairfax County Business News",
+      "url": "https://www.fairfaxcounty.gov/rssfeeds/?show=feedDetails&feedId=862",
+      "applicability": {
+        "scope": ["local"],
+        "geo_tags": ["northern_virginia", "fairfax"],
+        "domain_tags": ["business", "local_government"],
+        "specialty_tags": []
+      },
+      "relevance_score": 0.70
+    },
+    {
+      "name": "Fairfax County Board of Supervisors",
+      "url": "https://www.fairfaxcounty.gov/rssfeeds/?show=feedDetails&feedId=876",
+      "applicability": {
+        "scope": ["local"],
+        "geo_tags": ["northern_virginia", "fairfax"],
+        "domain_tags": ["local_government", "state_politics"],
+        "specialty_tags": []
+      },
+      "relevance_score": 0.90
+    },
+    {
+      "name": "Arlington County Government News",
+      "url": "https://www.arlingtonva.us/About-Arlington/Newsroom/news-rss-category",
+      "applicability": {
+        "scope": ["local"],
+        "geo_tags": ["northern_virginia", "arlington"],
+        "domain_tags": ["local_government"],
+        "specialty_tags": []
+      },
+      "relevance_score": 0.90
+    },
+    {
+      "name": "ALXnow - Alexandria News",
+      "url": "https://www.alxnow.com/feed/",
+      "applicability": {
+        "scope": ["local"],
+        "geo_tags": ["northern_virginia", "alexandria"],
+        "domain_tags": ["local_news"],
+        "specialty_tags": []
+      },
+      "relevance_score": 0.80
+    },
+    {
+      "name": "Washington Post Local (DC/MD/VA)",
+      "url": "https://feeds.washingtonpost.com/rss/local",
+      "applicability": {
+        "scope": ["regional"],
+        "geo_tags": ["northern_virginia", "washington_dc_metro", "maryland"],
+        "domain_tags": ["general_news", "investigative_journalism"],
+        "specialty_tags": []
+      },
+      "relevance_score": 0.95
+    },
+    {
+      "name": "Greater Greater Washington",
+      "url": "https://ggwash.org/feed",
+      "applicability": {
+        "scope": ["regional"],
+        "geo_tags": ["northern_virginia", "washington_dc_metro"],
+        "domain_tags": ["urban_planning", "transportation"],
+        "specialty_tags": ["housing"]
+      },
+      "relevance_score": 0.85
+    },
+    {
+      "name": "WTOP News - Virginia",
+      "url": "https://wtop.com/virginia/feed/",
+      "applicability": {
+        "scope": ["regional"],
+        "geo_tags": ["northern_virginia", "virginia"],
+        "domain_tags": ["general_news"],
+        "specialty_tags": []
+      },
+      "relevance_score": 0.75
+    },
+    {
+      "name": "DCist",
+      "url": "https://dcist.com/feed/",
+      "applicability": {
+        "scope": ["regional"],
+        "geo_tags": ["northern_virginia", "washington_dc_metro"],
+        "domain_tags": ["general_news"],
+        "specialty_tags": []
+      },
+      "relevance_score": 0.70
+    }
+  ]
+}

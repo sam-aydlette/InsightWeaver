@@ -1,34 +1,43 @@
-# Database Migrations
+# Database Migrations for Context Engineering
 
-This directory contains SQL migration scripts for InsightWeaver database schema changes.
+## Overview
+These migrations optimize the InsightWeaver database for the context engineering approach, removing agent-specific fields and adding context curation capabilities.
 
-## How to Apply Migrations
+## Migration Strategy
 
-### SQLite (Current)
+### Phase 1: Add New Fields (SAFE - Run Now)
+**File:** `001_optimize_for_context_engineering.py`
 
+**What it does:**
+- Adds new fields to `articles` table for context engineering
+- Creates `context_snapshots` table for reproducibility
+- Updates `narrative_syntheses` and `analysis_runs` tables
+- **Does NOT remove any existing data**
+
+**Run with:**
 ```bash
-# Apply migration
-sqlite3 your_database.db < migrations/001_add_content_filtering.sql
-
-# Or using Python
-python -c "
-import sqlite3
-conn = sqlite3.connect('your_database.db')
-with open('migrations/001_add_content_filtering.sql', 'r') as f:
-    conn.executescript(f.read())
-conn.close()
-"
+python migrations/001_optimize_for_context_engineering.py
 ```
 
-### Migration List
+### Phase 2: Cleanup Deprecated Fields (Run After Validation)
+**File:** `002_cleanup_deprecated_fields.py`
 
-| Migration | Description | Date |
-|-----------|-------------|------|
-| 001_add_content_filtering.sql | Add `filtered` and `filter_reason` columns | 2025-09-30 |
+**What it does:**
+- Removes deprecated tables: `trend_analyses`, `predictions`
+- Removes deprecated fields from `articles`
+- **This is destructive - only run after validating Phase 1 works**
 
-## Best Practices
+## Testing
 
-1. **Always backup database before running migrations**
-2. **Test migrations on a copy first**
-3. **Migrations should be idempotent where possible**
-4. **Document all schema changes**
+```bash
+# Backup database
+cp data/insightweaver.db data/insightweaver.db.backup
+
+# Run Phase 1
+python migrations/001_optimize_for_context_engineering.py
+
+# Test system
+python main.py
+```
+
+See file for full documentation.

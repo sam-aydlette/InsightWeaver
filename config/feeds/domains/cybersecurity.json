@@ -1,0 +1,82 @@
+{
+  "description": "Cybersecurity domain feeds - threat intelligence, vulnerabilities, security policy",
+  "feeds": [
+    {
+      "name": "CISA Cybersecurity Advisories",
+      "url": "https://www.cisa.gov/cybersecurity-advisories/rss.xml",
+      "applicability": {
+        "scope": ["always"],
+        "geo_tags": ["usa"],
+        "domain_tags": ["cybersecurity", "federal_policy"],
+        "specialty_tags": ["threat_intelligence"]
+      },
+      "relevance_score": 1.0
+    },
+    {
+      "name": "Krebs on Security",
+      "url": "https://krebsonsecurity.com/feed/",
+      "applicability": {
+        "scope": ["global"],
+        "geo_tags": [],
+        "domain_tags": ["cybersecurity"],
+        "specialty_tags": ["threat_analysis", "investigations"]
+      },
+      "relevance_score": 0.9
+    },
+    {
+      "name": "The Hacker News",
+      "url": "https://feeds.feedburner.com/TheHackersNews",
+      "applicability": {
+        "scope": ["global"],
+        "geo_tags": [],
+        "domain_tags": ["cybersecurity"],
+        "specialty_tags": ["threat_intelligence", "vulnerabilities"]
+      },
+      "relevance_score": 0.8
+    },
+    {
+      "name": "Dark Reading",
+      "url": "https://www.darkreading.com/rss.xml",
+      "applicability": {
+        "scope": ["global"],
+        "geo_tags": [],
+        "domain_tags": ["cybersecurity"],
+        "specialty_tags": ["enterprise_security"]
+      },
+      "relevance_score": 0.7
+    },
+    {
+      "name": "Bleeping Computer",
+      "url": "https://www.bleepingcomputer.com/feed/",
+      "applicability": {
+        "scope": ["global"],
+        "geo_tags": [],
+        "domain_tags": ["cybersecurity", "technology"],
+        "specialty_tags": ["threat_intelligence", "malware"]
+      },
+      "relevance_score": 0.7
+    },
+    {
+      "name": "Cybersecurity Dive",
+      "url": "https://www.cybersecuritydive.com/feeds/news/",
+      "applicability": {
+        "scope": ["global"],
+        "geo_tags": [],
+        "domain_tags": ["cybersecurity"],
+        "specialty_tags": ["enterprise_security", "policy"]
+      },
+      "relevance_score": 0.7
+    },
+    {
+      "name": "Threatpost",
+      "url": "https://threatpost.com/feed/",
+      "applicability": {
+        "scope": ["global"],
+        "geo_tags": [],
+        "domain_tags": ["cybersecurity"],
+        "specialty_tags": ["threat_intelligence", "vulnerabilities"]
+      },
+      "relevance_score": 0.6
+    }
+  ]
+}

@@ -41,11 +41,17 @@ class EmailSender:
             # Generate email content using PersonalizedNarrativeTemplate
             html_content = PersonalizedNarrativeTemplate.generate_html(content_data)
 
-            # Simple text version (extract executive summary)
+            # Simple text version (extract bottom line summary)
             synthesis = content_data.get('synthesis_data', {})
-            text_content = synthesis.get('executive_summary', 'Please view the HTML version for full formatting.')
+            bottom_line = synthesis.get('bottom_line', {})
+            text_content = bottom_line.get('summary', 'Please view the HTML version for full formatting.')
 
-            subject = f"InsightWeaver Daily Brief - {content_data['date'].strftime('%B %d, %Y')}"
+            # Format subject based on report type
+            if 'date' in content_data:
+                subject = f"InsightWeaver Daily Brief - {content_data['date'].strftime('%B %d, %Y')}"
+            else:
+                date_range = f"{content_data['start_date'].strftime('%b %d')} - {content_data['end_date'].strftime('%b %d, %Y')}"
+                subject = f"InsightWeaver Intelligence Report - {date_range}"
 
             # Send email
             success = await self._send_email(

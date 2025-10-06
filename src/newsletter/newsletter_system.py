@@ -10,7 +10,7 @@ from pathlib import Path
 
 from .content_engine import NewsletterContentEngine
 from .email_sender import NewsletterScheduler
-from .templates import DailyBriefTemplate, WeeklyTrendTemplate
+from .templates import DailyBriefTemplate
 
 
 class NewsletterSystem:
@@ -20,101 +20,96 @@ class NewsletterSystem:
         self.content_engine = NewsletterContentEngine()
         self.scheduler = NewsletterScheduler()
 
-    async def generate_daily_brief(self, date: Optional[datetime] = None,
-                                 save_local: bool = True, send_email: bool = True) -> Dict[str, Any]:
-        """Generate and optionally send daily intelligence brief"""
-        if date is None:
-            date = datetime.now()
+    async def generate_report(
+        self,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+        hours: Optional[int] = None,
+        save_local: bool = True,
+        send_email: bool = False
+    ) -> Dict[str, Any]:
+        """
+        Generate intelligence report for any time period
 
-        print(f"🚀 Starting daily brief generation for {date.strftime('%Y-%m-%d')}")
+        Args:
+            start_date: Start of analysis window
+            end_date: End of analysis window (defaults to now)
+            hours: Look back N hours from end_date (alternative to start_date)
+            save_local: Save HTML to data/newsletters/
+            send_email: Send via email
+
+        Returns:
+            Report generation results
+        """
+        # Generate content
+        content_data = await self.content_engine.generate_intelligence_report(
+            start_date=start_date,
+            end_date=end_date,
+            hours=hours
+        )
+
+        results = {
+            "success": True,
+            "start_date": content_data['start_date'],
+            "end_date": content_data['end_date'],
+            "duration_hours": content_data['duration_hours'],
+            "report_type": content_data['report_type'],
+            "articles_analyzed": content_data['articles_analyzed'],
+            "synthesis_id": content_data.get('synthesis_id'),
+            "processing_time": content_data.get('processing_time'),
+            "local_saved": False,
+            "email_sent": False
+        }
 
         try:
-            # Generate content
-            content_data = await self.content_engine.generate_daily_brief_content(date)
-
-            results = {
-                "success": True,
-                "date": date,
-                "content_generated": True,
-                "email_sent": False,
-                "local_saved": False,
-                "article_count": content_data.get("article_count", 0),
-                "priority_count": len(content_data.get("priority_articles", [])),
-                "trend_count": len(content_data.get("trends", [])),
-                "processing_time": content_data.get("processing_time", "N/A")
-            }
+            # Render template
+            html_content = DailyBriefTemplate.generate_html(content_data)
 
             # Save locally if requested
             if save_local:
-                html_content = DailyBriefTemplate.generate_html(content_data)
-                local_path = self._save_daily_brief_local(content_data, html_content)
+                local_path = self._save_report_local(content_data, html_content)
                 results["local_saved"] = True
                 results["local_path"] = str(local_path)
-                print(f"💾 Daily brief saved locally: {local_path}")
+                print(f"💾 Report saved: {local_path}")
 
             # Send email if requested
             if send_email:
-                email_success = await self.scheduler.send_daily_briefing(date)
-                results["email_sent"] = email_success
+                recipient = self.scheduler.default_recipient
+                if recipient and self.scheduler.email_sender.email_enabled:
+                    email_success = await self.scheduler.email_sender.send_daily_brief(
+                        content_data, recipient
+                    )
+                    results["email_sent"] = email_success
+                    if email_success:
+                        print(f"📧 Report emailed to {recipient}")
+                else:
+                    print("⚠️ Email not configured - report saved locally only")
+                    results["email_sent"] = False
 
             return results
 
         except Exception as e:
-            print(f"❌ Daily brief generation failed: {e}")
-            return {
-                "success": False,
-                "error": str(e),
-                "date": date
-            }
-
-    async def generate_weekly_analysis(self, end_date: Optional[datetime] = None,
-                                     save_local: bool = True, send_email: bool = True) -> Dict[str, Any]:
-        """Generate and optionally send weekly trend analysis"""
-        if end_date is None:
-            end_date = datetime.now()
-
-        start_date = end_date - timedelta(days=7)
-        print(f"📈 Starting weekly analysis: {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}")
-
-        try:
-            # Generate content
-            content_data = await self.content_engine.generate_weekly_trend_content(end_date)
-
-            results = {
-                "success": True,
-                "start_date": start_date,
-                "end_date": end_date,
-                "content_generated": True,
-                "email_sent": False,
-                "local_saved": False,
-                "total_articles": content_data.get("total_articles", 0),
-                "trend_count": len(content_data.get("trends", [])),
-                "processing_time": content_data.get("processing_time", "N/A")
-            }
-
-            # Save locally if requested
-            if save_local:
-                html_content = WeeklyTrendTemplate.generate_html(content_data)
-                local_path = self._save_weekly_analysis_local(content_data, html_content)
-                results["local_saved"] = True
-                results["local_path"] = str(local_path)
-                print(f"💾 Weekly analysis saved locally: {local_path}")
-
-            # Send email if requested
-            if send_email:
-                email_success = await self.scheduler.send_weekly_analysis(end_date)
-                results["email_sent"] = email_success
-
+            print(f"❌ Report generation failed: {e}")
+            results["success"] = False
+            results["error"] = str(e)
             return results
 
-        except Exception as e:
-            print(f"❌ Weekly analysis generation failed: {e}")
-            return {
-                "success": False,
-                "error": str(e),
-                "start_date": start_date,
-                "end_date": end_date
-            }
+    def _save_report_local(self, content_data: Dict[str, Any], html_content: str) -> Path:
+        """Save report with descriptive filename"""
+        newsletters_dir = Path("data/newsletters")
+        newsletters_dir.mkdir(parents=True, exist_ok=True)
+
+        start = content_data['start_date'].strftime('%Y-%m-%d')
+        end = content_data['end_date'].strftime('%Y-%m-%d')
+        report_type = content_data['report_type']
+
+        filename = f"intel_report_{report_type}_{start}_to_{end}.html"
+        filepath = newsletters_dir / filename
+
+        with open(filepath, 'w', encoding='utf-8') as f:
+            f.write(html_content)
+
+        return filepath
 
     async def test_system(self) -> Dict[str, Any]:
         """Test the newsletter system components"""
@@ -130,8 +125,12 @@ class NewsletterSystem:
         try:
             # Test content engine with recent data
             print("📊 Testing content engine...")
-            test_date = datetime.now() - timedelta(days=1)  # Yesterday's data
-            content_data = await self.content_engine.generate_daily_brief_content(test_date)
+            end_date = datetime.now()
+            start_date = end_date - timedelta(hours=24)
+            content_data = await self.content_engine.generate_intelligence_report(
+                start_date=start_date,
+                end_date=end_date
+            )
 
             if content_data and "executive_summary" in content_data:
                 test_results["content_engine"] = True
@@ -183,50 +182,25 @@ class NewsletterSystem:
             test_results["error"] = str(e)
             return test_results
 
-    def _save_daily_brief_local(self, content_data: Dict[str, Any], html_content: str) -> Path:
-        """Save daily brief to local file"""
-        newsletters_dir = Path("data/newsletters")
-        newsletters_dir.mkdir(parents=True, exist_ok=True)
+    async def preview_report(self, start_date: Optional[datetime] = None,
+                            end_date: Optional[datetime] = None, hours: Optional[int] = None) -> str:
+        """
+        Generate preview of intelligence report (HTML content only)
 
-        date_str = content_data['date'].strftime('%Y-%m-%d')
-        filename = f"daily_brief_{date_str}.html"
-        filepath = newsletters_dir / filename
+        Args:
+            start_date: Start of analysis window
+            end_date: End of analysis window
+            hours: Look back N hours (alternative to start_date)
 
-        with open(filepath, 'w', encoding='utf-8') as f:
-            f.write(html_content)
-
-        return filepath
-
-    def _save_weekly_analysis_local(self, content_data: Dict[str, Any], html_content: str) -> Path:
-        """Save weekly analysis to local file"""
-        newsletters_dir = Path("data/newsletters")
-        newsletters_dir.mkdir(parents=True, exist_ok=True)
-
-        start_str = content_data['start_date'].strftime('%Y-%m-%d')
-        end_str = content_data['end_date'].strftime('%Y-%m-%d')
-        filename = f"weekly_analysis_{start_str}_to_{end_str}.html"
-        filepath = newsletters_dir / filename
-
-        with open(filepath, 'w', encoding='utf-8') as f:
-            f.write(html_content)
-
-        return filepath
-
-    async def preview_daily_brief(self, date: Optional[datetime] = None) -> str:
-        """Generate preview of daily brief (HTML content only)"""
-        if date is None:
-            date = datetime.now()
-
-        content_data = await self.content_engine.generate_daily_brief_content(date)
+        Returns:
+            HTML content string
+        """
+        content_data = await self.content_engine.generate_intelligence_report(
+            start_date=start_date,
+            end_date=end_date,
+            hours=hours
+        )
         return DailyBriefTemplate.generate_html(content_data)
-
-    async def preview_weekly_analysis(self, end_date: Optional[datetime] = None) -> str:
-        """Generate preview of weekly analysis (HTML content only)"""
-        if end_date is None:
-            end_date = datetime.now()
-
-        content_data = await self.content_engine.generate_weekly_trend_content(end_date)
-        return WeeklyTrendTemplate.generate_html(content_data)
 
     def get_system_status(self) -> Dict[str, Any]:
         """Get current system status"""
@@ -247,8 +221,8 @@ class NewsletterSystem:
                 "directory": "data/newsletters/"
             },
             "capabilities": [
-                "Daily intelligence briefings",
-                "Weekly trend analysis",
+                "Intelligence reports for any time window",
+                "Narrative synthesis from RSS feeds",
                 "Executive summary generation",
                 "Multi-format output (HTML/Text)",
                 "Email delivery with SMTP",

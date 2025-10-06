@@ -1,3 +1,0 @@
-"""
-InsightWeaver Test Suite
-"""

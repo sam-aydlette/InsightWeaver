@@ -15,8 +15,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from src.pipeline.orchestrator import run_pipeline
-from src.agents.prioritization_agent import PrioritizationAgent
-from src.agents.trend_agent import TrendAnalysisAgent
 from src.feed_manager import setup_feeds
 from src.config.settings import settings
 from src.database.connection import create_tables
@@ -38,81 +36,14 @@ async def run_fetch_only():
     return results
 
 
-async def run_prioritize_only():
-    """Run only prioritization on existing articles"""
-    print("Running article prioritization...")
-    agent = PrioritizationAgent()
-    results = await agent.run_analysis(hours=48)
-    summary = results.get("summary", {})
-    print(f"Prioritized {results['articles_processed']} articles")
-    print(f"High priority articles: {summary.get('high_priority_articles', 0)}")
-    return results
+async def run_analysis_only():
+    """Run analysis on existing articles using context-driven approach"""
+    print("Running article analysis...")
+    # TODO: Implement context-driven analysis
+    print("⚠️ Analysis functionality being refactored to context-engineering approach")
+    return {"status": "pending_refactor"}
 
 
-async def run_trend_analysis():
-    """Run trend analysis on existing articles"""
-    print("Running trend analysis...")
-    agent = TrendAnalysisAgent()
-    results = await agent.run_analysis(days=30)  # Analyze last 30 days
-    summary = results.get("summary", {})
-    print(f"Analyzed {results['articles_processed']} articles")
-    print(f"Trends detected: {summary.get('trends_detected', 0)}")
-
-    # Display key trend findings
-    trend_analysis = results.get("trend_analysis", [])
-    if trend_analysis:
-        print("\nKey Trend Movements:")
-        for trend in sorted(trend_analysis, key=lambda x: x.get('confidence', 0), reverse=True)[:5]:
-            trend_name = trend.get('trend', '').replace('_', ' ').title()
-            direction = trend.get('direction', 'NEUTRAL')
-            confidence = trend.get('confidence', 0)
-            print(f"  • {trend_name}: {direction} (confidence: {confidence:.2f})")
-
-    return results
-
-
-async def run_newsletter_system():
-    """Run newsletter system operations"""
-    from src.newsletter.newsletter_system import NewsletterSystem
-
-    system = NewsletterSystem()
-
-    print("\n" + "=" * 50)
-    print("InsightWeaver Newsletter System")
-    print("=" * 50)
-
-    # Test system first
-    test_results = await system.test_system()
-
-    if test_results["overall_status"] in ["FULLY_OPERATIONAL", "OPERATIONAL_LOCAL_ONLY"]:
-        print("\n📊 Generating daily brief...")
-        daily_result = await system.generate_daily_brief()
-
-        if daily_result["success"]:
-            print(f"✅ Daily brief generated successfully")
-            print(f"   • Articles processed: {daily_result['article_count']}")
-            print(f"   • Priority items: {daily_result['priority_count']}")
-            print(f"   • Trends detected: {daily_result['trend_count']}")
-            if daily_result.get("local_saved"):
-                print(f"   • Saved to: {daily_result['local_path']}")
-            if daily_result.get("email_sent"):
-                print(f"   • Email sent successfully")
-
-        print("\n📈 Generating weekly analysis...")
-        weekly_result = await system.generate_weekly_analysis()
-
-        if weekly_result["success"]:
-            print(f"✅ Weekly analysis generated successfully")
-            print(f"   • Total articles: {weekly_result['total_articles']}")
-            print(f"   • Trends analyzed: {weekly_result['trend_count']}")
-            if weekly_result.get("local_saved"):
-                print(f"   • Saved to: {weekly_result['local_path']}")
-            if weekly_result.get("email_sent"):
-                print(f"   • Email sent successfully")
-    else:
-        print("❌ Newsletter system not operational. Check configuration.")
-
-    return test_results
 
 
 async def test_newsletter():
@@ -138,73 +69,52 @@ async def run_full_pipeline():
         prioritize_limit=None  # Two-stage analysis processes all articles efficiently
     )
 
-    # Run trend analysis after prioritization
-    if settings.anthropic_api_key and results.get("summary", {}).get('articles_fetched', 0) > 0:
-        print("\n📈 Running trend analysis...")
-        trend_results = await run_trend_analysis()
-        results["trend_results"] = trend_results
-    else:
-        print("\n⚠️ Skipping trend analysis - no API key or no articles")
+    # Analysis integrated into pipeline orchestrator
+    if not settings.anthropic_api_key:
+        print("\n⚠️ Skipping analysis - no API key configured")
 
     # Display summary
     summary = results.get("summary", {})
-    trend_summary = results.get("trend_results", {}).get("summary", {})
     print("\n" + "=" * 60)
     print("Analysis Pipeline Complete")
     print(f"• Articles fetched: {summary.get('articles_fetched', 0)}")
     print(f"• Duplicates removed: {summary.get('duplicates_removed', 0)}")
-    print(f"• High priority articles: {summary.get('high_priority_articles', 0)}")
-    print(f"• Trends detected: {trend_summary.get('trends_detected', 0)}")
+    print(f"• Articles analyzed: {summary.get('articles_synthesized', 0)}")
+    print(f"• Narrative generated: {summary.get('narrative_generated', False)}")
     print(f"• Duration: {summary.get('duration_seconds', 0):.1f}s")
     print("=" * 60)
 
     # Generate newsletters if analysis was successful
-    if summary.get('high_priority_articles', 0) > 0 or summary.get('articles_fetched', 0) > 0:
-        print("\n📧 Generating Intelligence Newsletters...")
+    if summary.get('articles_synthesized', 0) > 0 or summary.get('articles_fetched', 0) > 0:
+        print("\n📧 Generating Intelligence Report...")
         print("-" * 40)
 
         try:
             from src.newsletter.newsletter_system import NewsletterSystem
             newsletter_system = NewsletterSystem()
 
-            # Generate daily brief
-            print("📊 Generating daily intelligence brief...")
-            daily_result = await newsletter_system.generate_daily_brief()
+            # Generate intelligence report for last 24 hours
+            print("📊 Generating Intelligence Report...")
+            report_result = await newsletter_system.generate_report(hours=24, send_email=True)
 
-            if daily_result["success"]:
-                print(f"✅ Daily brief generated successfully")
-                print(f"   • Articles processed: {daily_result['article_count']}")
-                print(f"   • Priority items: {daily_result['priority_count']}")
-                if daily_result.get("local_saved"):
-                    print(f"   • Saved to: {daily_result['local_path']}")
-                if daily_result.get("email_sent"):
+            if report_result["success"]:
+                print(f"✅ Report generated successfully")
+                print(f"   • Articles analyzed: {report_result['articles_analyzed']}")
+                print(f"   • Report type: {report_result['report_type']}")
+                if report_result.get("local_saved"):
+                    print(f"   • Saved to: {report_result['local_path']}")
+                if report_result.get("email_sent"):
                     print(f"   • Email sent successfully")
 
-            # Generate weekly analysis
-            print("\n📈 Generating weekly trend analysis...")
-            weekly_result = await newsletter_system.generate_weekly_analysis()
-
-            if weekly_result["success"]:
-                print(f"✅ Weekly analysis generated successfully")
-                print(f"   • Total articles analyzed: {weekly_result['total_articles']}")
-                print(f"   • Trends tracked: {weekly_result['trend_count']}")
-                if weekly_result.get("local_saved"):
-                    print(f"   • Saved to: {weekly_result['local_path']}")
-                if weekly_result.get("email_sent"):
-                    print(f"   • Email sent successfully")
-
-            # Update results with newsletter data
-            results["newsletter_results"] = {
-                "daily_brief": daily_result,
-                "weekly_analysis": weekly_result
-            }
+            # Update results with report data
+            results["report_results"] = report_result
 
         except Exception as e:
-            print(f"⚠️ Newsletter generation encountered an issue: {e}")
+            print(f"⚠️ Report generation encountered an issue: {e}")
             print("   Data collection and analysis completed successfully.")
 
     else:
-        print("\n⚠️ Skipping newsletter generation - no articles or priority items found")
+        print("\n⚠️ Skipping report generation - no articles or priority items found")
 
     print("\n" + "=" * 60)
     print("🎉 Complete Pipeline Finished")
@@ -222,7 +132,7 @@ def setup_database():
     print("Loading RSS feeds...")
     fm = setup_feeds()
     stats = fm.get_feed_statistics()
-    print(f"✓ Loaded {stats['active_feeds']} active feeds across {len(stats['categories'])} categories")
+    print(f"✓ Loaded {stats['database']['active_feeds']} active feeds across {len(stats['database']['categories'])} categories")
 
 
 def query_priorities(min_score=0.5, limit=10):
@@ -254,15 +164,15 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python main.py                     # Run full pipeline: fetch → prioritize → trends → newsletter
-  python main.py --fetch             # Only fetch RSS feeds
-  python main.py --prioritize        # Only run prioritization
-  python main.py --trends            # Only run trend analysis
-  python main.py --newsletter        # Generate intelligence newsletters
-  python main.py --test-newsletter   # Test newsletter system
-  python main.py --setup             # Initialize database and feeds
-  python main.py --query             # Query priority articles
-  python main.py --query --min 0.7   # Query high priority only
+  python main.py                              # Run full pipeline
+  python main.py --report                     # Generate report (last 24h)
+  python main.py --report --hours 48          # Last 48 hours
+  python main.py --report --hours 168         # Last week (168h)
+  python main.py --report --start-date 2025-10-01 --end-date 2025-10-07
+  python main.py --fetch                      # Only fetch RSS feeds
+  python main.py --test-newsletter            # Test reporting system
+  python main.py --setup                      # Initialize database and feeds
+  python main.py --query                      # Query priority articles
         """
     )
 
@@ -291,15 +201,33 @@ Examples:
     )
 
     parser.add_argument(
-        "--newsletter",
+        "--report",
         action="store_true",
-        help="Generate and send intelligence newsletters"
+        help="Generate intelligence report (flexible time window)"
+    )
+
+    parser.add_argument(
+        "--hours",
+        type=int,
+        help="Look back N hours for report (default: 24)"
+    )
+
+    parser.add_argument(
+        "--start-date",
+        type=str,
+        help="Report start date (YYYY-MM-DD or YYYY-MM-DD HH:MM)"
+    )
+
+    parser.add_argument(
+        "--end-date",
+        type=str,
+        help="Report end date (YYYY-MM-DD or YYYY-MM-DD HH:MM)"
     )
 
     parser.add_argument(
         "--test-newsletter",
         action="store_true",
-        help="Test newsletter system configuration"
+        help="Test reporting system configuration"
     )
 
     parser.add_argument(
@@ -335,26 +263,68 @@ Examples:
         elif args.fetch:
             asyncio.run(run_fetch_only())
 
-        elif args.prioritize:
+        elif args.prioritize or args.trends:
             if not settings.anthropic_api_key:
                 print("⚠️  Warning: ANTHROPIC_API_KEY not configured")
-                print("Prioritization requires Claude API access")
+                print("Analysis requires Claude API access")
                 sys.exit(1)
-            asyncio.run(run_prioritize_only())
+            asyncio.run(run_analysis_only())
 
-        elif args.trends:
+        elif args.report:
             if not settings.anthropic_api_key:
                 print("⚠️  Warning: ANTHROPIC_API_KEY not configured")
-                print("Trend analysis requires Claude API access")
+                print("Report generation requires Claude API access")
                 sys.exit(1)
-            asyncio.run(run_trend_analysis())
 
-        elif args.newsletter:
-            if not settings.anthropic_api_key:
-                print("⚠️  Warning: ANTHROPIC_API_KEY not configured")
-                print("Newsletter generation requires Claude API access")
-                sys.exit(1)
-            asyncio.run(run_newsletter_system())
+            # Parse date arguments if provided
+            start_date = None
+            end_date = None
+
+            if args.start_date:
+                try:
+                    if len(args.start_date) == 10:  # YYYY-MM-DD
+                        start_date = datetime.strptime(args.start_date, '%Y-%m-%d')
+                    else:  # YYYY-MM-DD HH:MM
+                        start_date = datetime.strptime(args.start_date, '%Y-%m-%d %H:%M')
+                except ValueError as e:
+                    print(f"❌ Invalid start date format: {args.start_date}")
+                    print("Use YYYY-MM-DD or 'YYYY-MM-DD HH:MM'")
+                    sys.exit(1)
+
+            if args.end_date:
+                try:
+                    if len(args.end_date) == 10:  # YYYY-MM-DD
+                        end_date = datetime.strptime(args.end_date, '%Y-%m-%d')
+                    else:  # YYYY-MM-DD HH:MM
+                        end_date = datetime.strptime(args.end_date, '%Y-%m-%d %H:%M')
+                except ValueError as e:
+                    print(f"❌ Invalid end date format: {args.end_date}")
+                    print("Use YYYY-MM-DD or 'YYYY-MM-DD HH:MM'")
+                    sys.exit(1)
+
+            async def run_report():
+                from src.newsletter.newsletter_system import NewsletterSystem
+                system = NewsletterSystem()
+                result = await system.generate_report(
+                    start_date=start_date,
+                    end_date=end_date,
+                    hours=args.hours,
+                    send_email=True  # Enable email by default
+                )
+
+                if result["success"]:
+                    print(f"✅ Report generated successfully")
+                    print(f"   • Type: {result['report_type']}")
+                    print(f"   • Duration: {result['duration_hours']:.1f}h")
+                    print(f"   • Articles analyzed: {result['articles_analyzed']}")
+                    if result.get("local_saved"):
+                        print(f"   • Saved to: {result['local_path']}")
+                    if result.get("email_sent"):
+                        print(f"   • Email sent successfully")
+                else:
+                    print(f"❌ Report generation failed: {result.get('error')}")
+
+            asyncio.run(run_report())
 
         elif args.test_newsletter:
             asyncio.run(test_newsletter())

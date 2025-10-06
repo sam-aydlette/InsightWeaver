@@ -79,5 +79,31 @@
       "policy briefs"
     ],
     "complexity_level": "technical"
+  },
+  "briefing_preferences": {
+    "perspective": "daily_intelligence_brief",
+    "tone": "analytical_professional",
+    "reading_time_minutes": 7
+  },
+  "feed_preferences": {
+    "required_scopes": ["always", "national"],
+    "geographic_interests": [
+      "usa",
+      "virginia",
+      "northern_virginia"
+    ],
+    "professional_domains": [
+      "cybersecurity",
+      "technology",
+      "software_development"
+    ],
+    "specialty_interests": [
+      "education",
+      "transportation"
+    ],
+    "excluded_topics": [
+      "sports",
+      "entertainment"
+    ]
   }
 }
