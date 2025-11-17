@@ -10,8 +10,10 @@ from typing import Dict, Any, Optional
 
 from .curator import ContextCurator
 from .claude_client import ClaudeClient
+from .reflection_engine import ReflectionEngine
 from ..database.connection import get_db
 from ..database.models import NarrativeSynthesis, AnalysisRun, ContextSnapshot, Article
+from ..config.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +25,7 @@ class NarrativeSynthesizer:
         """Initialize narrative synthesizer"""
         self.curator = ContextCurator()
         self.client = ClaudeClient()
+        self.reflection_engine = ReflectionEngine()
 
     async def synthesize(
         self,
@@ -90,6 +93,162 @@ class NarrativeSynthesizer:
                 "status": "error",
                 "error": str(e)
             }
+
+    async def synthesize_with_reflection(
+        self,
+        hours: int = 48,
+        max_articles: int = 50,
+        depth_threshold: float = 8.0
+    ) -> Dict[str, Any]:
+        """
+        Generate narrative synthesis with reflection loop for deeper analysis
+
+        Args:
+            hours: Hours to look back for articles
+            max_articles: Maximum articles to include in context
+            depth_threshold: Minimum depth score to skip refinement (0-10)
+
+        Returns:
+            Synthesis results dictionary with reflection metadata
+        """
+        logger.info(f"Starting narrative synthesis with reflection (depth threshold: {depth_threshold})")
+
+        # Check if reflection is enabled
+        enable_reflection = getattr(settings, 'enable_reflection', True)
+        if not enable_reflection:
+            logger.info("Reflection disabled in settings, using standard synthesis")
+            return await self.synthesize(hours, max_articles)
+
+        # Curate context
+        context = self.curator.curate_for_narrative_synthesis(hours, max_articles)
+
+        if not context["articles"]:
+            logger.warning("No articles available for synthesis")
+            return {
+                "articles_analyzed": 0,
+                "synthesis_id": None,
+                "status": "no_articles"
+            }
+
+        # Build synthesis task
+        task = self._build_synthesis_task(len(context["articles"]))
+
+        try:
+            # STEP 1: Initial synthesis
+            logger.info("Step 1: Generating initial synthesis")
+            response = await self.client.analyze_with_context(
+                context=context,
+                task=task,
+                temperature=1.0
+            )
+
+            # Parse structured output
+            initial_synthesis = self._parse_synthesis_response(response)
+
+            # STEP 2: Evaluate depth with reflection engine
+            logger.info("Step 2: Evaluating synthesis depth")
+            reflection = await self.reflection_engine.evaluate_depth(
+                synthesis_data=initial_synthesis,
+                context=context
+            )
+
+            logger.info(f"Initial depth score: {reflection.depth_score}/10")
+
+            # Store reflection metadata
+            initial_synthesis["reflection"] = {
+                "initial_depth_score": reflection.depth_score,
+                "dimension_scores": reflection.evaluation_metadata.get("dimension_scores", {}),
+                "refinement_applied": False
+            }
+
+            # STEP 3: Decide if refinement needed
+            if reflection.depth_score >= depth_threshold:
+                logger.info(f"Depth score {reflection.depth_score} meets threshold {depth_threshold}, skipping refinement")
+                final_synthesis = initial_synthesis
+            else:
+                logger.info(f"Depth score {reflection.depth_score} below threshold {depth_threshold}, refining analysis")
+
+                # Generate refinement prompt
+                refinement_prompt = await self.reflection_engine.generate_refinement_prompt(
+                    synthesis_data=initial_synthesis,
+                    reflection=reflection,
+                    context=context
+                )
+
+                # STEP 4: Regenerate with deeper focus
+                logger.info("Step 4: Generating refined synthesis")
+                refined_response = await self.client.analyze(
+                    system_prompt=self._build_system_prompt(context),
+                    user_message=refinement_prompt,
+                    temperature=1.0
+                )
+
+                # Parse refined synthesis
+                final_synthesis = self._parse_synthesis_response(refined_response)
+
+                # Update reflection metadata
+                final_synthesis["reflection"] = {
+                    "initial_depth_score": reflection.depth_score,
+                    "dimension_scores": reflection.evaluation_metadata.get("dimension_scores", {}),
+                    "refinement_applied": True,
+                    "shallow_areas_addressed": [area.to_dict() for area in reflection.shallow_areas],
+                    "recommendations_followed": reflection.recommendations
+                }
+
+                logger.info("Refinement complete")
+
+            # Store in database with context snapshot
+            synthesis_id = self._store_synthesis(
+                synthesis_data=final_synthesis,
+                articles_count=len(context["articles"]),
+                context=context
+            )
+
+            logger.info(f"Narrative synthesis with reflection complete: {synthesis_id}")
+
+            return {
+                "articles_analyzed": len(context["articles"]),
+                "synthesis_id": synthesis_id,
+                "synthesis_data": final_synthesis,
+                "reflection_metadata": final_synthesis.get("reflection", {}),
+                "status": "success"
+            }
+
+        except Exception as e:
+            logger.error(f"Narrative synthesis with reflection failed: {e}", exc_info=True)
+            return {
+                "articles_analyzed": 0,
+                "synthesis_id": None,
+                "status": "error",
+                "error": str(e)
+            }
+
+    def _build_system_prompt(self, context: Dict[str, Any]) -> str:
+        """Build system prompt from context (mirrors ClaudeClient logic)"""
+        parts = []
+
+        # Add user profile context
+        if "user_profile" in context:
+            profile = context["user_profile"]
+            parts.append(f"## User Context")
+            parts.append(f"Location: {profile.get('location', 'Unknown')}")
+            parts.append(f"Professional Domains: {', '.join(profile.get('professional_domains', []))}")
+            parts.append(f"Civic Interests: {', '.join(profile.get('civic_interests', []))}")
+            parts.append("")
+
+        # Add recent articles context (abbreviated for refinement)
+        if "articles" in context:
+            parts.append(f"## Context: {len(context['articles'])} articles analyzed")
+            parts.append("(Full article content available in original synthesis)")
+            parts.append("")
+
+        # Add instructions
+        if "instructions" in context:
+            parts.append("## Core Instructions")
+            parts.append(context["instructions"])
+            parts.append("")
+
+        return "\n".join(parts)
 
     def _build_synthesis_task(self, article_count: int) -> str:
         """Build synthesis task prompt"""

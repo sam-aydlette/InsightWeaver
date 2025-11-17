@@ -1,0 +1,56 @@
+{
+  "module_name": "decision_context",
+  "description": "Template for active decisions and priorities requiring intelligence monitoring",
+  "version": "1.0",
+  "priority": "high",
+  "active_decisions": [
+    {
+      "decision_id": "example_career",
+      "decision": "Job search or career change",
+      "timeline": "Next 6 months",
+      "status": "active_monitoring|monitoring|on_hold",
+      "relevant_signals": [
+        "job market trends in your field",
+        "salary trends",
+        "skills demand",
+        "company hiring/layoffs"
+      ],
+      "decision_criteria": [
+        "Compensation: target range",
+        "Work-life balance: preferences",
+        "Growth: career trajectory"
+      ],
+      "why_matters": "Explain why this decision is time-sensitive or important"
+    },
+    {
+      "decision_id": "example_housing",
+      "decision": "Home purchase, relocation, or major expense",
+      "timeline": "Next 12 months",
+      "status": "monitoring",
+      "relevant_signals": [
+        "interest rates",
+        "housing market trends",
+        "local economic indicators"
+      ],
+      "decision_criteria": [
+        "Affordability: specific thresholds",
+        "Market conditions: what you're waiting for"
+      ],
+      "why_matters": "How this affects financial planning or life decisions"
+    }
+  ],
+  "watching_topics": [
+    "Topic 1 that affects you",
+    "Topic 2 that requires monitoring",
+    "Topic 3 with time-sensitive implications"
+  ],
+  "context_for_analysis": {
+    "life_stage": "Your current life stage",
+    "decision_mode": "Planning mode (strategic, reactive, etc.)",
+    "risk_tolerance": "How you approach risk",
+    "geographic_constraints": "Any location-specific factors"
+  },
+  "instructions_for_synthesis": "How Claude should use this context when analyzing articles",
+  "last_updated": "YYYY-MM-DD",
+  "token_estimate": 500
+}

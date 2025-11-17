@@ -25,6 +25,12 @@ class Settings(BaseSettings):
     debug: bool = os.getenv("DEBUG", "False").lower() == "true"
     log_level: str = os.getenv("LOG_LEVEL", "INFO")
 
+    # Deep Context Enhancements
+    enable_reflection: bool = os.getenv("ENABLE_REFLECTION", "True").lower() == "true"
+    reflection_depth_threshold: float = float(os.getenv("REFLECTION_DEPTH_THRESHOLD", "8.0"))
+    enable_semantic_memory: bool = os.getenv("ENABLE_SEMANTIC_MEMORY", "False").lower() == "true"  # Phase 2
+    enable_perception: bool = os.getenv("ENABLE_PERCEPTION", "False").lower() == "true"  # Phase 3
+
     # Paths
     project_root: Path = Path(__file__).parent.parent.parent
     data_dir: Path = project_root / "data"

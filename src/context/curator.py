@@ -14,6 +14,8 @@ from ..database.connection import get_db
 from ..database.models import Article, NarrativeSynthesis
 from ..utils.profile_loader import get_user_profile, UserProfile
 from .perspectives import get_perspective, Perspective
+from .module_loader import ContextModuleLoader
+from .anomaly_detector import CoverageAnomalyDetector
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +70,12 @@ class ContextCurator:
         self.perspective = get_perspective(perspective_id)
         logger.info(f"Using perspective: {self.perspective.name}")
 
+        # Initialize context module loader
+        self.module_loader = ContextModuleLoader()
+
+        # Initialize anomaly detector
+        self.anomaly_detector = CoverageAnomalyDetector(baseline_days=30)
+
     def curate_for_narrative_synthesis(
         self,
         hours: int = 48,
@@ -87,13 +95,25 @@ class ContextCurator:
             # Get recent unfiltered articles
             articles = self._get_recent_articles(session, hours, max_articles)
 
-            # Get historical context
+            # Get historical context (now 5 syntheses with enhanced format)
             memory = self._get_historical_memory(session)
+
+            # Load decision context module
+            modules = self.module_loader.load_all_modules()
+            decision_context = self._format_decision_context(modules.get('core', []))
+
+            # Detect coverage anomalies
+            anomaly_report = self.anomaly_detector.detect_anomalies(
+                session, articles, current_hours=hours
+            )
+            anomaly_context = self.anomaly_detector.format_for_context(anomaly_report)
 
             # Build initial context
             context = {
                 "user_profile": self._format_user_profile(),
+                "decision_context": decision_context,
                 "articles": self._format_articles(articles),
+                "anomaly_analysis": anomaly_context,
                 "memory": memory,
                 "instructions": self._get_synthesis_instructions()
             }
@@ -146,21 +166,62 @@ class ContextCurator:
         return articles
 
     def _get_historical_memory(self, session: Session) -> str:
-        """Get historical context from past syntheses"""
-        # Get last 3 narrative syntheses
+        """
+        Get enhanced historical context from past syntheses
+
+        Includes:
+        - Last 5 synthesis summaries (increased from 3)
+        - Tracked trends and predictions
+        - Identified patterns
+        """
+        # Get last 5 narrative syntheses (increased from 3)
         syntheses = session.query(NarrativeSynthesis).order_by(
             NarrativeSynthesis.generated_at.desc()
-        ).limit(3).all()
+        ).limit(5).all()
 
         if not syntheses:
             return "No historical context available."
 
-        memory_parts = ["## Recent Intelligence Summaries"]
+        memory_parts = ["<historical_context>"]
+        memory_parts.append("## Recent Intelligence Summaries")
+        memory_parts.append("Previous analyses for trend tracking and prediction verification:\n")
 
-        for synth in syntheses:
-            if synth.executive_summary:
-                date_str = synth.generated_at.strftime("%Y-%m-%d")
-                memory_parts.append(f"\n**{date_str}:** {synth.executive_summary[:300]}...")
+        for i, synth in enumerate(syntheses, 1):
+            date_str = synth.generated_at.strftime("%Y-%m-%d")
+
+            # Use bottom_line summary if available (new format), fallback to executive_summary (old format)
+            if synth.synthesis_data:
+                try:
+                    import json
+                    data = json.loads(synth.synthesis_data) if isinstance(synth.synthesis_data, str) else synth.synthesis_data
+                    bottom_line = data.get('bottom_line', {})
+                    summary = bottom_line.get('summary', '')
+
+                    if summary:
+                        memory_parts.append(f"\n**{date_str} ({i} days ago):**")
+                        memory_parts.append(summary)
+
+                        # Include immediate actions if present
+                        actions = bottom_line.get('immediate_actions', [])
+                        if actions:
+                            memory_parts.append("  Key actions identified: " + "; ".join(actions[:2]))
+                    elif synth.executive_summary:
+                        # Fallback to old format
+                        memory_parts.append(f"\n**{date_str}:** {synth.executive_summary[:400]}...")
+                except:
+                    # If parsing fails, use executive_summary
+                    if synth.executive_summary:
+                        memory_parts.append(f"\n**{date_str}:** {synth.executive_summary[:400]}...")
+            elif synth.executive_summary:
+                memory_parts.append(f"\n**{date_str}:** {synth.executive_summary[:400]}...")
+
+        memory_parts.append("\n## Analysis Continuity")
+        memory_parts.append("Use the above summaries to:")
+        memory_parts.append("• Identify continuing trends vs new developments")
+        memory_parts.append("• Verify or update previous predictions")
+        memory_parts.append("• Note unusual patterns (topic appearing/disappearing)")
+        memory_parts.append("• Provide comparative context (e.g., 'unlike last week when...')")
+        memory_parts.append("</historical_context>")
 
         return "\n".join(memory_parts)
 
@@ -254,14 +315,18 @@ class ContextCurator:
             len(context.get('instructions', ''))
         )
 
+        decision_chars = len(context.get('decision_context', ''))
         articles_chars = count_chars(context.get('articles', []))
+        anomaly_chars = len(context.get('anomaly_analysis', ''))
         memory_chars = len(context.get('memory', ''))
 
         return {
             'system': system_chars // 4,
+            'decision_context': decision_chars // 4,
             'articles': articles_chars // 4,
+            'anomaly_analysis': anomaly_chars // 4,
             'historical': memory_chars // 4,
-            'total': (system_chars + articles_chars + memory_chars) // 4
+            'total': (system_chars + decision_chars + articles_chars + anomaly_chars + memory_chars) // 4
         }
 
     def _format_user_profile(self) -> Dict[str, Any]:
@@ -281,6 +346,16 @@ class ContextCurator:
             "professional_domains": self.user_profile.get_professional_domains(),
             "civic_interests": self.user_profile.get_civic_interests()
         }
+
+    def _format_decision_context(self, core_modules: List) -> str:
+        """Format decision context from modules"""
+        decision_modules = [m for m in core_modules if 'decision_context' in m.name.lower()]
+
+        if not decision_modules:
+            return ""
+
+        # Use the module loader to format
+        return self.module_loader.format_for_claude_context(decision_modules)
 
     def _format_articles(self, articles: List[Article]) -> List[Dict[str, Any]]:
         """Format articles for context inclusion"""

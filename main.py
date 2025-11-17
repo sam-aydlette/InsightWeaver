@@ -44,6 +44,75 @@ async def run_analysis_only():
     return {"status": "pending_refactor"}
 
 
+async def run_collectors(force=False, collector_name=None):
+    """Run API data collectors"""
+    from src.collectors.manager import CollectorManager
+
+    print("\n" + "=" * 60)
+    print("Running Data Collectors")
+    print("=" * 60 + "\n")
+
+    manager = CollectorManager()
+
+    if collector_name:
+        print(f"Running specific collector: {collector_name}")
+        result = manager.run_specific_collector(collector_name)
+        print(f"\n✓ Collector '{collector_name}' completed")
+        print(f"  • New items: {result.get('new_items', 0)}")
+        print(f"  • Duplicates skipped: {result.get('duplicates_skipped', 0)}")
+        return result
+    else:
+        print(f"Running all {'collectors (forced)' if force else 'due collectors'}...")
+        summary = manager.collect_all(force=force)
+
+        print("\n" + "=" * 60)
+        print("Collection Summary")
+        print("=" * 60)
+        print(f"• Total collectors: {summary['total_collectors']}")
+        print(f"• Collectors run: {summary['collectors_run']}")
+        print(f"• Collectors skipped: {summary['collectors_skipped']}")
+        print(f"• Collectors failed: {summary['collectors_failed']}")
+        print(f"• Total items collected: {summary['total_items_collected']}")
+
+        if summary['results']:
+            print("\nDetailed Results:")
+            for name, result in summary['results'].items():
+                if result.get('success', True):
+                    print(f"  • {name}: {result.get('new_items', 0)} new items")
+                else:
+                    print(f"  • {name}: FAILED - {result.get('error', 'Unknown error')}")
+
+        print("=" * 60)
+        return summary
+
+
+def show_collector_status():
+    """Display status of all collectors"""
+    from src.collectors.manager import CollectorManager
+
+    manager = CollectorManager()
+    status = manager.get_collection_status()
+
+    if not status:
+        print("No collectors configured or no data sources in database")
+        return
+
+    print("\n" + "=" * 60)
+    print("Collector Status")
+    print("=" * 60)
+
+    for name, info in status.items():
+        print(f"\n{name}")
+        print(f"  • Type: {info['source_type']}")
+        print(f"  • Active: {'Yes' if info['is_active'] else 'No'}")
+        print(f"  • Last fetched: {info['last_fetched'] or 'Never'}")
+        print(f"  • Error count: {info['error_count']}")
+        if info['last_error']:
+            print(f"  • Last error: {info['last_error'][:100]}...")
+
+    print("=" * 60)
+
+
 
 
 async def test_newsletter():
@@ -61,6 +130,7 @@ async def run_full_pipeline():
     print("=" * 60)
     print(f"Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
 
+    # Step 1: Run RSS feed collection
     results = await run_pipeline(
         max_concurrent=10,
         rate_limit=2.0,
@@ -69,18 +139,43 @@ async def run_full_pipeline():
         prioritize_limit=None  # Two-stage analysis processes all articles efficiently
     )
 
+    # Step 2: Run API data collectors
+    print("\n" + "-" * 60)
+    print("Running API Data Collectors")
+    print("-" * 60 + "\n")
+
+    try:
+        from src.collectors.manager import CollectorManager
+        collector_manager = CollectorManager()
+        collector_summary = collector_manager.collect_all(force=False)
+
+        print(f"✓ Collectors run: {collector_summary['collectors_run']}")
+        print(f"  • Items collected: {collector_summary['total_items_collected']}")
+        print(f"  • Collectors skipped: {collector_summary['collectors_skipped']}")
+        if collector_summary['collectors_failed'] > 0:
+            print(f"  ⚠️  Collectors failed: {collector_summary['collectors_failed']}")
+
+        results['collector_summary'] = collector_summary
+    except Exception as e:
+        print(f"⚠️ Collector run encountered an issue: {e}")
+        print("   Continuing with pipeline...")
+
     # Analysis integrated into pipeline orchestrator
     if not settings.anthropic_api_key:
         print("\n⚠️ Skipping analysis - no API key configured")
 
     # Display summary
     summary = results.get("summary", {})
+    collector_summary = results.get("collector_summary", {})
+
     print("\n" + "=" * 60)
     print("Analysis Pipeline Complete")
     print(f"• Articles fetched: {summary.get('articles_fetched', 0)}")
     print(f"• Duplicates removed: {summary.get('duplicates_removed', 0)}")
     print(f"• Articles analyzed: {summary.get('articles_synthesized', 0)}")
     print(f"• Narrative generated: {summary.get('narrative_generated', False)}")
+    if collector_summary:
+        print(f"• API data collected: {collector_summary.get('total_items_collected', 0)}")
     print(f"• Duration: {summary.get('duration_seconds', 0):.1f}s")
     print("=" * 60)
 
@@ -170,6 +265,10 @@ Examples:
   python main.py --report --hours 168         # Last week (168h)
   python main.py --report --start-date 2025-10-01 --end-date 2025-10-07
   python main.py --fetch                      # Only fetch RSS feeds
+  python main.py --collect                    # Run API data collectors
+  python main.py --collect --force            # Force all collectors to run
+  python main.py --collect --name usajobs     # Run specific collector
+  python main.py --collector-status           # Show collector status
   python main.py --test-newsletter            # Test reporting system
   python main.py --setup                      # Initialize database and feeds
   python main.py --query                      # Query priority articles
@@ -186,6 +285,30 @@ Examples:
         "--fetch",
         action="store_true",
         help="Only fetch RSS feeds (no analysis)"
+    )
+
+    parser.add_argument(
+        "--collect",
+        action="store_true",
+        help="Run API data collectors (government calendars, events, jobs)"
+    )
+
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Force collectors to run even if not due (use with --collect)"
+    )
+
+    parser.add_argument(
+        "--name",
+        type=str,
+        help="Run specific collector by name (use with --collect)"
+    )
+
+    parser.add_argument(
+        "--collector-status",
+        action="store_true",
+        help="Show status of all data collectors"
     )
 
     parser.add_argument(
@@ -257,11 +380,17 @@ Examples:
         if args.setup:
             setup_database()
 
+        elif args.collector_status:
+            show_collector_status()
+
         elif args.query:
             query_priorities(min_score=args.min, limit=args.limit)
 
         elif args.fetch:
             asyncio.run(run_fetch_only())
+
+        elif args.collect:
+            asyncio.run(run_collectors(force=args.force, collector_name=args.name))
 
         elif args.prioritize or args.trends:
             if not settings.anthropic_api_key:

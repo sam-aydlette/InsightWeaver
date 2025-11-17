@@ -193,3 +193,141 @@ class Prediction(Base):
     timeframe = Column(String(50))
     supporting_evidence = Column(JSON)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+# New models for enhanced data collection
+
+class APIDataSource(Base):
+    """
+    Configuration for API-based data sources (Tier 1 + Tier 4)
+    Examples: Government calendars, job boards, event APIs, economic data
+    """
+    __tablename__ = "api_data_sources"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(200), nullable=False)
+    source_type = Column(String(50), nullable=False)  # 'calendar', 'job_market', 'events', 'economic', etc.
+    endpoint_url = Column(String(500))
+    api_key_required = Column(Boolean, default=False)
+    refresh_frequency_hours = Column(Integer, default=24)  # How often to fetch
+    is_active = Column(Boolean, default=True)
+    last_fetched = Column(DateTime)
+    last_error = Column(Text)
+    error_count = Column(Integer, default=0)
+    config_metadata = Column(JSON)  # API-specific config (headers, params, etc.)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_source_type', 'source_type'),
+        Index('idx_last_fetched', 'last_fetched'),
+    )
+
+
+class APIDataPoint(Base):
+    """
+    Individual data points collected from API sources
+    Flexible schema to handle different data types (events, jobs, metrics)
+    """
+    __tablename__ = "api_data_points"
+
+    id = Column(Integer, primary_key=True)
+    source_id = Column(Integer, ForeignKey("api_data_sources.id"), nullable=False)
+    data_type = Column(String(50), nullable=False)  # 'event', 'job_posting', 'metric', etc.
+    external_id = Column(String(200))  # ID from the external system
+    title = Column(String(500))
+    description = Column(Text)
+    data_payload = Column(JSON)  # Full structured data from API
+
+    # Time-based fields
+    event_date = Column(DateTime)  # For events/meetings
+    published_date = Column(DateTime)
+    expires_date = Column(DateTime)  # For job postings, events
+
+    # Relevance scoring
+    relevance_score = Column(Float)  # Score against user decisions
+    decision_ids = Column(JSON)  # Which decision_context items this relates to
+
+    # Context inclusion tracking
+    last_included_in_synthesis = Column(DateTime)
+    included_count = Column(Integer, default=0)
+
+    # Metadata
+    fetched_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_api_data_type', 'data_type'),
+        Index('idx_api_event_date', 'event_date'),
+        Index('idx_api_relevance_score', 'relevance_score'),
+        UniqueConstraint('source_id', 'external_id', name='_source_external_id_uc'),
+    )
+
+
+class MonitoredPage(Base):
+    """
+    Configuration for website change monitoring (Tier 2)
+    Tracks specific pages for changes relevant to user decisions
+    """
+    __tablename__ = "monitored_pages"
+
+    id = Column(Integer, primary_key=True)
+    url = Column(String(500), nullable=False, unique=True)
+    name = Column(String(200), nullable=False)
+    page_type = Column(String(50))  # 'policy', 'job_board', 'event_page', etc.
+    selector = Column(String(200))  # CSS selector for content to monitor
+    check_frequency_hours = Column(Integer, default=24)
+    decision_ids = Column(JSON)  # Which decisions this page relates to
+
+    # Monitoring state
+    is_active = Column(Boolean, default=True)
+    last_checked = Column(DateTime)
+    last_changed = Column(DateTime)
+    last_content_hash = Column(String(64))  # Hash of monitored content
+    last_error = Column(Text)
+    error_count = Column(Integer, default=0)
+
+    # Metadata
+    config_metadata = Column(JSON)  # Page-specific config
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_page_type', 'page_type'),
+        Index('idx_last_checked', 'last_checked'),
+    )
+
+
+class PageChange(Base):
+    """
+    Detected changes from monitored pages
+    Stored as context for Claude analysis
+    """
+    __tablename__ = "page_changes"
+
+    id = Column(Integer, primary_key=True)
+    monitored_page_id = Column(Integer, ForeignKey("monitored_pages.id"), nullable=False)
+    change_type = Column(String(50))  # 'content_added', 'content_removed', 'content_modified'
+
+    # Change details
+    old_content = Column(Text)
+    new_content = Column(Text)
+    diff_summary = Column(Text)  # Human-readable summary of changes
+    content_hash = Column(String(64))
+
+    # Relevance
+    relevance_score = Column(Float)
+    decision_ids = Column(JSON)  # Which decisions this change relates to
+
+    # Context inclusion tracking
+    last_included_in_synthesis = Column(DateTime)
+    included_count = Column(Integer, default=0)
+
+    # Timestamps
+    detected_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_page_change_detected_at', 'detected_at'),
+        Index('idx_page_change_relevance_score', 'relevance_score'),
+    )

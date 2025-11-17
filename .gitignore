@@ -3,6 +3,10 @@
 
 # User profile (contains personal information)
 config/user_profile.json
+config/context_modules/core/decision_contect.json
+
+# Philosophical documentation (not for version control)
+docs/philosophical_docs/
 
 # Database files
 *.db

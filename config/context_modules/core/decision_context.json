@@ -1,0 +1,88 @@
+{
+  "_comment": "This file contains TIME-SENSITIVE DECISIONS you're actively making. Edit this when decisions change (monthly). For permanent scope/preferences, edit ../../../user_profile.json instead (yearly).",
+  "module_name": "decision_context",
+  "description": "Active decisions and priorities requiring intelligence monitoring",
+  "version": "1.0",
+  "priority": "high",
+  "active_decisions": [
+    {
+      "decision_id": "career_2025_q4",
+      "decision": "Career advancement - evaluating opportunities in cybersecurity leadership",
+      "timeline": "Next 3-6 months (Q4 2025 - Q1 2026)",
+      "status": "active_monitoring",
+      "relevant_signals": [
+        "cybersecurity job market trends",
+        "salary trends for senior roles",
+        "compliance automation roles",
+        "tech industry market health",
+        "remote work policy changes",
+        "AI/ML skills demand in cybersecurity"
+      ],
+      "decision_criteria": [
+        "Compensation: target $200k+ range",
+        "Work-life balance: hybrid or remote preferred",
+        "Growth potential: leadership track",
+        "Stability: cybersecurity, tech and federal market conditions"
+      ],
+      "why_matters": "Timing job search based on market conditions, clearance processing, and compensation trends"
+    },
+    {
+      "decision_id": "education_monitoring",
+      "decision": "School system quality - ongoing monitoring for family planning",
+      "timeline": "Continuous",
+      "status": "active_monitoring",
+      "relevant_signals": [
+        "FCPS policy changes",
+        "school performance metrics",
+        "budget allocations to schools",
+        "teacher retention/hiring",
+        "capacity and overcrowding issues",
+        "curriculum changes (especially STEM/tech)"
+      ],
+      "decision_criteria": [
+        "Quality: maintaining high standards",
+        "Capacity: managing growth",
+        "Innovation: STEM/tech programs",
+        "Stability: budget and staffing"
+      ],
+      "why_matters": "School quality affects both current family planning and long-term housing decisions"
+    },
+    {
+      "decision_id": "concerts_2025_2026",
+      "decision": "Concert attendance - monitoring tour announcements and ticket availability",
+      "timeline": "Next 12 months",
+      "status": "active_monitoring",
+      "relevant_signals": [
+        "Kurt Vile tour announcements",
+        "Death Cab for Cutie tour dates",
+        "Corrosion of Conformity show schedules",
+        "venue announcements in DC/NoVA area",
+        "ticket sale dates",
+        "concert news and festival lineups"
+      ],
+      "decision_criteria": [
+        "Location: DC, Northern Virginia, or nearby venues",
+        "Timing: Weekends or evenings that work with schedule",
+        "Ticket availability: Early notification for presales",
+        "Venue quality: Good sound and viewing"
+      ],
+      "why_matters": "Want to catch these bands live while actively touring, requires advance notice for ticket purchases"
+    }
+  ],
+  "watching_topics": [
+    "Federal budget/shutdown risks (affects NoVA economy)",
+    "CISA/federal cybersecurity directives (affects job requirements)",
+    "Fairfax County zoning/development (affects housing options)",
+    "Transportation/Metro updates (affects commute/quality of life)",
+    "AI regulation (affects career trajectory)"
+  ],
+  "context_for_analysis": {
+    "life_stage": "Mid-career professional with family considerations",
+    "decision_mode": "Strategic planning - multiple major decisions in 12-18 month window",
+    "risk_tolerance": "Moderate - stable job, but monitoring for advancement opportunities",
+    "geographic_constraints": "Fairfax/Northern Virginia (family, job market, schools)"
+  },
+  "instructions_for_synthesis": "When analyzing articles, explicitly connect developments to active decisions. Flag any signals matching decision criteria. Note when events accelerate or delay decision timelines. Identify risks or opportunities relevant to current planning.",
+  "last_updated": "2025-10-07",
+  "token_estimate": 800
+}

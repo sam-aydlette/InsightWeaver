@@ -13,6 +13,7 @@ from ..database.models import Article, TrendAnalysis, NarrativeSynthesis
 from ..utils.profile_loader import get_user_profile
 from ..context.curator import ContextCurator
 from ..context.claude_client import ClaudeClient
+from ..config.settings import settings
 
 
 class NewsletterContentEngine:
@@ -97,16 +98,26 @@ class NewsletterContentEngine:
 
         # Calculate hours for synthesizer
         synthesis_hours = int(duration_hours) + 1
-        synthesis_result = await synthesizer.synthesize(
+
+        # Use reflection-enhanced synthesis for deeper insights
+        synthesis_result = await synthesizer.synthesize_with_reflection(
             hours=synthesis_hours,
-            max_articles=max_articles
+            max_articles=max_articles,
+            depth_threshold=settings.reflection_depth_threshold
         )
+
+        # Handle case where no synthesis was created (no articles)
+        if synthesis_result['synthesis_id'] is None:
+            return self._generate_empty_report(start_date, end_date, duration_hours)
 
         # Get fresh synthesis from DB
         with get_db() as session:
             synthesis = session.query(NarrativeSynthesis).get(
                 synthesis_result['synthesis_id']
             )
+
+            if synthesis is None:
+                return self._generate_empty_report(start_date, end_date, duration_hours)
 
             return self._format_synthesis_report(
                 synthesis, start_date, end_date, duration_hours
