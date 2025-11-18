@@ -31,6 +31,17 @@ class Settings(BaseSettings):
     enable_semantic_memory: bool = os.getenv("ENABLE_SEMANTIC_MEMORY", "False").lower() == "true"  # Phase 2
     enable_perception: bool = os.getenv("ENABLE_PERCEPTION", "False").lower() == "true"  # Phase 3
 
+    # Data Retention Policies (in days)
+    retention_articles_days: int = int(os.getenv("RETENTION_ARTICLES_DAYS", "90"))
+    retention_syntheses_days: int = int(os.getenv("RETENTION_SYNTHESES_DAYS", "180"))
+    retention_feed_health_days: int = int(os.getenv("RETENTION_FEED_HEALTH_DAYS", "30"))
+    # Note: Semantic facts use type-based expiration (60-365 days)
+
+    # Scheduling
+    daily_report_enabled: bool = os.getenv("DAILY_REPORT_ENABLED", "True").lower() == "true"
+    daily_report_hours: int = int(os.getenv("DAILY_REPORT_HOURS", "24"))  # Look back window
+    auto_cleanup_enabled: bool = os.getenv("AUTO_CLEANUP_ENABLED", "True").lower() == "true"
+
     # Paths
     project_root: Path = Path(__file__).parent.parent.parent
     data_dir: Path = project_root / "data"

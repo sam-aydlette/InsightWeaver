@@ -269,6 +269,12 @@ Examples:
   python main.py --collect --force            # Force all collectors to run
   python main.py --collect --name usajobs     # Run specific collector
   python main.py --collector-status           # Show collector status
+  python main.py --retention-status           # Show data retention status
+  python main.py --cleanup --dry-run          # Preview cleanup (safe)
+  python main.py --cleanup                    # Clean up old data
+  python main.py --health                     # Show system health status
+  python main.py --metrics                    # Show performance metrics (7d)
+  python main.py --metrics --days 30          # Show 30-day metrics
   python main.py --test-newsletter            # Test reporting system
   python main.py --setup                      # Initialize database and feeds
   python main.py --query                      # Query priority articles
@@ -373,6 +379,43 @@ Examples:
         help="Maximum articles to display in query (default: 10)"
     )
 
+    parser.add_argument(
+        "--cleanup",
+        action="store_true",
+        help="Clean up old data based on retention policies"
+    )
+
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show what would be deleted without actually deleting (use with --cleanup)"
+    )
+
+    parser.add_argument(
+        "--retention-status",
+        action="store_true",
+        help="Show current data retention status and policy settings"
+    )
+
+    parser.add_argument(
+        "--health",
+        action="store_true",
+        help="Show system health status and metrics"
+    )
+
+    parser.add_argument(
+        "--metrics",
+        action="store_true",
+        help="Show performance metrics"
+    )
+
+    parser.add_argument(
+        "--days",
+        type=int,
+        default=7,
+        help="Number of days for metrics (default: 7)"
+    )
+
     args = parser.parse_args()
 
     try:
@@ -385,6 +428,188 @@ Examples:
 
         elif args.query:
             query_priorities(min_score=args.min, limit=args.limit)
+
+        elif args.retention_status:
+            from src.maintenance.data_retention import get_retention_status
+            import json
+            status = get_retention_status()
+            print("\n" + "=" * 70)
+            print("DATA RETENTION STATUS")
+            print("=" * 70)
+            print("\n📋 Retention Policies:")
+            print(f"  • Articles: {status['retention_policies']['articles_days']} days")
+            print(f"  • Syntheses: {status['retention_policies']['syntheses_days']} days")
+            print(f"  • Semantic Facts: Type-based (60-365 days)")
+
+            print("\n📊 Current Data:")
+            articles = status['current_data']['articles']
+            print(f"\n  Articles ({articles['total']} total):")
+            if articles['oldest']:
+                print(f"    • Oldest: {articles['oldest']}")
+            if articles['newest']:
+                print(f"    • Newest: {articles['newest']}")
+            if articles['pending_deletion'] > 0:
+                print(f"    • ⚠️  Pending deletion: {articles['pending_deletion']}")
+            else:
+                print(f"    • ✓ No articles pending deletion")
+
+            syntheses = status['current_data']['syntheses']
+            print(f"\n  Syntheses ({syntheses['total']} total):")
+            if syntheses['oldest']:
+                print(f"    • Oldest: {syntheses['oldest']}")
+            if syntheses['newest']:
+                print(f"    • Newest: {syntheses['newest']}")
+            if syntheses['pending_deletion'] > 0:
+                print(f"    • ⚠️  Pending deletion: {syntheses['pending_deletion']}")
+            else:
+                print(f"    • ✓ No syntheses pending deletion")
+
+            print("\n" + "=" * 70)
+
+        elif args.health:
+            from src.monitoring.health_monitor import get_system_health
+            health = get_system_health()
+
+            print("\n" + "=" * 70)
+            print("SYSTEM HEALTH STATUS")
+            print("=" * 70)
+
+            # Overall status
+            status_emoji = {
+                "healthy": "✅",
+                "warning": "⚠️ ",
+                "degraded": "⚠️ ",
+                "error": "❌"
+            }.get(health["overall_status"], "❓")
+
+            print(f"\nOverall Status: {status_emoji} {health['overall_status'].upper()}")
+            print(f"Checked at: {health['timestamp']}")
+
+            # Database
+            db = health["metrics"]["database"]
+            print(f"\n📊 Database:")
+            print(f"  • Size: {db['size_mb']} MB")
+            print(f"  • Articles: {db['total_articles']:,}")
+            print(f"  • Syntheses: {db['total_syntheses']}")
+            print(f"  • Memory Facts: {db['total_facts']}")
+
+            # Feeds
+            feeds = health["metrics"]["feeds"]
+            feed_emoji = "✅" if feeds["status"] == "healthy" else "⚠️ "
+            print(f"\n📡 RSS Feeds: {feed_emoji} {feeds['status']}")
+            print(f"  • Active: {feeds['active_feeds']}/{feeds['total_feeds']}")
+            print(f"  • With errors: {feeds['feeds_with_errors']}")
+            print(f"  • Stale (>48h): {feeds['stale_feeds']}")
+            if feeds["issues"]:
+                for issue in feeds["issues"]:
+                    print(f"    ⚠️  {issue}")
+
+            # Synthesis
+            synth = health["metrics"]["synthesis"]
+            synth_emoji = "✅" if synth["status"] == "healthy" else "⚠️ "
+            print(f"\n🧠 Synthesis Generation: {synth_emoji} {synth['status']}")
+            print(f"  • Recent (7d): {synth['recent_syntheses_7d']}")
+            if synth['latest_synthesis']:
+                print(f"  • Latest: {synth['latest_synthesis']}")
+                print(f"  • Hours since last: {synth['hours_since_last']}")
+            if synth["issues"]:
+                for issue in synth["issues"]:
+                    print(f"    ⚠️  {issue}")
+
+            # Memory
+            memory = health["metrics"]["memory"]
+            print(f"\n💾 Semantic Memory:")
+            print(f"  • Total facts: {memory['total_facts']}")
+            print(f"  • Active: {memory['active_facts']}")
+            print(f"  • Expired: {memory['expired_facts']}")
+            if memory['facts_by_type']:
+                print(f"  • By type: {dict(memory['facts_by_type'])}")
+
+            # Retention
+            retention = health["metrics"]["retention"]
+            ret_emoji = "✅" if retention["status"] == "healthy" else "⚠️ "
+            print(f"\n🗑️  Data Retention: {ret_emoji} {retention['status']}")
+            print(f"  • Policies: {retention['retention_days_articles']}d articles, {retention['retention_days_syntheses']}d syntheses")
+            print(f"  • Pending deletion: {retention['articles_pending_deletion']} articles, {retention['syntheses_pending_deletion']} syntheses")
+            if retention["issues"]:
+                for issue in retention["issues"]:
+                    print(f"    ⚠️  {issue}")
+
+            # Disk
+            disk = health["metrics"]["disk"]
+            disk_emoji = "✅" if disk["status"] == "healthy" else "⚠️ "
+            print(f"\n💽 Disk Space: {disk_emoji} {disk['status']}")
+            print(f"  • Data directory: {disk['data_dir_size_mb']} MB")
+
+            # Issues summary
+            if health["issues"]:
+                print(f"\n⚠️  Issues Found ({len(health['issues'])}):")
+                for issue in health["issues"]:
+                    print(f"  • {issue}")
+
+            print("\n" + "=" * 70)
+
+        elif args.metrics:
+            from src.monitoring.health_monitor import get_performance_metrics
+            metrics = get_performance_metrics(days=args.days)
+
+            print("\n" + "=" * 70)
+            print(f"PERFORMANCE METRICS (Last {args.days} days)")
+            print("=" * 70)
+            print(f"\nPeriod: {metrics['start_date']} to {metrics['end_date']}")
+
+            print(f"\n📰 Article Collection:")
+            print(f"  • Total collected: {metrics.get('articles_collected', 0):,}")
+            print(f"  • Per day: {metrics.get('articles_per_day', 0)}")
+
+            print(f"\n🧠 Synthesis Generation:")
+            print(f"  • Total syntheses: {metrics.get('syntheses_generated', 0)}")
+
+            print(f"\n💾 Semantic Memory:")
+            print(f"  • Facts created: {metrics.get('facts_created', 0)}")
+
+            print("\n" + "=" * 70)
+
+        elif args.cleanup:
+            from src.maintenance.data_retention import cleanup_old_data
+            print("\n" + "=" * 70)
+            if args.dry_run:
+                print("DATA RETENTION CLEANUP (DRY RUN)")
+            else:
+                print("DATA RETENTION CLEANUP")
+            print("=" * 70)
+
+            results = cleanup_old_data(dry_run=args.dry_run)
+
+            print(f"\n📅 Retention Policies:")
+            print(f"  • Articles: {settings.retention_articles_days} days")
+            print(f"  • Syntheses: {settings.retention_syntheses_days} days")
+
+            print(f"\n🗑️  Cleanup Results:")
+            articles_deleted = results['articles'].get('deleted', 0)
+            syntheses_deleted = results['syntheses'].get('deleted', 0)
+
+            if articles_deleted > 0:
+                cutoff = results['articles'].get('cutoff_date', 'N/A')
+                print(f"  • Articles: {articles_deleted} {'would be' if args.dry_run else ''} deleted (older than {cutoff[:10]})")
+            else:
+                print(f"  • Articles: No articles to delete")
+
+            if syntheses_deleted > 0:
+                cutoff = results['syntheses'].get('cutoff_date', 'N/A')
+                print(f"  • Syntheses: {syntheses_deleted} {'would be' if args.dry_run else ''} deleted (older than {cutoff[:10]})")
+            else:
+                print(f"  • Syntheses: No syntheses to delete")
+
+            if args.dry_run:
+                print(f"\n💾 Estimated space to be freed: ~{results['total_freed_mb']} MB")
+                print("\n⚠️  This was a DRY RUN - no data was actually deleted")
+                print("   Run without --dry-run to perform actual cleanup")
+            else:
+                print(f"\n💾 Space freed: ~{results['total_freed_mb']} MB")
+                print("\n✅ Cleanup complete!")
+
+            print("\n" + "=" * 70)
 
         elif args.fetch:
             asyncio.run(run_fetch_only())

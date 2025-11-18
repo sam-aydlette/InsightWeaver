@@ -1,0 +1,23 @@
+[Unit]
+Description=InsightWeaver Daily Intelligence Report
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=%u
+WorkingDirectory=/home/saydlette/workspace/InsightWeaver
+Environment="PATH=/home/saydlette/workspace/InsightWeaver/venv/bin:/usr/local/bin:/usr/bin:/bin"
+ExecStart=/home/saydlette/workspace/InsightWeaver/venv/bin/python /home/saydlette/workspace/InsightWeaver/scripts/scheduled_report.py
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=insightweaver-daily
+
+# Security hardening
+PrivateTmp=true
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

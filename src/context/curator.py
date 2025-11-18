@@ -16,6 +16,9 @@ from ..utils.profile_loader import get_user_profile, UserProfile
 from .perspectives import get_perspective, Perspective
 from .module_loader import ContextModuleLoader
 from .anomaly_detector import CoverageAnomalyDetector
+from .semantic_memory import SemanticMemory
+from .perception import PerceptionEngine
+from ..config.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -76,7 +79,10 @@ class ContextCurator:
         # Initialize anomaly detector
         self.anomaly_detector = CoverageAnomalyDetector(baseline_days=30)
 
-    def curate_for_narrative_synthesis(
+        # Initialize perception engine
+        self.perception_engine = PerceptionEngine()
+
+    async def curate_for_narrative_synthesis(
         self,
         hours: int = 48,
         max_articles: int = 50
@@ -92,15 +98,44 @@ class ContextCurator:
             Curated context dictionary with token metadata
         """
         with get_db() as session:
+            # Cleanup expired facts (if semantic memory enabled)
+            if getattr(settings, 'enable_semantic_memory', False):
+                try:
+                    semantic_memory = SemanticMemory(session)
+                    deleted_count = semantic_memory.cleanup_expired_facts()
+                    if deleted_count > 0:
+                        logger.info(f"Cleaned up {deleted_count} expired facts from memory")
+                except Exception as e:
+                    logger.warning(f"Failed to cleanup expired facts (non-fatal): {e}")
+
             # Get recent unfiltered articles
             articles = self._get_recent_articles(session, hours, max_articles)
 
             # Get historical context (now 5 syntheses with enhanced format)
             memory = self._get_historical_memory(session)
 
+            # Get semantic memory facts (if enabled)
+            semantic_facts = ""
+            if getattr(settings, 'enable_semantic_memory', False):
+                try:
+                    semantic_memory = SemanticMemory(session)
+                    relevant_facts = semantic_memory.retrieve_relevant_facts(
+                        articles,
+                        max_facts=20
+                    )
+                    semantic_facts = semantic_memory.build_historical_context(relevant_facts)
+                    if semantic_facts:
+                        logger.info(f"Added {len(relevant_facts)} facts from semantic memory")
+                except Exception as e:
+                    logger.error(f"Failed to retrieve semantic memory (non-fatal): {e}")
+
             # Load decision context module
             modules = self.module_loader.load_all_modules()
             decision_context = self._format_decision_context(modules.get('core', []))
+
+            # Extract perception (cross-article patterns)
+            perception_data = await self.perception_engine.extract_perception(articles)
+            perception_context = self.perception_engine.format_for_context(perception_data)
 
             # Detect coverage anomalies
             anomaly_report = self.anomaly_detector.detect_anomalies(
@@ -108,13 +143,19 @@ class ContextCurator:
             )
             anomaly_context = self.anomaly_detector.format_for_context(anomaly_report)
 
+            # Combine historical memory with semantic facts
+            combined_memory = memory
+            if semantic_facts:
+                combined_memory = f"{memory}\n\n{semantic_facts}" if memory else semantic_facts
+
             # Build initial context
             context = {
                 "user_profile": self._format_user_profile(),
                 "decision_context": decision_context,
                 "articles": self._format_articles(articles),
+                "perception": perception_context,
                 "anomaly_analysis": anomaly_context,
-                "memory": memory,
+                "memory": combined_memory,
                 "instructions": self._get_synthesis_instructions()
             }
 
@@ -317,6 +358,7 @@ class ContextCurator:
 
         decision_chars = len(context.get('decision_context', ''))
         articles_chars = count_chars(context.get('articles', []))
+        perception_chars = len(context.get('perception', ''))
         anomaly_chars = len(context.get('anomaly_analysis', ''))
         memory_chars = len(context.get('memory', ''))
 
@@ -324,9 +366,10 @@ class ContextCurator:
             'system': system_chars // 4,
             'decision_context': decision_chars // 4,
             'articles': articles_chars // 4,
+            'perception': perception_chars // 4,
             'anomaly_analysis': anomaly_chars // 4,
             'historical': memory_chars // 4,
-            'total': (system_chars + decision_chars + articles_chars + anomaly_chars + memory_chars) // 4
+            'total': (system_chars + decision_chars + articles_chars + perception_chars + anomaly_chars + memory_chars) // 4
         }
 
     def _format_user_profile(self) -> Dict[str, Any]:

@@ -11,6 +11,7 @@ from typing import Dict, Any, Optional
 from .curator import ContextCurator
 from .claude_client import ClaudeClient
 from .reflection_engine import ReflectionEngine
+from .semantic_memory import SemanticMemory
 from ..database.connection import get_db
 from ..database.models import NarrativeSynthesis, AnalysisRun, ContextSnapshot, Article
 from ..config.settings import settings
@@ -45,7 +46,7 @@ class NarrativeSynthesizer:
         logger.info(f"Starting narrative synthesis for last {hours} hours")
 
         # Curate context
-        context = self.curator.curate_for_narrative_synthesis(hours, max_articles)
+        context = await self.curator.curate_for_narrative_synthesis(hours, max_articles)
 
         if not context["articles"]:
             logger.warning("No articles available for synthesis")
@@ -120,7 +121,7 @@ class NarrativeSynthesizer:
             return await self.synthesize(hours, max_articles)
 
         # Curate context
-        context = self.curator.curate_for_narrative_synthesis(hours, max_articles)
+        context = await self.curator.curate_for_narrative_synthesis(hours, max_articles)
 
         if not context["articles"]:
             logger.warning("No articles available for synthesis")
@@ -177,8 +178,10 @@ class NarrativeSynthesizer:
 
                 # STEP 4: Regenerate with deeper focus
                 logger.info("Step 4: Generating refined synthesis")
+                # Build complete system prompt with all context
+                complete_system_prompt = self._build_complete_refinement_system_prompt(context)
                 refined_response = await self.client.analyze(
-                    system_prompt=self._build_system_prompt(context),
+                    system_prompt=complete_system_prompt,
                     user_message=refinement_prompt,
                     temperature=1.0
                 )
@@ -205,6 +208,22 @@ class NarrativeSynthesizer:
             )
 
             logger.info(f"Narrative synthesis with reflection complete: {synthesis_id}")
+
+            # Extract and store facts for semantic memory (if enabled)
+            if synthesis_id and getattr(settings, 'enable_semantic_memory', False):
+                try:
+                    logger.info("Extracting facts for semantic memory")
+                    with get_db() as memory_session:
+                        memory = SemanticMemory(memory_session)
+                        facts = await memory.extract_facts_from_synthesis(
+                            final_synthesis,
+                            synthesis_id
+                        )
+                        stored_count = memory.store_facts(facts)
+                        logger.info(f"Stored {stored_count} facts in semantic memory")
+                except Exception as e:
+                    logger.error(f"Fact extraction failed (non-fatal): {e}")
+                    # Don't fail synthesis if fact extraction fails
 
             return {
                 "articles_analyzed": len(context["articles"]),
@@ -250,6 +269,68 @@ class NarrativeSynthesizer:
 
         return "\n".join(parts)
 
+    def _build_complete_refinement_system_prompt(self, context: Dict[str, Any]) -> str:
+        """
+        Build complete system prompt for refinement that includes both context and task specification
+        This mirrors what analyze_with_context() does but allows custom refinement instructions
+        """
+        parts = []
+
+        # Add all the context from _build_system_prompt
+        if "user_profile" in context:
+            profile = context["user_profile"]
+            parts.append(f"## User Context")
+            parts.append(f"Location: {profile.get('location', 'Unknown')}")
+            parts.append(f"Professional Domains: {', '.join(profile.get('professional_domains', []))}")
+            parts.append(f"Civic Interests: {', '.join(profile.get('civic_interests', []))}")
+            parts.append("")
+
+        # Add decision context if present
+        if context.get("decision_context"):
+            parts.append("## Decision Context")
+            parts.append(context["decision_context"])
+            parts.append("")
+
+        # Add anomaly analysis if present
+        if context.get("anomaly_analysis"):
+            parts.append("## Coverage Anomalies")
+            parts.append(context["anomaly_analysis"])
+            parts.append("")
+
+        # Add recent articles context (full content like claude_client does)
+        if "articles" in context:
+            parts.append(f"## Recent Articles ({len(context['articles'])} total)")
+            for i, article in enumerate(context["articles"], 1):
+                parts.append(f"\n### Article {i}")
+                parts.append(f"**Title:** {article.get('title', 'Untitled')}")
+                parts.append(f"**Source:** {article.get('source', 'Unknown')}")
+                if article.get('published_date'):
+                    parts.append(f"**Date:** {article['published_date']}")
+                if article.get('content'):
+                    content = article['content']
+                    parts.append(f"**Content:** {content}")
+                if article.get('entities'):
+                    parts.append(f"**Entities:** {', '.join(article['entities'][:10])}")
+            parts.append("")
+
+        # Add historical memory if present
+        if context.get("memory"):
+            parts.append("## Historical Context")
+            parts.append(context["memory"])
+            parts.append("")
+
+        # Add core instructions from perspective
+        if "instructions" in context:
+            parts.append("## Instructions")
+            parts.append(context["instructions"])
+            parts.append("")
+
+        # Add synthesis task specification with JSON schema
+        article_count = len(context.get("articles", []))
+        parts.append(self._build_synthesis_task(article_count))
+
+        return "\n".join(parts)
+
     def _build_synthesis_task(self, article_count: int) -> str:
         """Build synthesis task prompt"""
         return f"""Analyze the {article_count} articles provided and generate a structured intelligence brief.
@@ -271,14 +352,15 @@ Rank by impact level:
 - LOW: Awareness only
 
 ### Predictions: Project Likely Developments (2-4 week horizon)
-Include likelihood (high/medium/low) and confidence (0.0-1.0)
+Use confidence score (0.0-1.0) to indicate how likely the prediction is to occur.
 
-### Confidence Levels
-Assign confidence scores (0.0-1.0) based on:
-- 0.9-1.0: Multiple confirming sources, clear evidence
-- 0.7-0.89: Strong evidence, some uncertainty
-- 0.5-0.69: Moderate evidence, notable uncertainty
-- <0.5: Limited evidence, speculative
+### Confidence Scores
+Assign confidence scores (0.0-1.0) representing probability of occurrence:
+- 0.9-1.0: Very likely to occur - multiple confirming sources, clear causal chain
+- 0.7-0.89: Likely to occur - strong evidence, plausible mechanism
+- 0.5-0.69: Moderate probability - some evidence, notable uncertainty
+- 0.3-0.49: Low probability - limited evidence, speculative
+- <0.3: Very unlikely - weak or contradictory evidence
 
 ## Output Structure
 
@@ -318,10 +400,9 @@ Return ONLY valid JSON with this exact structure:
         "local_governance": [
             {{
                 "prediction": "Specific predicted development",
-                "likelihood": "high|medium|low",
                 "confidence": 0.75,
                 "timeframe": "2-4 weeks",
-                "rationale": "Why this is likely"
+                "rationale": "Why this is likely to occur"
             }}
         ],
         "education": [],

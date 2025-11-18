@@ -256,7 +256,7 @@ Focus on QUALITY over QUANTITY - every statement should provide insight, not jus
                 if items:
                     category_name = category.replace("_", " ").title()
                     pred_text = "\n".join([
-                        f"- {p.get('prediction', '')} (likelihood: {p.get('likelihood', '')}, confidence: {p.get('confidence', '')})"
+                        f"- {p.get('prediction', '')} (confidence: {p.get('confidence', 'N/A')})"
                         for p in items
                     ])
                     sections.append(f"PREDICTIONS ({category_name})\n{pred_text}")

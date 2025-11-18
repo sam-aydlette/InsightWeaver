@@ -104,45 +104,35 @@ SYNTHESIS_EXAMPLE = {
         "predictions_scenarios": {
             "local_governance": [
                 {
-                    "prediction": "County will adopt AI vendor accountability requirements similar to federal standards within 3-6 months",
-                    "likelihood": "high",
-                    "confidence": 0.80,
+                    "prediction": "County will adopt AI vendor accountability requirements similar to federal standards within 3-6 months",                    "confidence": 0.80,
                     "timeframe": "2-4 weeks for initial policy discussion",
                     "rationale": "Local governments typically follow federal technology procurement patterns with 3-6 month lag; County Board already showing interest based on meeting agendas"
                 }
             ],
             "education": [
                 {
-                    "prediction": "School enrollment and resource allocation systems will incorporate algorithmic accountability reviews",
-                    "likelihood": "medium",
-                    "confidence": 0.65,
+                    "prediction": "School enrollment and resource allocation systems will incorporate algorithmic accountability reviews",                    "confidence": 0.65,
                     "timeframe": "2-4 weeks for pilot program announcements",
                     "rationale": "Federal frameworks cascading to state education agencies; pilot programs likely in districts serving federal workforce"
                 }
             ],
             "niche_field": [
                 {
-                    "prediction": "Cybersecurity job market will require AI governance certifications for government contractor roles",
-                    "likelihood": "high",
-                    "confidence": 0.85,
+                    "prediction": "Cybersecurity job market will require AI governance certifications for government contractor roles",                    "confidence": 0.85,
                     "timeframe": "2-4 weeks for requirement announcements in new solicitations",
                     "rationale": "Defense contractor clearances facing enhanced AI-related scrutiny; professional development in AI governance becoming competitive requirement"
                 }
             ],
             "economic_conditions": [
                 {
-                    "prediction": "Small defense contractors will seek compliance partnerships or face market consolidation pressure",
-                    "likelihood": "high",
-                    "confidence": 0.78,
+                    "prediction": "Small defense contractors will seek compliance partnerships or face market consolidation pressure",                    "confidence": 0.78,
                     "timeframe": "2-4 weeks for partnership announcements",
                     "rationale": "Compliance complexity with intersecting AI and cybersecurity requirements creating barriers to entry for smaller firms"
                 }
             ],
             "infrastructure": [
                 {
-                    "prediction": "Regional infrastructure projects will incorporate AI oversight requirements in procurement specifications",
-                    "likelihood": "medium",
-                    "confidence": 0.70,
+                    "prediction": "Regional infrastructure projects will incorporate AI oversight requirements in procurement specifications",                    "confidence": 0.70,
                     "timeframe": "2-4 weeks for updated RFP language",
                     "rationale": "Recent cybersecurity incidents triggering enhanced monitoring; smart city initiatives requiring governance frameworks"
                 }
@@ -196,7 +186,7 @@ def format_examples_for_prompt(examples: List[Dict[str, Any]]) -> str:
         formatted += "- Trends organized geographically (local → state → national → global → niche field)\n"
         formatted += "- Trends formatted as observable patterns with direction and quantifiers\n"
         formatted += "- Events prioritized by impact level with clear timeframes and recommended actions\n"
-        formatted += "- Predictions include likelihood, confidence scores, and rationale\n"
+        formatted += "- Predictions include confidence scores, and rationale\n"
         formatted += "- Analytical tone balances professional rigor with personal relevance\n\n"
 
     return formatted

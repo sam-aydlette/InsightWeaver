@@ -73,7 +73,7 @@ Analyze developments across these layers, identifying specific, measurable trend
 
 **Predictions:** Project likely developments (2-4 week horizon)
 - Categories: Local governance, Education, Niche field, Economic conditions, Infrastructure
-- Include: prediction, likelihood (high/medium/low), confidence (0.0-1.0), timeframe, rationale
+- Include: prediction, confidence (0.0-1.0 probability), timeframe, rationale
 - Base on identified trends and patterns
 
 **Bottom Line:**

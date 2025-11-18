@@ -432,15 +432,15 @@ class PersonalizedNarrativeTemplate(NewsletterTemplate):
             border-radius: 6px;
             border-left: 4px solid #cbd5e0;
         }}
-        .prediction-item.likelihood-high {{
+        .prediction-item.confidence-high {{
             border-left-color: #38a169;
             background: #f0fff4;
         }}
-        .prediction-item.likelihood-medium {{
+        .prediction-item.confidence-medium {{
             border-left-color: #ed8936;
             background: #fffaf0;
         }}
-        .prediction-item.likelihood-low {{
+        .prediction-item.confidence-low {{
             border-left-color: #cbd5e0;
             background: #f7fafc;
         }}
@@ -464,7 +464,7 @@ class PersonalizedNarrativeTemplate(NewsletterTemplate):
             font-size: 12px;
             font-weight: 600;
         }}
-        .likelihood {{
+        .confidence {{
             color: #2d3748;
         }}
         .timeframe {{
@@ -684,17 +684,17 @@ class PersonalizedNarrativeTemplate(NewsletterTemplate):
 
             for pred in cat_predictions:
                 prediction_text = pred.get('prediction', '')
-                likelihood = pred.get('likelihood', 'medium')
-                confidence = pred.get('confidence', 0)
+                # Map confidence to high/medium/low for CSS styling
+                conf = pred.get('confidence', 0.5)
+                confidence_level = 'high' if conf >= 0.7 else ('medium' if conf >= 0.4 else 'low')
                 timeframe = pred.get('timeframe', '2-4 weeks')
                 rationale = pred.get('rationale', '')
 
                 html += f"""
-                <li class="prediction-item likelihood-{likelihood}">
+                <li class="prediction-item confidence-{confidence_level}">
                     <div class="prediction-text">{prediction_text}</div>
                     <div class="prediction-meta">
-                        <span class="likelihood">{likelihood.upper()} likelihood</span>
-                        <span class="confidence">{int(confidence * 100)}% confidence</span>
+                        <span class="confidence">{int(conf*100)}% confidence</span>
                         <span class="timeframe">{timeframe}</span>
                     </div>
                     {f'<div class="rationale">{rationale}</div>' if rationale else ''}

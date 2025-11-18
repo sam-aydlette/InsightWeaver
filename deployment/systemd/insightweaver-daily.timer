@@ -1,0 +1,16 @@
+[Unit]
+Description=Run InsightWeaver Daily Intelligence Report
+Requires=insightweaver-daily.service
+
+[Timer]
+# Run daily at 8:00 AM
+OnCalendar=daily
+OnCalendar=*-*-* 08:00:00
+Persistent=true
+
+# If system was off at scheduled time, run on next boot
+# (with a 10 minute delay)
+WakeSystem=false
+
+[Install]
+WantedBy=timers.target
