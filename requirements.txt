@@ -20,6 +20,9 @@ secure-smtplib==0.1.1
 # AI Integration
 anthropic==0.40.0
 
+# CLI Framework
+click==8.1.7
+
 # Logging and Monitoring
 structlog==24.4.0
 

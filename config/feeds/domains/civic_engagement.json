@@ -1,0 +1,159 @@
+{
+  "description": "Civic Engagement feeds - local news, school board, elections, planning, state legislation (Northern Virginia focus). Relying on local news coverage since direct government RSS feeds are inaccessible.",
+  "feeds": [
+    {
+      "name": "Fairfax County Public Schools News",
+      "url": "https://www.fcps.edu/feeds/news.rss",
+      "applicability": {
+        "scope": ["local"],
+        "geo_tags": ["northern_virginia", "fairfax"],
+        "domain_tags": ["civic_engagement", "education"],
+        "specialty_tags": ["school_board", "k12_education", "meetings"]
+      },
+      "relevance_score": 0.96
+    },
+    {
+      "name": "Inside Nova - Northern Virginia News",
+      "url": "https://www.insidenova.com/search/?f=rss",
+      "applicability": {
+        "scope": ["regional"],
+        "geo_tags": ["northern_virginia", "fairfax", "prince_william", "loudoun"],
+        "domain_tags": ["civic_engagement", "local_news"],
+        "specialty_tags": ["investigative", "watchdog_journalism", "local_government", "zoning"]
+      },
+      "relevance_score": 0.94
+    },
+    {
+      "name": "FFXnow - Fairfax County News",
+      "url": "https://www.ffxnow.com/feed/",
+      "applicability": {
+        "scope": ["local"],
+        "geo_tags": ["northern_virginia", "fairfax"],
+        "domain_tags": ["civic_engagement", "local_news"],
+        "specialty_tags": ["breaking_news", "development", "local_government", "meetings"]
+      },
+      "relevance_score": 0.92
+    },
+    {
+      "name": "Virginia Mercury",
+      "url": "https://virginiamercury.com/feed/",
+      "applicability": {
+        "scope": ["regional"],
+        "geo_tags": ["virginia", "northern_virginia"],
+        "domain_tags": ["civic_engagement", "state_politics"],
+        "specialty_tags": ["legislation", "policy", "watchdog", "general_assembly"]
+      },
+      "relevance_score": 0.95
+    },
+    {
+      "name": "Washington Post - Local (DC/MD/VA)",
+      "url": "https://feeds.washingtonpost.com/rss/local",
+      "applicability": {
+        "scope": ["regional"],
+        "geo_tags": ["northern_virginia", "washington_dc_metro"],
+        "domain_tags": ["civic_engagement", "general_news"],
+        "specialty_tags": ["investigative_journalism", "local_government", "elections"]
+      },
+      "relevance_score": 0.93
+    },
+    {
+      "name": "DCist",
+      "url": "https://dcist.com/feed/",
+      "applicability": {
+        "scope": ["regional"],
+        "geo_tags": ["northern_virginia", "washington_dc_metro"],
+        "domain_tags": ["civic_engagement", "general_news"],
+        "specialty_tags": ["local_politics", "community"]
+      },
+      "relevance_score": 0.81
+    },
+    {
+      "name": "WTOP News - Virginia",
+      "url": "https://wtop.com/virginia/feed/",
+      "applicability": {
+        "scope": ["regional"],
+        "geo_tags": ["northern_virginia", "virginia"],
+        "domain_tags": ["civic_engagement", "general_news"],
+        "specialty_tags": ["breaking_news", "government"]
+      },
+      "relevance_score": 0.80
+    },
+    {
+      "name": "Greater Greater Washington",
+      "url": "https://ggwash.org/feed",
+      "applicability": {
+        "scope": ["regional"],
+        "geo_tags": ["northern_virginia", "washington_dc_metro"],
+        "domain_tags": ["civic_engagement", "urban_planning"],
+        "specialty_tags": ["housing_policy", "transportation", "land_use", "zoning"]
+      },
+      "relevance_score": 0.91
+    },
+    {
+      "name": "ARLnow - Arlington Local News",
+      "url": "https://www.arlnow.com/feed/",
+      "applicability": {
+        "scope": ["local"],
+        "geo_tags": ["northern_virginia", "arlington"],
+        "domain_tags": ["civic_engagement", "local_news"],
+        "specialty_tags": ["breaking_news", "local_government", "development"]
+      },
+      "relevance_score": 0.87
+    },
+    {
+      "name": "ALXnow - Alexandria News",
+      "url": "https://www.alxnow.com/feed/",
+      "applicability": {
+        "scope": ["local"],
+        "geo_tags": ["northern_virginia", "alexandria"],
+        "domain_tags": ["civic_engagement", "local_news"],
+        "specialty_tags": ["community", "local_government"]
+      },
+      "relevance_score": 0.85
+    },
+    {
+      "name": "The Zebra (Arlington)",
+      "url": "https://thezebra.org/feed/",
+      "applicability": {
+        "scope": ["local"],
+        "geo_tags": ["northern_virginia", "arlington"],
+        "domain_tags": ["civic_engagement", "local_news"],
+        "specialty_tags": ["community", "public_interest"]
+      },
+      "relevance_score": 0.82
+    },
+    {
+      "name": "Potomac Local News",
+      "url": "https://www.potomaclocal.com/feed/",
+      "applicability": {
+        "scope": ["regional"],
+        "geo_tags": ["northern_virginia", "prince_william", "stafford"],
+        "domain_tags": ["civic_engagement", "local_news"],
+        "specialty_tags": ["community", "local_government"]
+      },
+      "relevance_score": 0.83
+    },
+    {
+      "name": "Prince William Living",
+      "url": "https://princewilliamliving.com/feed/",
+      "applicability": {
+        "scope": ["local"],
+        "geo_tags": ["northern_virginia", "prince_william"],
+        "domain_tags": ["civic_engagement", "local_news"],
+        "specialty_tags": ["community", "lifestyle", "local_issues"]
+      },
+      "relevance_score": 0.79
+    },
+    {
+      "name": "What's Up Prince William (Woodbridge)",
+      "url": "https://whatsupwoodbridge.com/feed/",
+      "applicability": {
+        "scope": ["local"],
+        "geo_tags": ["northern_virginia", "prince_william", "woodbridge"],
+        "domain_tags": ["civic_engagement", "local_news"],
+        "specialty_tags": ["community", "events", "local_government"]
+      },
+      "relevance_score": 0.77
+    }
+  ]
+}

@@ -411,6 +411,61 @@ class PersonalizedNarrativeTemplate(NewsletterTemplate):
         .impact-low .impact-badge {{
             color: #718096;
         }}
+        .civic-section {{
+            background: #ebf8ff;
+            border: 2px solid #4299e1;
+            border-radius: 8px;
+            padding: 24px;
+            margin: 36px 0;
+        }}
+        .civic-section h2 {{
+            margin: 0 0 16px 0;
+            color: #2c5282;
+            font-size: 24px;
+            font-weight: 700;
+        }}
+        .civic-event {{
+            background: white;
+            border-left: 4px solid #4299e1;
+            padding: 16px;
+            margin: 12px 0;
+            border-radius: 4px;
+        }}
+        .civic-event-title {{
+            font-weight: 600;
+            color: #2d3748;
+            font-size: 16px;
+            margin-bottom: 8px;
+        }}
+        .civic-event-date {{
+            color: #2c5282;
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }}
+        .civic-event-details {{
+            color: #4a5568;
+            font-size: 14px;
+            line-height: 1.6;
+        }}
+        .civic-action {{
+            background: #f0fff4;
+            padding: 12px;
+            margin-top: 8px;
+            border-radius: 4px;
+            border-left: 3px solid #38a169;
+        }}
+        .civic-action-label {{
+            font-weight: 600;
+            color: #22543d;
+            font-size: 13px;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }}
+        .civic-action-text {{
+            color: #2d3748;
+            font-size: 14px;
+        }}
         .prediction-category {{
             margin-bottom: 24px;
         }}
@@ -499,6 +554,8 @@ class PersonalizedNarrativeTemplate(NewsletterTemplate):
         </div>
 
         {PersonalizedNarrativeTemplate._render_bottom_line(bottom_line)}
+
+        {PersonalizedNarrativeTemplate._render_civic_engagement(events)}
 
         {PersonalizedNarrativeTemplate._render_trends_and_patterns(trends, niche_field)}
 
@@ -707,6 +764,64 @@ class PersonalizedNarrativeTemplate(NewsletterTemplate):
             """
 
         html += "</div>\n"
+        return html
+
+    @staticmethod
+    def _render_civic_engagement(events: List[Dict[str, Any]]) -> str:
+        """Render civic engagement section with government meetings, public hearings, and civic deadlines"""
+        if not events:
+            return ""
+
+        # Filter for civic events (keywords: meeting, hearing, board, school board, election, zoning, council)
+        civic_keywords = ['meeting', 'hearing', 'board', 'school board', 'election', 'zoning', 'council',
+                         'public comment', 'supervisor', 'ordinance', 'ballot', 'vote', 'planning commission']
+
+        civic_events = []
+        for event in events:
+            event_text = f"{event.get('event', '')} {event.get('why_matters', '')} {event.get('recommended_action', '')}".lower()
+            if any(keyword in event_text for keyword in civic_keywords):
+                civic_events.append(event)
+
+        if not civic_events:
+            return ""
+
+        html = """
+        <div class="civic-section">
+            <h2>🏛️ CIVIC ENGAGEMENT OPPORTUNITIES</h2>
+            <p style="margin: 0 0 16px 0; color: #4a5568; font-size: 15px;">
+                Upcoming meetings, public hearings, and civic participation opportunities in your area.
+            </p>
+        """
+
+        for event in civic_events:
+            event_name = event.get('event', '')
+            when = event.get('when', '')
+            why_matters = event.get('why_matters', '')
+            action = event.get('recommended_action', '')
+            impact = event.get('impact_level', 'MEDIUM')
+
+            html += f"""
+            <div class="civic-event">
+                <div class="civic-event-title">{event_name}</div>
+                <div class="civic-event-date">📅 {when}</div>
+                <div class="civic-event-details">{why_matters}</div>
+        """
+
+            if action:
+                html += f"""
+                <div class="civic-action">
+                    <div class="civic-action-label">How to Participate</div>
+                    <div class="civic-action-text">{action}</div>
+                </div>
+        """
+
+            html += """
+            </div>
+        """
+
+        html += """
+        </div>
+        """
         return html
 
 

@@ -83,27 +83,27 @@ Monitors federal job postings matching specified keywords and locations.
 ### Run All Collectors
 ```bash
 # Run collectors that are due for refresh
-python main.py --collect
+insightweaver brief collect
 
 # Force all enabled collectors to run
-python main.py --collect --force
+insightweaver brief collect --force
 ```
 
 ### Run Specific Collector
 ```bash
-python main.py --collect --name vulncheck_kev
-python main.py --collect --name fairfax_calendar
+insightweaver brief collect --name vulncheck_kev
+insightweaver brief collect --name fairfax_calendar
 ```
 
 ### Check Collector Status
 ```bash
-python main.py --collector-status
+insightweaver brief collector-status
 ```
 
 ### Full Pipeline (includes collectors)
 ```bash
 # Collectors run automatically in full pipeline
-python main.py
+insightweaver brief
 ```
 
 ## Configuration

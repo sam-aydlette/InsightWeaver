@@ -34,6 +34,8 @@ Analyze developments across these layers, identifying specific, measurable trend
    - Daily life impacts: schools, transportation, housing, local economy
    - Community services and infrastructure
    - Local governance and policy changes
+   - **Civic engagement opportunities**: public hearings, zoning applications, elections, meeting agendas
+   - **Government decisions**: Board/School Board actions, budget changes, ordinances, appointments
 
 2. **State/Regional** ({state}):
    - State policy and regulatory changes
@@ -70,6 +72,8 @@ Analyze developments across these layers, identifying specific, measurable trend
 - MEDIUM: Notable but manageable
 - LOW: Awareness only
 - Specify: what it is, when, why it matters, recommended action
+- **Civic events priority**: Public hearings, zoning applications, elections, ballot measures, meeting agendas with action items
+- Include specific dates/times for civic participation opportunities
 
 **Predictions:** Project likely developments (2-4 week horizon)
 - Categories: Local governance, Education, Niche field, Economic conditions, Infrastructure

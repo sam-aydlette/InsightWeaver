@@ -114,7 +114,7 @@ systemctl --user disable insightweaver-daily.timer
 2. **Add cron entry**:
    ```bash
    # Daily at 8:00 AM
-   0 8 * * * cd /home/saydlette/workspace/InsightWeaver && /home/saydlette/workspace/InsightWeaver/venv/bin/python /home/saydlette/workspace/InsightWeaver/scripts/scheduled_report.py >> /home/saydlette/workspace/InsightWeaver/data/logs/cron.log 2>&1
+   0 8 * * * cd /home/saydlette/workspace/InsightWeaver && /home/saydlette/workspace/InsightWeaver/venv/bin/insightweaver brief >> /home/saydlette/workspace/InsightWeaver/data/logs/cron.log 2>&1
    ```
 
 ### Cron Schedule Examples
@@ -144,11 +144,14 @@ tail -f /home/saydlette/workspace/InsightWeaver/data/logs/cron.log
 You can always run reports manually:
 
 ```bash
-# Using the scheduler script
-python scripts/scheduled_report.py
+# Run full pipeline
+insightweaver brief
 
-# Using main.py
-python main.py --report --hours 24 --email
+# Generate report only
+insightweaver brief report
+
+# Custom time window
+insightweaver brief report --hours 48
 ```
 
 ## Logs
@@ -175,7 +178,7 @@ tail -f data/logs/scheduled_report_$(date +%Y%m%d).log
 - Verify email settings in `.env`
 - Check SMTP credentials are correct
 - Review log files for error messages
-- Test email manually: `python main.py --report --hours 24 --email`
+- Test email manually: `insightweaver brief test-newsletter`
 
 ### Timer not triggering
 - Verify timer is enabled: `systemctl --user is-enabled insightweaver-daily.timer`

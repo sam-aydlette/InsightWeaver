@@ -1,0 +1,165 @@
+{
+  "module_name": "civic_engagement_fairfax",
+  "description": "Civic engagement context for Fairfax County and Northern Virginia - governance structure, key issues, decision-making bodies, and civic participation framework",
+  "version": "1.0",
+  "priority": "high",
+  "content_sections": {
+    "local_governance_structure": {
+      "description": "Key decision-making bodies and officials in Fairfax County",
+      "content": [
+        "Fairfax County Board of Supervisors: 9 district supervisors + 1 chairman, meet 1st & 3rd Tuesday monthly",
+        "Fairfax County Public Schools (FCPS) Board: 12 members, 193,000+ students, 3rd largest district in Virginia",
+        "Planning Commission: Reviews zoning applications, comprehensive plan amendments, holds public hearings",
+        "Board of Zoning Appeals: Hears variance requests and special exception cases",
+        "School Board meets 2nd & 4th Thursday monthly at Luther Jackson MS",
+        "County Executive: serves as chief administrative officer, implements Board policies"
+      ]
+    },
+    "electoral_districts": {
+      "description": "Voting districts and representation structure",
+      "content": [
+        "9 supervisor districts: Braddock, Dranesville, Hunter Mill, Lee, Mason, Mount Vernon, Providence, Springfield, Sully",
+        "At-large Chairman elected countywide",
+        "School Board: 9 district reps + 3 at-large members",
+        "Virginia House of Delegates: Northern Virginia has ~40 delegates",
+        "Virginia Senate: Northern Virginia has ~15 senators",
+        "U.S. Congress: Districts 8, 10, 11 cover Fairfax area"
+      ]
+    },
+    "key_civic_issues": {
+      "description": "Ongoing civic issues affecting Fairfax County residents",
+      "content": [
+        "School funding: FCPS budget battles, teacher pay, facility needs",
+        "Housing affordability: Missing middle housing, zoning reform, development density",
+        "Transportation: Metro funding, Route 28/66/495 congestion, bike/ped infrastructure",
+        "Development: Rezoning applications, comprehensive plan amendments, neighborhood impacts",
+        "Taxes: Real estate assessments, tax rate decisions, budget priorities",
+        "Public safety: Police funding, emergency services, mental health response",
+        "Environment: Tree canopy preservation, stormwater management, climate action"
+      ]
+    },
+    "civic_participation_touchpoints": {
+      "description": "How residents engage with local government",
+      "content": [
+        "Public hearings: BOS, Planning Commission, School Board all have citizen comment periods",
+        "Budget process: Feb-Apr, includes town halls and public input sessions",
+        "Zoning applications: 15-day neighbor notification, public hearing opportunities",
+        "School boundary reviews: When schools are over/under capacity, community engagement process",
+        "Comprehensive Plan: Updated every 5 years, extensive public input",
+        "Citizen advisory committees: 50+ committees on various topics",
+        "Elections: Nov general, June primaries, May local (odd years)"
+      ]
+    },
+    "high_priority_signals": {
+      "description": "Signals that indicate important civic developments",
+      "content": [
+        "Board/School Board meeting agendas with action items",
+        "Zoning application filings (especially rezonings, not administrative permits)",
+        "Proposed ordinance/policy changes",
+        "Budget amendments or significant expenditures",
+        "Leadership changes (appointments, resignations, retirements)",
+        "Public hearing schedules",
+        "Election filing deadlines and candidate announcements",
+        "Legislative bills affecting local governance (dillon rule, taxation, education)",
+        "Development proposals >50 units or >100K sq ft commercial",
+        "School capacity studies and boundary changes"
+      ]
+    },
+    "regional_context": {
+      "description": "Northern Virginia regional governance and planning",
+      "content": [
+        "Northern Virginia Regional Commission (NVRC): Coordinates across jurisdictions",
+        "Metropolitan Washington Council of Governments (MWCOG): Regional planning for DC metro",
+        "WMATA: Regional transit authority governing Metro",
+        "Virginia Railway Express (VRE): Commuter rail service",
+        "Regional housing initiatives: coordinated affordable housing efforts",
+        "Transportation planning: I-495/I-66 managed lanes, future projects"
+      ]
+    },
+    "state_legislative_impact": {
+      "description": "How Virginia General Assembly affects local governance",
+      "content": [
+        "Dillon Rule state: Localities only have powers explicitly granted by GA",
+        "Education funding: State share of K-12 budget, Standards of Quality",
+        "Taxation authority: GA controls what taxes localities can levy",
+        "Land use: Proffers, zoning authority defined by state code",
+        "Elections: State sets election laws, redistricting every 10 years",
+        "Transportation funding: NVTA allocates regional gas tax revenue",
+        "Key session dates: GA convenes 2nd Wed in January, 60-day session (long years) or 30-day (short years)"
+      ]
+    }
+  },
+  "key_metrics_baselines": {
+    "governance": {
+      "board_meetings_per_month": "2 (1st & 3rd Tuesday)",
+      "school_board_meetings_per_month": "2 (2nd & 4th Thursday)",
+      "planning_commission_meetings": "Weekly on Wednesday evenings",
+      "public_comment_time_limit": "3 minutes per speaker typically"
+    },
+    "fiscal": {
+      "county_budget_fy2024": "$5.08 billion",
+      "fcps_budget_fy2024": "$3.47 billion",
+      "real_estate_tax_rate": "$1.105 per $100 assessed value (2024)",
+      "median_home_value": "~$650,000 (2024)"
+    },
+    "demographics": {
+      "population": "1.15 million (2024 est)",
+      "registered_voters": "~750,000",
+      "fcps_enrollment": "193,000 students",
+      "voting_age_population": "~900,000"
+    }
+  },
+  "civic_keywords": {
+    "high_priority": [
+      "Board of Supervisors",
+      "School Board",
+      "Planning Commission",
+      "public hearing",
+      "zoning application",
+      "rezoning",
+      "special exception",
+      "comprehensive plan",
+      "budget",
+      "tax rate",
+      "election",
+      "ballot measure",
+      "General Assembly",
+      "legislation",
+      "ordinance",
+      "development application"
+    ],
+    "medium_priority": [
+      "supervisor",
+      "school boundary",
+      "FCPS",
+      "transportation project",
+      "infrastructure",
+      "affordable housing",
+      "parking",
+      "traffic",
+      "Metro",
+      "public comment",
+      "citizen input",
+      "town hall",
+      "community meeting"
+    ],
+    "contextual": [
+      "neighborhood association",
+      "civic association",
+      "parent-teacher",
+      "volunteer",
+      "commission appointment",
+      "advisory board"
+    ]
+  },
+  "reference_links": {
+    "Board of Supervisors": "https://www.fairfaxcounty.gov/boardofsupervisors/",
+    "FCPS School Board": "https://www.fcps.edu/school-board",
+    "Planning Commission": "https://www.fairfaxcounty.gov/planning-development/planning-commission",
+    "Virginia General Assembly": "https://virginiageneralassembly.gov/",
+    "NVRC": "https://www.novaregion.org/",
+    "MWCOG": "https://www.mwcog.org/"
+  },
+  "last_updated": "2025-11-18",
+  "token_estimate": 1200
+}

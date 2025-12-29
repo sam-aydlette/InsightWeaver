@@ -188,7 +188,9 @@ class SemanticMemory:
             'metric': [],
             'trend': [],
             'relationship': [],
-            'decision': []
+            'decision': [],
+            'civic_event': [],
+            'policy_position': []
         }
 
         for fact in facts:
@@ -200,6 +202,26 @@ class SemanticMemory:
 
         # Build formatted context
         context_parts = ["## Historical Context (from past syntheses)\n"]
+
+        # Civic Events (prioritized for actionability)
+        if grouped_facts['civic_event']:
+            context_parts.append("### Upcoming Civic Events:")
+            for fact in grouped_facts['civic_event'][:5]:
+                context_parts.append(
+                    f"- {fact.subject} {fact.predicate} {fact.object} "
+                    f"({fact.temporal_context or 'date TBD'})"
+                )
+            context_parts.append("")
+
+        # Policy Positions
+        if grouped_facts['policy_position']:
+            context_parts.append("### Policy Positions:")
+            for fact in grouped_facts['policy_position'][:5]:
+                context_parts.append(
+                    f"- {fact.subject} {fact.predicate} {fact.object} "
+                    f"({fact.temporal_context or 'recent'})"
+                )
+            context_parts.append("")
 
         # Metrics
         if grouped_facts['metric']:
@@ -341,9 +363,11 @@ Extract facts as subject-predicate-object triples. Focus on:
 - Trends (directional changes over time)
 - Relationships (connections between entities)
 - Decisions (actions taken or planned)
+- Civic Events (government meetings, public hearings, elections, deadlines)
+- Policy Positions (who supports/opposes what)
 
 For each fact, provide:
-- type: 'metric', 'trend', 'relationship', or 'decision'
+- type: 'metric', 'trend', 'relationship', 'decision', 'civic_event', or 'policy_position'
 - subject: The entity or topic
 - predicate: The relationship or attribute
 - object: The value or related entity
@@ -360,10 +384,26 @@ Return ONLY valid JSON array:
     "temporal_context": "January 2025",
     "confidence": 0.9
   }},
+  {{
+    "type": "civic_event",
+    "subject": "Fairfax County Board of Supervisors",
+    "predicate": "public hearing",
+    "object": "Route 28 widening project",
+    "temporal_context": "February 4, 2025 at 7pm",
+    "confidence": 0.95
+  }},
+  {{
+    "type": "policy_position",
+    "subject": "Springfield District Supervisor",
+    "predicate": "supports",
+    "object": "rezoning for mixed-use development",
+    "temporal_context": "announced January 2025",
+    "confidence": 0.85
+  }},
   ...
 ]
 
-Extract 5-10 most significant facts. Return ONLY the JSON array, no additional text."""
+Extract 5-15 most significant facts. Prioritize civic events with specific dates/deadlines. Return ONLY the JSON array, no additional text."""
 
     def _parse_extraction_response(self, response: str) -> List[Dict[str, Any]]:
         """Parse Claude's fact extraction response"""
@@ -397,6 +437,8 @@ Extract 5-10 most significant facts. Return ONLY the JSON array, no additional t
 
         Retention policy:
         - decision/event: 60 days (time-bound, loses relevance fast)
+        - civic_event: 90 days (civic deadlines and meetings remain relevant longer)
+        - policy_position: 180 days (positions may evolve over time)
         - trend: 180 days (track until trend changes)
         - metric/relationship: 365 days (structural data, changes slowly)
         - Unknown types default to metric retention
@@ -407,6 +449,10 @@ Extract 5-10 most significant facts. Return ONLY the JSON array, no additional t
 
         if fact_type in ['decision', 'event']:
             return now + timedelta(days=60)
+        elif fact_type == 'civic_event':
+            return now + timedelta(days=90)
+        elif fact_type == 'policy_position':
+            return now + timedelta(days=180)
         elif fact_type == 'trend':
             return now + timedelta(days=180)
         elif fact_type in ['metric', 'relationship']:
