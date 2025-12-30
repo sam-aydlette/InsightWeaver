@@ -201,18 +201,10 @@ insightweaver brief  # Run whenever you want
 - `PROJECT_ALIGNMENT.md` - Architecture alignment analysis
 - `MIGRATION_GUIDE.md` - Database migration instructions
 
-## Philosophy
-
-> "The best code is no code. The best analysis engine is Claude with perfect context."
-
-We trust Claude for analysis. We focus on context curation.
-
 ### Design Principles
 
-1. **Context Over Code**: Engineer the context, not the algorithm
-2. **Simple Over Complex**: Avoid over-engineering
-3. **Trust Over Control**: Trust Claude's native capabilities
-4. **Focus Over Features**: Do one thing exceptionally well
+1. **Simple Over Complex**: Avoid over-engineering
+2. **Focus Over Features**: Do one thing exceptionally well
 
 ## Examples
 
@@ -325,14 +317,6 @@ Logs are written to:
 - **Feedparser** - RSS parsing
 - **HTTPX** - Async HTTP client
 - **BeautifulSoup4** - HTML parsing
-
-## License
-
-[Your license here]
-
-## Contributing
-
-[Your contributing guidelines here]
 
 ---
 
