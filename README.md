@@ -4,7 +4,7 @@
 
 ## Mission
 
-InsightWeaver processes diverse RSS feeds and generates personalized narrative intelligence briefs using Claude's analytical capabilities. The system focuses on **context engineering** rather than custom analysis engines, following Anthropic's guidance for building effective AI agents.
+InsightWeaver processes diverse RSS feeds and generates personalized narrative intelligence briefs using Claude's analytical capabilities. The system focuses on **context engineering** rather than custom analysis engines, following best practices for building effective AI agents.
 
 ## Quick Start
 
@@ -148,7 +148,7 @@ See `docs/collectors.md` for setup instructions.
 
 Instead of building pattern detectors and inference engines, InsightWeaver curates optimal context windows for Claude to analyze natively.
 
-**Core Principle:** Trust Claude's capabilities, engineer the context.
+**Core Principle:** Leverage the LLM's power, engineer the human context and trustworthiness.
 
 **Performance:** <10 minutes end-to-end, ~50k-65k tokens per synthesis
 

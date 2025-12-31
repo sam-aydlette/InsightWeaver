@@ -22,9 +22,12 @@ docs/philosophical_docs/
 # Generated newsletters and reports
 data/newsletters/*.html
 data/newsletters/*.json
+data/forecasts/*.html
+data/forecasts/*.json
 briefing_*.html
 enhanced_briefing_*.html
 cyber_*.html
+forecast_*.html
 
 # Reports directory (but keep directory structure)
 /reports/*.html
