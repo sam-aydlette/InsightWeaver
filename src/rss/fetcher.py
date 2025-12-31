@@ -6,6 +6,7 @@ import feedparser
 import httpx
 from bs4 import BeautifulSoup
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from src.database.models import RSSFeed, Article
 from src.database.connection import get_db
 
@@ -151,6 +152,7 @@ class RSSFetcher:
             # Process articles
             articles_count = 0
             articles_with_errors = 0
+            duplicates_skipped = 0
 
             for entry in feed_data.entries:
                 try:
@@ -173,6 +175,8 @@ class RSSFetcher:
                         )
                         db.add(article)
                         articles_count += 1
+                    else:
+                        duplicates_skipped += 1
 
                 except Exception as e:
                     articles_with_errors += 1
@@ -182,13 +186,44 @@ class RSSFetcher:
                         break
                     continue
 
-            db.commit()
+            # Commit with integrity error handling
+            try:
+                db.commit()
+            except IntegrityError as e:
+                db.rollback()
+                logger.warning(f"Duplicate articles detected in {feed.name} during commit, skipping duplicates")
+                # Re-process articles one by one to identify duplicates
+                articles_count = 0
+                for entry in feed_data.entries:
+                    try:
+                        article_data = self.normalize_article(entry, feed_data.feed)
+                        if not article_data.get('title') or not article_data.get('guid'):
+                            continue
 
+                        existing = db.query(Article).filter(
+                            Article.feed_id == feed.id,
+                            Article.guid == article_data['guid']
+                        ).first()
+
+                        if not existing:
+                            article = Article(feed_id=feed.id, **article_data)
+                            db.add(article)
+                            try:
+                                db.commit()
+                                articles_count += 1
+                            except IntegrityError:
+                                db.rollback()
+                                duplicates_skipped += 1
+                    except Exception:
+                        continue
+
+            log_msg = f"Processed {articles_count} new articles from {feed.name}"
+            if duplicates_skipped > 0:
+                log_msg += f" ({duplicates_skipped} duplicates skipped)"
             if articles_with_errors > 0:
-                logger.warning(f"Processed {articles_count} articles from {feed.name} with {articles_with_errors} errors")
-            else:
-                logger.info(f"Successfully processed {articles_count} new articles from {feed.name}")
+                log_msg += f" ({articles_with_errors} errors)"
 
+            logger.info(log_msg)
             return True, articles_count, None
 
     async def _fetch_with_retry(self, url: str, feed_name: str) -> Tuple[bool, Optional[Dict], Optional[str]]:

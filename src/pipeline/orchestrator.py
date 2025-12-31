@@ -25,7 +25,8 @@ class PipelineOrchestrator:
                  rate_limit: float = 2.0,
                  dedup_hours: int = 24,
                  prioritize_hours: int = 48,
-                 prioritize_limit: Optional[int] = None):
+                 prioritize_limit: Optional[int] = None,
+                 topic_filters: Optional[Dict] = None):
         """
         Initialize pipeline orchestrator
 
@@ -35,12 +36,14 @@ class PipelineOrchestrator:
             dedup_hours: Hours to look back for deduplication
             prioritize_hours: Hours to look back for prioritization
             prioritize_limit: Max articles to prioritize (None = all)
+            topic_filters: Optional topic/scope filters for article selection
         """
         self.max_concurrent_feeds = max_concurrent_feeds
         self.rate_limit = rate_limit
         self.dedup_hours = dedup_hours
         self.prioritize_hours = prioritize_hours
         self.prioritize_limit = prioritize_limit
+        self.topic_filters = topic_filters or {}
         self.content_filter = None
 
     async def run_full_pipeline(self) -> Dict[str, Any]:
@@ -182,7 +185,7 @@ class PipelineOrchestrator:
 
     async def _synthesize_narrative(self) -> Dict[str, Any]:
         """Run narrative synthesis stage using context-driven approach"""
-        synthesizer = NarrativeSynthesizer()
+        synthesizer = NarrativeSynthesizer(topic_filters=self.topic_filters)
         return await synthesizer.synthesize(
             hours=self.prioritize_hours,
             max_articles=50
@@ -227,7 +230,8 @@ async def run_pipeline(
     rate_limit: float = 2.0,
     dedup_hours: int = 24,
     prioritize_hours: int = 48,
-    prioritize_limit: Optional[int] = None
+    prioritize_limit: Optional[int] = None,
+    topic_filters: Optional[Dict] = None
 ) -> Dict[str, Any]:
     """
     Convenience function to run the complete pipeline
@@ -238,6 +242,7 @@ async def run_pipeline(
         dedup_hours: Hours to look back for deduplication
         prioritize_hours: Hours to look back for prioritization
         prioritize_limit: Max articles to prioritize (None = all)
+        topic_filters: Optional topic/scope filters for article selection
 
     Returns:
         Pipeline execution results
@@ -247,7 +252,8 @@ async def run_pipeline(
         rate_limit=rate_limit,
         dedup_hours=dedup_hours,
         prioritize_hours=prioritize_hours,
-        prioritize_limit=prioritize_limit
+        prioritize_limit=prioritize_limit,
+        topic_filters=topic_filters
     )
 
     return await orchestrator.run_full_pipeline()

@@ -18,6 +18,7 @@ from .module_loader import ContextModuleLoader
 from .anomaly_detector import CoverageAnomalyDetector
 from .semantic_memory import SemanticMemory
 from .perception import PerceptionEngine
+from .topic_matcher import TopicMatcher
 from ..config.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -42,7 +43,8 @@ class ContextCurator:
     def __init__(
         self,
         user_profile: Optional[UserProfile] = None,
-        perspective_id: Optional[str] = None
+        perspective_id: Optional[str] = None,
+        topic_filters: Optional[Dict] = None
     ):
         """
         Initialize context curator
@@ -50,12 +52,17 @@ class ContextCurator:
         Args:
             user_profile: User profile for personalization
             perspective_id: Perspective to use for analysis framing (defaults to user preference or daily_intelligence_brief)
+            topic_filters: Optional topic/scope filters dict (e.g., {'topics': ['cybersecurity'], 'scopes': ['local']})
         """
         try:
             self.user_profile = user_profile or get_user_profile()
         except FileNotFoundError:
             logger.warning("User profile not found, context will not be personalized")
             self.user_profile = None
+
+        # Topic filtering
+        self.topic_filters = topic_filters or {}
+        self.topic_matcher = TopicMatcher() if self.topic_filters else None
 
         # Determine perspective: user preference > parameter > default
         if perspective_id is None:
@@ -193,18 +200,76 @@ class ContextCurator:
         hours: int,
         max_articles: int
     ) -> List[Article]:
-        """Get recent unfiltered articles from database"""
+        """
+        Get recent unfiltered articles from database with optional topic filtering
+
+        Args:
+            session: Database session
+            hours: Hours to look back
+            max_articles: Maximum articles to return
+
+        Returns:
+            List of articles (filtered by topic/scope if filters provided)
+        """
         cutoff_time = datetime.utcnow() - timedelta(hours=hours)
 
-        articles = session.query(Article).filter(
+        # Base query: recent, unfiltered articles
+        query = session.query(Article).filter(
             Article.fetched_at >= cutoff_time,
             Article.filtered == False
-        ).order_by(
-            Article.fetched_at.desc()
-        ).limit(max_articles).all()
+        )
 
-        logger.info(f"Curated {len(articles)} articles from last {hours} hours")
-        return articles
+        # If no topic filters, use existing logic
+        if not self.topic_filters:
+            articles = query.order_by(
+                Article.fetched_at.desc()
+            ).limit(max_articles).all()
+
+            logger.info(f"Curated {len(articles)} articles from last {hours} hours (no filters)")
+            return articles
+
+        # Fetch 2x candidates for filtering buffer
+        candidate_articles = query.order_by(
+            Article.fetched_at.desc()
+        ).limit(max_articles * 2).all()
+
+        logger.info(
+            f"Fetched {len(candidate_articles)} candidate articles for filtering "
+            f"with filters: {self.topic_filters}"
+        )
+
+        # Apply topic filters using TopicMatcher
+        if self.topic_matcher and self.user_profile:
+            filtered_articles = self.topic_matcher.filter_articles(
+                articles=candidate_articles,
+                topic_filters=self.topic_filters,
+                user_profile=self.user_profile
+            )
+        else:
+            logger.warning("TopicMatcher not initialized or user_profile missing, skipping filters")
+            filtered_articles = candidate_articles
+
+        # Limit to max_articles after filtering
+        final_articles = filtered_articles[:max_articles]
+
+        # Warn if too few matches
+        if len(final_articles) == 0:
+            logger.warning(
+                f"No articles matched filters {self.topic_filters} in last {hours} hours. "
+                f"Consider expanding time window or using fewer filters."
+            )
+        elif len(final_articles) < 5:
+            logger.warning(
+                f"Only {len(final_articles)} articles matched filters {self.topic_filters}. "
+                f"Consider broadening filter criteria."
+            )
+
+        logger.info(
+            f"Curated {len(final_articles)} articles from {len(candidate_articles)} candidates "
+            f"(last {hours} hours, filters: {self.topic_filters})"
+        )
+
+        return final_articles
 
     def _get_historical_memory(self, session: Session) -> str:
         """

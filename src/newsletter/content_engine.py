@@ -39,7 +39,8 @@ class NewsletterContentEngine:
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
         hours: Optional[int] = None,
-        max_articles: int = 50
+        max_articles: int = 50,
+        topic_filters: Optional[Dict] = None
     ) -> Dict[str, Any]:
         """
         Generate intelligence report for any time period
@@ -49,6 +50,7 @@ class NewsletterContentEngine:
             end_date: End of analysis window (defaults to now)
             hours: Look back N hours from end_date (alternative to start_date)
             max_articles: Max articles to analyze
+            topic_filters: Optional topic/scope filters for article selection
 
         Returns:
             Report data with synthesis
@@ -94,7 +96,7 @@ class NewsletterContentEngine:
 
         # Generate new synthesis via NarrativeSynthesizer
         from ..context.synthesizer import NarrativeSynthesizer
-        synthesizer = NarrativeSynthesizer()
+        synthesizer = NarrativeSynthesizer(topic_filters=topic_filters)
 
         # Calculate hours for synthesizer
         synthesis_hours = int(duration_hours) + 1

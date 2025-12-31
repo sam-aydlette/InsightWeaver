@@ -23,6 +23,12 @@ from .intimacy_detector import (
     IntimacyAnalysis,
     IntimacyIssue
 )
+from .moderate_formatter import (
+    format_moderate_trust_summary,
+    format_compact_trust_summary,
+    calculate_actionability,
+    select_top_bias_issues
+)
 
 __all__ = [
     'TrustPipeline',
@@ -38,5 +44,9 @@ __all__ = [
     'LoadedTerm',
     'IntimacyDetector',
     'IntimacyAnalysis',
-    'IntimacyIssue'
+    'IntimacyIssue',
+    'format_moderate_trust_summary',
+    'format_compact_trust_summary',
+    'calculate_actionability',
+    'select_top_bias_issues'
 ]

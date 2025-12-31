@@ -11,12 +11,10 @@ from ..pipeline.orchestrator import run_pipeline
 from ..feed_manager import setup_feeds
 from ..config.settings import settings
 from ..database.connection import create_tables
+from .loading import loading
+from .output import get_output_manager, is_debug_mode
+from .brief_formatter import BriefFormatter
 
-# Configure logging
-logging.basicConfig(
-    level=getattr(logging, settings.log_level),
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
 logger = logging.getLogger(__name__)
 
 
@@ -249,16 +247,153 @@ def query_priorities(min_score=0.5, limit=10):
 
 @click.group(invoke_without_command=True)
 @click.pass_context
-def brief_group(ctx):
+@click.option('--hours', type=int, default=24, help='Look back N hours for analysis (default: 24)')
+@click.option('--email', is_flag=True, help='Send report via email (in addition to saving locally)')
+@click.option('--cybersecurity', '-cs', 'filter_cybersecurity', is_flag=True,
+              help='Filter to cybersecurity-related articles only')
+@click.option('--ai', '-ai', 'filter_ai', is_flag=True,
+              help='Filter to AI/ML-related articles only')
+@click.option('--local', '-l', 'filter_local', is_flag=True,
+              help='Filter to local news only')
+@click.option('--state', '-s', 'filter_state', is_flag=True,
+              help='Filter to state/regional news only')
+@click.option('--national', '-n', 'filter_national', is_flag=True,
+              help='Filter to national news only')
+@click.option('--global', '-g', 'filter_global', is_flag=True,
+              help='Filter to global/international news only')
+def brief_group(ctx, hours, email, filter_cybersecurity, filter_ai, filter_local, filter_state, filter_national, filter_global):
     """
-    Run intelligence brief pipeline
+    Run intelligence brief pipeline and generate report
 
     Fetches RSS feeds, analyzes content with Claude, and generates
     intelligence reports tailored to your location and interests.
+
+    You can filter by topic (e.g., --cybersecurity) and/or scope (e.g., --local).
+    Multiple filters combine with AND logic: --cybersecurity --local shows only local cybersecurity news.
     """
     if ctx.invoked_subcommand is None:
-        # Default: run full pipeline
-        asyncio.run(run_full_pipeline())
+        # Check for API key
+        if not settings.anthropic_api_key:
+            click.echo("⚠️  Warning: ANTHROPIC_API_KEY not configured")
+            click.echo("Brief generation requires Claude API access")
+            raise click.Abort()
+
+        # Build topic_filters dict from flags
+        topic_filters = {}
+
+        # Topic filters (from professional_domains)
+        topics = []
+        if filter_cybersecurity:
+            topics.append('cybersecurity')
+        if filter_ai:
+            topics.append('ai/ml')
+
+        if topics:
+            topic_filters['topics'] = topics
+
+        # Scope filters (geographic)
+        scopes = []
+        if filter_local:
+            scopes.append('local')
+        if filter_state:
+            scopes.append('state')
+        if filter_national:
+            scopes.append('national')
+        if filter_global:
+            scopes.append('global')
+
+        if scopes:
+            topic_filters['scopes'] = scopes
+
+        # Store in context for subcommands
+        ctx.ensure_object(dict)
+        ctx.obj['topic_filters'] = topic_filters
+
+        debug = is_debug_mode()
+        output_mgr = get_output_manager()
+
+        # Build loading message based on filters
+        if topic_filters:
+            filter_desc = []
+            if topics:
+                filter_desc.append(f"{', '.join(topics)}")
+            if scopes:
+                filter_desc.append(f"{', '.join(scopes)}")
+            loading_msg = f"Generating {' '.join(filter_desc)} brief"
+        else:
+            loading_msg = "Generating intelligence brief"
+
+        # Run pipeline and generate report
+        async def run_brief():
+            # Step 1: Run pipeline (fetch, deduplicate, filter, synthesize)
+            pipeline_result = await run_pipeline(topic_filters=topic_filters)
+
+            # Step 2: Generate report from synthesis
+            from ..newsletter.newsletter_system import NewsletterSystem
+            system = NewsletterSystem()
+            report_result = await system.generate_report(
+                hours=hours,
+                send_email=email,
+                topic_filters=topic_filters
+            )
+
+            return {
+                'pipeline': pipeline_result,
+                'report': report_result
+            }
+
+        with loading(loading_msg, debug=debug):
+            with output_mgr.suppress_output():
+                result = asyncio.run(run_brief())
+
+        # Display results
+        if result:
+            pipeline_summary = result.get("pipeline", {}).get("summary", {})
+            report_result = result.get("report", {})
+
+            # Check if filters resulted in 0 articles
+            articles_analyzed = report_result.get('articles_analyzed', 0)
+            articles_fetched = pipeline_summary.get('articles_fetched', 0)
+
+            if topic_filters and articles_analyzed == 0 and articles_fetched > 0:
+                # Filters were too restrictive
+                click.echo("\n" + "!" * 80)
+                click.echo("NO ARTICLES MATCHED YOUR FILTERS")
+                click.echo("!" * 80)
+                click.echo(f"\nFetched {articles_fetched} articles, but none matched:")
+                if 'topics' in topic_filters:
+                    click.echo(f"  Topics: {', '.join(topic_filters['topics'])}")
+                if 'scopes' in topic_filters:
+                    click.echo(f"  Scopes: {', '.join(topic_filters['scopes'])}")
+                click.echo("\nSuggestions:")
+                click.echo("  • Try expanding the time window: --hours 48 or --hours 168")
+                click.echo("  • Use fewer filters (remove -s or -cs)")
+                click.echo("  • Try different filter combinations")
+                click.echo("  • Run without filters to see all available content")
+                click.echo("=" * 80)
+            elif report_result.get("success") and articles_analyzed > 0:
+                # Display formatted report
+                formatter = BriefFormatter()
+                formatted_report = formatter.format_report(report_result)
+                click.echo(formatted_report)
+
+            # Display summary footer
+            click.echo("\n" + "=" * 80)
+            click.echo("PIPELINE SUMMARY")
+            click.echo("=" * 80)
+            if topic_filters:
+                click.echo(f"Filters: {topic_filters}")
+            click.echo(f"Articles fetched: {articles_fetched}")
+            click.echo(f"Articles analyzed: {articles_analyzed}")
+
+            if report_result.get("success"):
+                if report_result.get("local_saved"):
+                    click.echo(f"Saved to: {report_result.get('local_path', 'unknown')}")
+                if report_result.get("email_sent"):
+                    click.echo(f"Email sent successfully")
+
+            click.echo(f"Duration: {pipeline_summary.get('duration_seconds', 0):.1f}s")
+            click.echo("=" * 80)
 
 
 # ============================================================================
@@ -274,7 +409,15 @@ def setup_cmd():
 @brief_group.command(name="fetch")
 def fetch_cmd():
     """Only fetch RSS feeds (no analysis)"""
-    asyncio.run(run_fetch_only())
+    debug = is_debug_mode()
+    output_mgr = get_output_manager()
+
+    with loading("Fetching RSS feeds", debug=debug):
+        with output_mgr.suppress_output():
+            result = asyncio.run(run_fetch_only())
+
+    if result:
+        click.echo(f"\n✓ Fetched {result['total_articles']} articles from {result['successful_feeds']}/{result['total_feeds']} feeds")
 
 
 @brief_group.command(name="collect")
@@ -282,7 +425,22 @@ def fetch_cmd():
 @click.option('--name', type=str, help='Run specific collector by name')
 def collect_cmd(force, name):
     """Run API data collectors (government calendars, events, jobs)"""
-    asyncio.run(run_collectors(force=force, collector_name=name))
+    debug = is_debug_mode()
+    output_mgr = get_output_manager()
+
+    message = f"Running collector: {name}" if name else "Running data collectors"
+    with loading(message, debug=debug):
+        with output_mgr.suppress_output():
+            result = asyncio.run(run_collectors(force=force, collector_name=name))
+
+    if result and not debug:
+        if name:
+            click.echo(f"\n✓ Collector '{name}' completed")
+            click.echo(f"  • New items: {result.get('new_items', 0)}")
+        else:
+            click.echo(f"\n✓ Data collection completed")
+            click.echo(f"  • Collectors run: {result.get('collectors_run', 0)}")
+            click.echo(f"  • Total items collected: {result.get('total_items_collected', 0)}")
 
 
 @brief_group.command(name="collector-status")
@@ -309,68 +467,6 @@ def trends_cmd():
         print("Analysis requires Claude API access")
         raise click.Abort()
     asyncio.run(run_analysis_only())
-
-
-@brief_group.command(name="report")
-@click.option('--hours', type=int, help='Look back N hours for report (default: 24)')
-@click.option('--start-date', type=str, help='Report start date (YYYY-MM-DD or YYYY-MM-DD HH:MM)')
-@click.option('--end-date', type=str, help='Report end date (YYYY-MM-DD or YYYY-MM-DD HH:MM)')
-def report_cmd(hours, start_date, end_date):
-    """Generate intelligence report (flexible time window)"""
-    if not settings.anthropic_api_key:
-        print("⚠️  Warning: ANTHROPIC_API_KEY not configured")
-        print("Report generation requires Claude API access")
-        raise click.Abort()
-
-    # Parse date arguments if provided
-    start_date_obj = None
-    end_date_obj = None
-
-    if start_date:
-        try:
-            if len(start_date) == 10:  # YYYY-MM-DD
-                start_date_obj = datetime.strptime(start_date, '%Y-%m-%d')
-            else:  # YYYY-MM-DD HH:MM
-                start_date_obj = datetime.strptime(start_date, '%Y-%m-%d %H:%M')
-        except ValueError:
-            print(f"❌ Invalid start date format: {start_date}")
-            print("Use YYYY-MM-DD or 'YYYY-MM-DD HH:MM'")
-            raise click.Abort()
-
-    if end_date:
-        try:
-            if len(end_date) == 10:  # YYYY-MM-DD
-                end_date_obj = datetime.strptime(end_date, '%Y-%m-%d')
-            else:  # YYYY-MM-DD HH:MM
-                end_date_obj = datetime.strptime(end_date, '%Y-%m-%d %H:%M')
-        except ValueError:
-            print(f"❌ Invalid end date format: {end_date}")
-            print("Use YYYY-MM-DD or 'YYYY-MM-DD HH:MM'")
-            raise click.Abort()
-
-    async def run_report():
-        from ..newsletter.newsletter_system import NewsletterSystem
-        system = NewsletterSystem()
-        result = await system.generate_report(
-            start_date=start_date_obj,
-            end_date=end_date_obj,
-            hours=hours,
-            send_email=True
-        )
-
-        if result["success"]:
-            print(f"✅ Report generated successfully")
-            print(f"   • Type: {result['report_type']}")
-            print(f"   • Duration: {result['duration_hours']:.1f}h")
-            print(f"   • Articles analyzed: {result['articles_analyzed']}")
-            if result.get("local_saved"):
-                print(f"   • Saved to: {result['local_path']}")
-            if result.get("email_sent"):
-                print(f"   • Email sent successfully")
-        else:
-            print(f"❌ Report generation failed: {result.get('error')}")
-
-    asyncio.run(run_report())
 
 
 @brief_group.command(name="test-newsletter")

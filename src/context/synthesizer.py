@@ -22,9 +22,15 @@ logger = logging.getLogger(__name__)
 class NarrativeSynthesizer:
     """Generates narrative intelligence briefs using context engineering"""
 
-    def __init__(self):
-        """Initialize narrative synthesizer"""
-        self.curator = ContextCurator()
+    def __init__(self, topic_filters: Optional[Dict] = None):
+        """
+        Initialize narrative synthesizer
+
+        Args:
+            topic_filters: Optional topic/scope filters for article selection
+        """
+        self.topic_filters = topic_filters or {}
+        self.curator = ContextCurator(topic_filters=self.topic_filters)
         self.client = ClaudeClient()
         self.reflection_engine = ReflectionEngine()
 

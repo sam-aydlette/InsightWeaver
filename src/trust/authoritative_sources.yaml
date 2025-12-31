@@ -1,0 +1,114 @@
+# Authoritative Sources for Temporal Fact Verification
+# Maps fact patterns to trusted source URLs for real-time verification
+
+# Pattern matching rules:
+# - keywords: List of keywords that must appear in the claim (case-insensitive)
+# - url: Authoritative URL to fetch
+# - query_prompt: Prompt to extract specific information from the fetched page
+
+sources:
+  # US Government Leadership
+  - name: "US President"
+    keywords: ["president", "united states", "potus", "white house"]
+    url: "https://www.whitehouse.gov/administration/"
+    query_prompt: "Who is currently serving as President of the United States?"
+
+  - name: "US Vice President"
+    keywords: ["vice president", "vp", "united states"]
+    url: "https://www.whitehouse.gov/administration/"
+    query_prompt: "Who is currently serving as Vice President of the United States?"
+
+  - name: "US Cabinet"
+    keywords: ["secretary of", "attorney general", "cabinet"]
+    url: "https://www.whitehouse.gov/administration/"
+    query_prompt: "List the current members of the President's Cabinet and their positions."
+
+  - name: "US Congress Leadership"
+    keywords: ["speaker of the house", "senate majority leader", "senate minority leader"]
+    url: "https://www.congress.gov/members"
+    query_prompt: "Who are the current leaders of the House and Senate?"
+
+  # US Economic Indicators
+  - name: "US Unemployment Rate"
+    keywords: ["unemployment rate", "jobless rate", "employment statistics"]
+    url: "https://www.bls.gov/news.release/empsit.nr0.htm"
+    query_prompt: "What is the most recent unemployment rate for the United States?"
+
+  - name: "US GDP"
+    keywords: ["gdp", "gross domestic product", "economic growth"]
+    url: "https://www.bea.gov/data/gdp/gross-domestic-product"
+    query_prompt: "What is the most recent GDP growth rate or GDP figure for the United States?"
+
+  - name: "US Inflation/CPI"
+    keywords: ["inflation", "cpi", "consumer price index"]
+    url: "https://www.bls.gov/news.release/cpi.nr0.htm"
+    query_prompt: "What is the most recent inflation rate or CPI figure?"
+
+  - name: "Federal Funds Rate"
+    keywords: ["federal funds rate", "fed rate", "interest rate", "federal reserve"]
+    url: "https://www.federalreserve.gov/monetarypolicy/openmarket.htm"
+    query_prompt: "What is the current federal funds rate target range?"
+
+  # US Legislative Status
+  - name: "Bill Status (Congress.gov)"
+    keywords: ["bill", "legislation", "congress", "h.r.", "s."]
+    url: "https://www.congress.gov/"
+    query_prompt: "Search for the mentioned bill and provide its current status (passed, pending, etc.)."
+
+  # Corporate Leadership (Fortune 500)
+  - name: "Apple CEO"
+    keywords: ["apple", "ceo", "chief executive"]
+    url: "https://www.apple.com/leadership/"
+    query_prompt: "Who is currently listed as CEO of Apple Inc.?"
+
+  - name: "Microsoft CEO"
+    keywords: ["microsoft", "ceo", "chief executive"]
+    url: "https://www.microsoft.com/en-us/about"
+    query_prompt: "Who is currently listed as CEO of Microsoft?"
+
+  - name: "Amazon CEO"
+    keywords: ["amazon", "ceo", "chief executive"]
+    url: "https://www.aboutamazon.com/about-us/leadership"
+    query_prompt: "Who is currently listed as CEO of Amazon?"
+
+  - name: "Google/Alphabet CEO"
+    keywords: ["google", "alphabet", "ceo", "chief executive"]
+    url: "https://abc.xyz/investor/"
+    query_prompt: "Who is currently listed as CEO of Alphabet/Google?"
+
+  # Global Government Leadership
+  - name: "UK Prime Minister"
+    keywords: ["prime minister", "uk", "united kingdom", "britain"]
+    url: "https://www.gov.uk/government/ministers"
+    query_prompt: "Who is currently serving as Prime Minister of the United Kingdom?"
+
+  - name: "Canadian Prime Minister"
+    keywords: ["prime minister", "canada", "canadian"]
+    url: "https://www.canada.ca/en/government/ministers.html"
+    query_prompt: "Who is currently serving as Prime Minister of Canada?"
+
+  - name: "French President"
+    keywords: ["president", "france", "french"]
+    url: "https://www.elysee.fr/en/"
+    query_prompt: "Who is currently serving as President of France?"
+
+  - name: "German Chancellor"
+    keywords: ["chancellor", "germany", "german"]
+    url: "https://www.bundesregierung.de/breg-en"
+    query_prompt: "Who is currently serving as Chancellor of Germany?"
+
+  # Military Leadership
+  - name: "US Secretary of Defense"
+    keywords: ["secretary of defense", "defense secretary", "pentagon"]
+    url: "https://www.defense.gov/About/Biographies/"
+    query_prompt: "Who is currently serving as US Secretary of Defense?"
+
+  - name: "Chairman Joint Chiefs of Staff"
+    keywords: ["chairman", "joint chiefs", "military"]
+    url: "https://www.defense.gov/About/Biographies/"
+    query_prompt: "Who is currently serving as Chairman of the Joint Chiefs of Staff?"
+
+# Fallback strategy when no pattern matches
+fallback:
+  enabled: false
+  reason: "No authoritative source configured for this fact type. Cannot verify beyond model knowledge cutoff (January 2025)."

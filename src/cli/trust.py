@@ -8,6 +8,8 @@ from pathlib import Path
 from ..config.settings import settings
 from ..trust.trust_pipeline import TrustPipeline
 from ..trust.trust_report import TrustReportFormatter
+from .loading import loading
+from .output import get_output_manager, is_debug_mode
 
 
 @click.command()
@@ -105,9 +107,11 @@ async def _run_trust_pipeline(
         verbose: Whether to show detailed output
     """
     formatter = TrustReportFormatter()
+    debug = is_debug_mode()
 
     # Initialize pipeline
-    click.echo("\n🔍 Querying Claude with trust constraints...")
+    if debug or verbose:
+        click.echo("\n🔍 Querying Claude with trust constraints...")
     pipeline = TrustPipeline()
 
     try:
@@ -126,7 +130,8 @@ async def _run_trust_pipeline(
 
         # Display analysis (if verification was run)
         if verify_response:
-            click.echo("\n🔍 Analyzing response...")
+            if debug or verbose:
+                click.echo("\n🔍 Analyzing response...")
 
             if "analysis" in result:
                 # Show analysis

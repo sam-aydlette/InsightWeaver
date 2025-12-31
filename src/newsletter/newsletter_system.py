@@ -26,7 +26,8 @@ class NewsletterSystem:
         end_date: Optional[datetime] = None,
         hours: Optional[int] = None,
         save_local: bool = True,
-        send_email: bool = False
+        send_email: bool = False,
+        topic_filters: Optional[Dict] = None
     ) -> Dict[str, Any]:
         """
         Generate intelligence report for any time period
@@ -37,6 +38,7 @@ class NewsletterSystem:
             hours: Look back N hours from end_date (alternative to start_date)
             save_local: Save HTML to data/newsletters/
             send_email: Send via email
+            topic_filters: Optional topic/scope filters for article selection
 
         Returns:
             Report generation results
@@ -45,7 +47,8 @@ class NewsletterSystem:
         content_data = await self.content_engine.generate_intelligence_report(
             start_date=start_date,
             end_date=end_date,
-            hours=hours
+            hours=hours,
+            topic_filters=topic_filters
         )
 
         results = {
@@ -57,6 +60,8 @@ class NewsletterSystem:
             "articles_analyzed": content_data['articles_analyzed'],
             "synthesis_id": content_data.get('synthesis_id'),
             "processing_time": content_data.get('processing_time'),
+            "executive_summary": content_data.get('executive_summary', ''),
+            "synthesis_data": content_data.get('synthesis_data', {}),
             "local_saved": False,
             "email_sent": False
         }

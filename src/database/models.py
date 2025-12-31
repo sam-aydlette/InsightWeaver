@@ -373,3 +373,135 @@ class MemoryFact(Base):
         Index('idx_memory_fact_confidence', 'confidence'),  # For confidence-based ordering
         Index('idx_memory_fact_created', 'created_at'),  # For recency-based ordering
     )
+
+
+class ForecastRun(Base):
+    """
+    Execution tracking for long-term forecast runs
+    Each run can generate multiple horizon forecasts
+    """
+    __tablename__ = "forecast_runs"
+
+    id = Column(Integer, primary_key=True)
+    run_type = Column(String(50))  # 'multi_horizon', 'single_horizon'
+    horizons_requested = Column(JSON)  # ['6mo', '1yr', '3yr', '5yr']
+    scenario_count = Column(Integer, default=3)
+
+    # Execution tracking
+    started_at = Column(DateTime, default=datetime.utcnow)
+    completed_at = Column(DateTime, nullable=True)
+    status = Column(String(50))  # 'running', 'completed', 'failed'
+
+    # Results
+    forecasts_generated = Column(Integer, default=0)
+    error_message = Column(Text, nullable=True)
+
+    __table_args__ = (
+        Index('idx_forecast_run_started', 'started_at'),
+        Index('idx_forecast_run_status', 'status'),
+    )
+
+
+class LongTermForecast(Base):
+    """
+    Long-term forecasts (6mo - 5yr horizons)
+    Separate from NarrativeSynthesis for distinct analysis types
+    """
+    __tablename__ = "long_term_forecasts"
+
+    id = Column(Integer, primary_key=True)
+    forecast_run_id = Column(Integer, ForeignKey("forecast_runs.id"))
+
+    # Horizon metadata
+    time_horizon = Column(String(50), nullable=False)  # '6mo', '1yr', '3yr', '5yr'
+    horizon_months = Column(Integer)  # 6, 12, 36, 60
+    base_date = Column(DateTime, default=datetime.utcnow)
+    target_date = Column(DateTime, nullable=False)
+
+    # Forecast data (structured JSON with all 5 analysis types)
+    forecast_data = Column(JSON, nullable=False)
+    # Structure: {
+    #   "trend_extrapolations": [...],
+    #   "scenarios": [optimistic/baseline/pessimistic],
+    #   "historical_patterns": [...],
+    #   "causal_chains": [...],
+    #   "event_risks": {known_knowns, known_unknowns, unknown_unknowns}
+    # }
+
+    # Source tracking
+    data_sources_used = Column(JSON)  # List of source names
+    articles_analyzed = Column(Integer)
+    historical_months_analyzed = Column(Integer)
+
+    # Confidence metrics (DEPRECATED - not grounded in empirical methodology)
+    # overall_confidence = Column(Float)  # REMOVED: No validated confidence methodology
+    # confidence_by_type = Column(JSON)  # REMOVED: No validated confidence methodology
+
+    # Token usage tracking
+    context_tokens = Column(Integer)
+    generation_tokens = Column(Integer)
+
+    generated_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_forecast_horizon', 'time_horizon'),
+        Index('idx_forecast_target_date', 'target_date'),
+        Index('idx_forecast_generated_at', 'generated_at'),
+    )
+
+
+class ForecastScenario(Base):
+    """
+    Individual scenario branches for a forecast
+    Optimistic/baseline/pessimistic or custom scenarios
+    """
+    __tablename__ = "forecast_scenarios"
+
+    id = Column(Integer, primary_key=True)
+    forecast_id = Column(Integer, ForeignKey("long_term_forecasts.id"))
+
+    # Scenario metadata
+    scenario_type = Column(String(50))  # 'optimistic', 'baseline', 'pessimistic', 'custom'
+    scenario_name = Column(String(200))
+    scenario_description = Column(Text)
+
+    # Scenario details
+    predictions = Column(JSON)
+    key_assumptions = Column(JSON)
+    trigger_events = Column(JSON)  # Early signals this scenario is unfolding
+    scenario_probability = Column(Float)  # 0.0-1.0 (should sum to 1.0 across scenarios)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_scenario_forecast', 'forecast_id'),
+        Index('idx_scenario_type', 'scenario_type'),
+    )
+
+
+class CausalChain(Base):
+    """
+    Cause-effect relationships mapped over time
+    Tracks how initial causes lead to final outcomes
+    """
+    __tablename__ = "causal_chains"
+
+    id = Column(Integer, primary_key=True)
+    forecast_id = Column(Integer, ForeignKey("long_term_forecasts.id"))
+
+    # Chain structure
+    chain_name = Column(String(200))
+    initial_cause = Column(Text)
+    intermediate_effects = Column(JSON)  # Ordered list of effects
+    final_outcome = Column(Text)
+
+    # Temporal metadata
+    time_to_unfold_months = Column(Integer)
+    confidence = Column(Float)  # 0.0-1.0
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_causal_forecast', 'forecast_id'),
+        Index('idx_causal_confidence', 'confidence'),
+    )

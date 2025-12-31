@@ -4,6 +4,8 @@ Format trust analysis results for terminal display and export
 """
 from typing import Dict, Any, Optional
 
+from .moderate_formatter import format_moderate_trust_summary
+
 
 class TrustReportFormatter:
     """
@@ -77,6 +79,7 @@ class TrustReportFormatter:
                     "VERIFIED": "✓",
                     "CONTRADICTED": "✗",
                     "UNVERIFIABLE": "?",
+                    "OUTDATED": "⏰",
                     "ERROR": "⚠"
                 }.get(verdict, "?")
 
@@ -84,6 +87,22 @@ class TrustReportFormatter:
                 lines.append(f"   Type: {claim.get('type', 'UNKNOWN')}")
                 lines.append(f"   Verdict: {verdict} (confidence: {confidence:.2f})")
                 lines.append(f"   Reasoning: {reasoning}")
+
+                # Show temporal verification if present
+                temporal_check = verification.get("temporal_check")
+                if temporal_check:
+                    still_current = temporal_check.get("still_current")
+                    checked_date = temporal_check.get("checked_date", "unknown")
+
+                    if still_current is False:
+                        lines.append(f"   ⏰ TEMPORAL CHECK: Outdated as of {checked_date}")
+                        update_info = temporal_check.get("update_info", "")
+                        if update_info:
+                            lines.append(f"      Update: {update_info}")
+                    elif still_current is True:
+                        lines.append(f"   ✓ TEMPORAL CHECK: Still current as of {checked_date}")
+                    else:
+                        lines.append(f"   ⚠ TEMPORAL CHECK: Could not verify current status")
 
                 # Show caveats if present
                 caveats = verification.get("caveats", [])
@@ -231,9 +250,18 @@ class TrustReportFormatter:
             uncertain = facts.get("uncertain_count", 0)
             contradicted = facts.get("contradicted_count", 0)
 
+            # Count outdated facts separately
+            outdated = 0
+            for verification in facts.get("verifications", []):
+                if verification.get("verdict") == "OUTDATED":
+                    outdated += 1
+                    verified = max(0, verified - 1)  # Don't double-count
+
             fact_parts = []
             if verified > 0:
                 fact_parts.append(f"✓ {verified}")
+            if outdated > 0:
+                fact_parts.append(f"⏰ {outdated}")
             if uncertain > 0:
                 fact_parts.append(f"? {uncertain}")
             if contradicted > 0:
@@ -301,6 +329,28 @@ class TrustReportFormatter:
             return " | ".join(parts)
         else:
             return "No analysis results"
+
+    @staticmethod
+    def format_moderate_summary(analysis: Dict[str, Any]) -> str:
+        """
+        Format moderate-detail trust summary
+
+        Intermediate format between compact and verbose showing:
+        - Fact verification counts
+        - Top 2-3 bias/framing issues
+        - Tone rating with explanation
+        - Actionability check (YES/NO/CAUTION)
+
+        Args:
+            analysis: Analysis results dictionary
+
+        Returns:
+            Formatted moderate-detail summary string
+        """
+        if not analysis.get("analyzed", False):
+            return "\nTrust Verification: UNAVAILABLE (Analysis not run)\n"
+
+        return "\n" + format_moderate_trust_summary(analysis) + "\n"
 
     @staticmethod
     def export_to_json(result: Dict[str, Any]) -> str:
