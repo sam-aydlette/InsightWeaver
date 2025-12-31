@@ -68,9 +68,10 @@ async def web_fetch(url: str, prompt: str, timeout: int = 30) -> str:
         lines = [line.strip() for line in markdown_content.split('\n') if line.strip()]
         clean_content = '\n'.join(lines)
 
-        # Truncate if too long (keep first 8000 chars to stay within token limits)
-        if len(clean_content) > 8000:
-            clean_content = clean_content[:8000] + "\n\n[Content truncated for length...]"
+        # Truncate if too long (keep first 50000 chars to stay within token limits)
+        # 50k characters is ~12.5k tokens, well within Claude's 200k token context window
+        if len(clean_content) > 50000:
+            clean_content = clean_content[:50000] + "\n\n[Content truncated for length...]"
 
         logger.info(f"Extracted {len(clean_content)} characters of clean text")
 

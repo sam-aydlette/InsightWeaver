@@ -108,6 +108,196 @@ sources:
     url: "https://www.defense.gov/About/Biographies/"
     query_prompt: "Who is currently serving as Chairman of the Joint Chiefs of Staff?"
 
+  # More World Leaders (G20 and Major Nations)
+  - name: "Japanese Prime Minister"
+    keywords: ["prime minister", "japan", "japanese"]
+    url: "https://www.kantei.go.jp/foreign/index-e.html"
+    query_prompt: "Who is currently serving as Prime Minister of Japan?"
+
+  - name: "Chinese President"
+    keywords: ["president", "china", "chinese", "premier"]
+    url: "https://www.cia.gov/the-world-factbook/countries/china/"
+    query_prompt: "Who is currently listed as the leader of China?"
+
+  - name: "Russian President"
+    keywords: ["president", "russia", "russian", "kremlin"]
+    url: "https://www.cia.gov/the-world-factbook/countries/russia/"
+    query_prompt: "Who is currently listed as the President of Russia?"
+
+  - name: "Indian Prime Minister"
+    keywords: ["prime minister", "india", "indian"]
+    url: "https://www.pmindia.gov.in/"
+    query_prompt: "Who is currently serving as Prime Minister of India?"
+
+  - name: "Brazilian President"
+    keywords: ["president", "brazil", "brazilian"]
+    url: "https://www.cia.gov/the-world-factbook/countries/brazil/"
+    query_prompt: "Who is currently listed as the President of Brazil?"
+
+  - name: "Mexican President"
+    keywords: ["president", "mexico", "mexican"]
+    url: "https://www.gob.mx/presidencia"
+    query_prompt: "Who is currently serving as President of Mexico?"
+
+  - name: "South African President"
+    keywords: ["president", "south africa", "south african"]
+    url: "https://www.gov.za/about-government"
+    query_prompt: "Who is currently serving as President of South Africa?"
+
+  - name: "Australian Prime Minister"
+    keywords: ["prime minister", "australia", "australian"]
+    url: "https://www.pm.gov.au/"
+    query_prompt: "Who is currently serving as Prime Minister of Australia?"
+
+  - name: "Italian Prime Minister"
+    keywords: ["prime minister", "italy", "italian"]
+    url: "https://www.governo.it/en"
+    query_prompt: "Who is currently serving as Prime Minister of Italy?"
+
+  - name: "Spanish Prime Minister"
+    keywords: ["prime minister", "spain", "spanish"]
+    url: "https://www.lamoncloa.gob.es/lang/en/Paginas/index.aspx"
+    query_prompt: "Who is currently serving as Prime Minister of Spain?"
+
+  - name: "South Korean President"
+    keywords: ["president", "south korea", "korean"]
+    url: "https://www.cia.gov/the-world-factbook/countries/korea-south/"
+    query_prompt: "Who is currently listed as the President of South Korea?"
+
+  - name: "Turkish President"
+    keywords: ["president", "turkey", "turkish"]
+    url: "https://www.cia.gov/the-world-factbook/countries/turkey/"
+    query_prompt: "Who is currently listed as the President of Turkey?"
+
+  - name: "Israeli Prime Minister"
+    keywords: ["prime minister", "israel", "israeli"]
+    url: "https://www.gov.il/en"
+    query_prompt: "Who is currently serving as Prime Minister of Israel?"
+
+  - name: "Saudi Arabian King"
+    keywords: ["king", "saudi arabia", "saudi"]
+    url: "https://www.cia.gov/the-world-factbook/countries/saudi-arabia/"
+    query_prompt: "Who is currently listed as the King of Saudi Arabia?"
+
+  - name: "Egyptian President"
+    keywords: ["president", "egypt", "egyptian"]
+    url: "https://www.cia.gov/the-world-factbook/countries/egypt/"
+    query_prompt: "Who is currently listed as the President of Egypt?"
+
+  # International Organizations
+  - name: "UN Secretary-General"
+    keywords: ["secretary-general", "united nations", "un"]
+    url: "https://www.un.org/sg/en"
+    query_prompt: "Who is currently serving as UN Secretary-General?"
+
+  - name: "NATO Secretary General"
+    keywords: ["secretary general", "nato"]
+    url: "https://www.nato.int/cps/en/natohq/who_is_who.htm"
+    query_prompt: "Who is currently serving as NATO Secretary General?"
+
+  - name: "European Commission President"
+    keywords: ["president", "european commission", "eu commission"]
+    url: "https://commission.europa.eu/about-european-commission/president_en"
+    query_prompt: "Who is currently serving as President of the European Commission?"
+
+  - name: "World Bank President"
+    keywords: ["president", "world bank"]
+    url: "https://www.worldbank.org/en/about/leadership"
+    query_prompt: "Who is currently serving as President of the World Bank?"
+
+  - name: "IMF Managing Director"
+    keywords: ["managing director", "imf", "international monetary fund"]
+    url: "https://www.imf.org/en/About/senior-officials"
+    query_prompt: "Who is currently serving as Managing Director of the IMF?"
+
+  - name: "WHO Director-General"
+    keywords: ["director-general", "who", "world health organization"]
+    url: "https://www.who.int/about/governance/director-general"
+    query_prompt: "Who is currently serving as Director-General of WHO?"
+
+  # US Supreme Court
+  - name: "US Supreme Court Chief Justice"
+    keywords: ["chief justice", "supreme court"]
+    url: "https://www.supremecourt.gov/about/biographies.aspx"
+    query_prompt: "Who is currently serving as Chief Justice of the US Supreme Court?"
+
+  # Major US State Governors (top 10 by population)
+  - name: "California Governor"
+    keywords: ["governor", "california"]
+    url: "https://www.gov.ca.gov/"
+    query_prompt: "Who is currently serving as Governor of California?"
+
+  - name: "Texas Governor"
+    keywords: ["governor", "texas"]
+    url: "https://gov.texas.gov/"
+    query_prompt: "Who is currently serving as Governor of Texas?"
+
+  - name: "Florida Governor"
+    keywords: ["governor", "florida"]
+    url: "https://www.flgov.com/"
+    query_prompt: "Who is currently serving as Governor of Florida?"
+
+  - name: "New York Governor"
+    keywords: ["governor", "new york"]
+    url: "https://www.governor.ny.gov/"
+    query_prompt: "Who is currently serving as Governor of New York?"
+
+  # Major Sports Organizations
+  - name: "FIFA President"
+    keywords: ["president", "fifa", "football", "soccer"]
+    url: "https://www.fifa.com/about-fifa/president"
+    query_prompt: "Who is currently serving as FIFA President?"
+
+  - name: "IOC President"
+    keywords: ["president", "ioc", "international olympic committee", "olympics"]
+    url: "https://olympics.com/ioc/president"
+    query_prompt: "Who is currently serving as IOC President?"
+
+  - name: "NBA Commissioner"
+    keywords: ["commissioner", "nba", "basketball"]
+    url: "https://www.nba.com/news/nba-commissioner"
+    query_prompt: "Who is currently serving as NBA Commissioner?"
+
+  - name: "NFL Commissioner"
+    keywords: ["commissioner", "nfl", "football"]
+    url: "https://www.nfl.com/news/commissioner"
+    query_prompt: "Who is currently serving as NFL Commissioner?"
+
+  # Major US Cities Mayors
+  - name: "NYC Mayor"
+    keywords: ["mayor", "new york city", "nyc"]
+    url: "https://www.nyc.gov/office-of-the-mayor"
+    query_prompt: "Who is currently serving as Mayor of New York City?"
+
+  - name: "LA Mayor"
+    keywords: ["mayor", "los angeles", "la"]
+    url: "https://www.lamayor.org/"
+    query_prompt: "Who is currently serving as Mayor of Los Angeles?"
+
+  - name: "Chicago Mayor"
+    keywords: ["mayor", "chicago"]
+    url: "https://www.chicago.gov/city/en/depts/mayor.html"
+    query_prompt: "Who is currently serving as Mayor of Chicago?"
+
+  # Major University Presidents
+  - name: "Harvard President"
+    keywords: ["president", "harvard", "university"]
+    url: "https://www.harvard.edu/president/"
+    query_prompt: "Who is currently serving as President of Harvard University?"
+
+  # Federal Reserve
+  - name: "Federal Reserve Chair"
+    keywords: ["chair", "chairman", "federal reserve", "fed"]
+    url: "https://www.federalreserve.gov/aboutthefed/bios/board/default.htm"
+    query_prompt: "Who is currently serving as Chair of the Federal Reserve?"
+
+  # Fallback: Wikipedia (Comprehensive Coverage, Quickly Updated)
+  - name: "Wikipedia - Country Information"
+    keywords: ["leader of", "government of", "head of state", "president of", "prime minister of", "current leader"]
+    url_template: "https://en.wikipedia.org/wiki/{country}"
+    requires_country_extraction: true
+    query_prompt: "Who is currently listed as the leader or head of government for this country? Look in the infobox and Government/Politics sections for current leadership."
+
 # Fallback strategy when no pattern matches
 fallback:
   enabled: false

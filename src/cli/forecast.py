@@ -15,6 +15,7 @@ from ..database.connection import get_db
 from ..database.models import ForecastRun
 from ..utils.profile_loader import get_user_profile
 from .output import is_debug_mode
+from .forecast_verifier import verify_forecast_horizon, verify_forecast_aggregate, format_forecast_trust_section
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +27,8 @@ logger = logging.getLogger(__name__)
               help='Number of detailed scenarios to generate (0 = skip, 3 = standard)')
 @click.option('--full', is_flag=True,
               help='Show full detailed analysis (default: executive briefing)')
+@click.option('--no-verify', 'no_verify', is_flag=True,
+              help='Skip trust verification of AI output')
 @click.option('--cybersecurity', '-cs', 'filter_cybersecurity', is_flag=True,
               help='Filter to cybersecurity topics only')
 @click.option('--ai', '-ai', 'filter_ai', is_flag=True,
@@ -44,6 +47,7 @@ def forecast_command(
     horizon,
     scenarios,
     full,
+    no_verify,
     filter_cybersecurity,
     filter_ai,
     filter_local,
@@ -87,13 +91,14 @@ def forecast_command(
     )
 
     # Run forecast
-    asyncio.run(_run_forecast(horizon, scenarios, full, topic_filters))
+    asyncio.run(_run_forecast(horizon, scenarios, full, no_verify, topic_filters))
 
 
 async def _run_forecast(
     horizon: Optional[str],
     scenarios: int,
     full: bool,
+    no_verify: bool,
     topic_filters: Optional[Dict]
 ):
     """
@@ -103,6 +108,7 @@ async def _run_forecast(
         horizon: Horizon string or None for all horizons
         scenarios: Number of scenarios to generate
         full: If True, show full detailed analysis; if False, show executive briefing
+        no_verify: If True, skip trust verification
         topic_filters: Topic/scope filters dict
     """
     try:
@@ -155,6 +161,25 @@ async def _run_forecast(
                 formatted_output = formatter.format_forecast(forecast)
                 click.echo(formatted_output)
 
+                # Trust verification for this horizon (unless --no-verify)
+                if not no_verify:
+                    horizon_name = forecast.get('horizon', 'unknown')
+                    # Extract natural language content for verification
+                    # (trend description + scenario descriptions if present)
+                    trend_description = forecast.get('trend_description', '')
+                    scenarios_text = ''
+                    if forecast.get('scenarios'):
+                        scenarios_text = '\n'.join([s.get('description', '') for s in forecast['scenarios']])
+
+                    horizon_text = f"{trend_description}\n\n{scenarios_text}".strip()
+
+                    if horizon_text:
+                        click.echo(f"\nVerifying {horizon_name} forecast for trustworthiness...")
+                        trust_analysis = await verify_forecast_horizon(horizon_text, horizon_name)
+                        trust_section = format_forecast_trust_section(trust_analysis, horizon_name)
+                        if trust_section:
+                            click.echo(trust_section)
+
             # Save HTML report
             report_path = formatter.save_html_report(result)
         else:
@@ -170,6 +195,32 @@ async def _run_forecast(
             exec_formatter = ExecutiveForecastFormatter()
             briefing = exec_formatter.format_executive_briefing(result['forecasts'], report_path)
             click.echo(briefing)
+
+            # Trust verification for executive summary (unless --no-verify)
+            if not no_verify:
+                # Extract all natural language content from forecasts for aggregate verification
+                all_trend_descriptions = []
+                all_scenarios = []
+
+                for forecast in result['forecasts']:
+                    trend_description = forecast.get('trend_description', '')
+                    if trend_description:
+                        all_trend_descriptions.append(trend_description)
+
+                    if forecast.get('scenarios'):
+                        for scenario in forecast['scenarios']:
+                            scenario_desc = scenario.get('description', '')
+                            if scenario_desc:
+                                all_scenarios.append(scenario_desc)
+
+                executive_text = '\n\n'.join(all_trend_descriptions + all_scenarios).strip()
+
+                if executive_text:
+                    click.echo("\nVerifying forecast executive summary for trustworthiness...")
+                    trust_analysis = await verify_forecast_aggregate(executive_text)
+                    trust_section = format_forecast_trust_section(trust_analysis)
+                    if trust_section:
+                        click.echo(trust_section)
 
         click.echo()
         click.echo(f"✓ HTML report saved: {report_path}")

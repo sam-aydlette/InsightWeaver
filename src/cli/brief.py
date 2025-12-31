@@ -14,6 +14,7 @@ from ..database.connection import create_tables
 from .loading import loading
 from .output import get_output_manager, is_debug_mode
 from .brief_formatter import BriefFormatter
+from .brief_verifier import verify_brief_output, format_brief_trust_section
 
 logger = logging.getLogger(__name__)
 
@@ -249,6 +250,7 @@ def query_priorities(min_score=0.5, limit=10):
 @click.pass_context
 @click.option('--hours', type=int, default=24, help='Look back N hours for analysis (default: 24)')
 @click.option('--email', is_flag=True, help='Send report via email (in addition to saving locally)')
+@click.option('--no-verify', 'no_verify', is_flag=True, help='Skip trust verification of AI output')
 @click.option('--cybersecurity', '-cs', 'filter_cybersecurity', is_flag=True,
               help='Filter to cybersecurity-related articles only')
 @click.option('--ai', '-ai', 'filter_ai', is_flag=True,
@@ -261,7 +263,7 @@ def query_priorities(min_score=0.5, limit=10):
               help='Filter to national news only')
 @click.option('--global', '-g', 'filter_global', is_flag=True,
               help='Filter to global/international news only')
-def brief_group(ctx, hours, email, filter_cybersecurity, filter_ai, filter_local, filter_state, filter_national, filter_global):
+def brief_group(ctx, hours, email, no_verify, filter_cybersecurity, filter_ai, filter_local, filter_state, filter_national, filter_global):
     """
     Run intelligence brief pipeline and generate report
 
@@ -376,6 +378,16 @@ def brief_group(ctx, hours, email, filter_cybersecurity, filter_ai, filter_local
                 formatter = BriefFormatter()
                 formatted_report = formatter.format_report(report_result)
                 click.echo(formatted_report)
+
+                # Trust verification (unless --no-verify flag is set)
+                if not no_verify:
+                    executive_summary = report_result.get('executive_summary', '')
+                    if executive_summary:
+                        click.echo("\nVerifying AI output for trustworthiness...")
+                        trust_analysis = asyncio.run(verify_brief_output(executive_summary))
+                        trust_section = format_brief_trust_section(trust_analysis)
+                        if trust_section:
+                            click.echo(trust_section)
 
             # Display summary footer
             click.echo("\n" + "=" * 80)

@@ -121,7 +121,7 @@ class FactVerifier:
             client: ClaudeClient instance for API calls
         """
         self.client = client
-        self.source_matcher = AuthoritativeSourceMatcher()
+        self.source_matcher = AuthoritativeSourceMatcher(claude_client=client)
 
     async def verify(self, response: str, skip_temporal_validation: bool = False) -> List[FactVerification]:
         """
@@ -317,8 +317,8 @@ class FactVerifier:
 
         current_date = datetime.now().strftime("%Y-%m-%d")
 
-        # Try to find authoritative source for this claim
-        source = self.source_matcher.find_source(claim.text)
+        # Try to find authoritative source for this claim using intelligent Claude-based matching
+        source = await self.source_matcher.find_source(claim.text)
 
         if source is None:
             # No authoritative source available - acknowledge limitation

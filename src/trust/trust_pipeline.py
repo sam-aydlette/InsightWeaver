@@ -35,7 +35,7 @@ class TrustPipeline:
         self.fact_verifier = FactVerifier(self.client)
         self.bias_analyzer = BiasAnalyzer(self.client)
         self.intimacy_detector = IntimacyDetector(self.client)
-        self.source_matcher = AuthoritativeSourceMatcher()
+        self.source_matcher = AuthoritativeSourceMatcher(claude_client=self.client)
         logger.info("Trust pipeline initialized")
 
     async def query_with_trust_constraints(
@@ -259,8 +259,8 @@ Respond with JSON:
         else:
             search_string = query
 
-        # Find authoritative source for this query
-        source = self.source_matcher.find_source(search_string)
+        # Find authoritative source for this query using intelligent Claude-based matching
+        source = await self.source_matcher.find_source(search_string)
 
         if source is None:
             logger.info(f"No authoritative source found for source_type: {analysis.get('source_type')}")
