@@ -63,14 +63,32 @@ insightweaver --version            # Show version information
 
 ```bash
 # Full pipeline (default)
-insightweaver brief                # Fetch, analyze, generate report
+insightweaver brief                              # Fetch, analyze, generate report
+insightweaver brief --hours 48                   # Last 48 hours
+insightweaver brief --email                      # Send via email
+insightweaver brief --no-verify                  # Skip trust verification
+
+# Topic filters
+insightweaver brief --cybersecurity (-cs)        # Cybersecurity only
+insightweaver brief --ai (-ai)                   # AI/ML only
+
+# Scope filters
+insightweaver brief --local (-l)                 # Local news only
+insightweaver brief --state (-s)                 # State news only
+insightweaver brief --national (-n)              # National news only
+insightweaver brief --global (-g)                # Global news only
+
+# Combined filters
+insightweaver brief -cs -n                       # National cybersecurity
+insightweaver brief --hours 48 -l                # 48-hour local news
+insightweaver brief -cs -g --email               # Global cybersecurity via email
 
 # Setup and initialization
-insightweaver brief setup          # Initialize database and load feeds
+insightweaver brief setup                        # Initialize database and load feeds
 
 # Data collection
-insightweaver brief fetch          # Fetch RSS feeds only
-insightweaver brief collect        # Run API data collectors
+insightweaver brief fetch                        # Fetch RSS feeds only
+insightweaver brief collect                      # Run API data collectors
 insightweaver brief collect --force              # Force all collectors
 insightweaver brief collect --name usajobs       # Run specific collector
 
@@ -95,6 +113,97 @@ insightweaver brief collector-status             # Show collector status
 insightweaver brief query                        # Query priority articles
 insightweaver brief query --min 0.7 --limit 20   # Custom filters
 insightweaver brief test-newsletter              # Test email system
+```
+
+### Forecast Command (Long-term Trend Forecasting)
+
+```bash
+# Generate multi-horizon forecasts (default: executive mode)
+insightweaver forecast                           # All horizons (6mo, 1yr, 3yr, 5yr)
+insightweaver forecast --full                    # Full detailed analysis
+
+# Specific time horizons
+insightweaver forecast --horizon 6mo             # 6-month forecast only
+insightweaver forecast --horizon 1yr             # 1-year forecast only
+insightweaver forecast --horizon 3yr             # 3-year forecast only
+insightweaver forecast --horizon 5yr             # 5-year forecast only
+
+# Scenario generation
+insightweaver forecast --scenarios 3             # Generate 3 detailed scenarios
+insightweaver forecast --horizon 1yr --scenarios 5    # 1-year with 5 scenarios
+
+# Topic filters (same as brief)
+insightweaver forecast -cs                       # Cybersecurity trends
+insightweaver forecast -ai                       # AI/ML trends
+insightweaver forecast -cs --full --scenarios 3  # Detailed cybersecurity forecast
+
+# Scope filters
+insightweaver forecast -l                        # Local trends
+insightweaver forecast -n                        # National trends
+insightweaver forecast -g                        # Global trends
+
+# Trust verification
+insightweaver forecast --no-verify               # Skip trust verification
+
+# Combined examples
+insightweaver forecast --horizon 1yr -cs --full --scenarios 3
+    # 1-year detailed cybersecurity forecast with 3 scenarios
+insightweaver forecast -ai -g --scenarios 5
+    # Global AI trends with 5 scenarios (executive mode)
+```
+
+### Trust Command (Verified AI Responses)
+
+```bash
+# Get trust-verified AI responses with fact-checking and bias analysis
+insightweaver trust "Who is the current president of the United States?"
+insightweaver trust "What is the unemployment rate?"
+insightweaver trust "Who is the CEO of Apple?"
+
+# The trust command provides:
+# - Fact verification against authoritative sources (56 sources)
+# - Bias and framing analysis
+# - Tone and intimacy detection
+# - Temporal validation for time-sensitive facts
+```
+
+## Trust Verification
+
+InsightWeaver includes built-in trust verification for all AI-generated outputs. By default, brief and forecast commands automatically verify their outputs for trustworthiness.
+
+### What Gets Verified
+
+**Fact Verification**: Claims are extracted and verified against 56 authoritative sources:
+- Government websites (US, global leaders, economic indicators)
+- International organizations (UN, NATO, WHO, IMF, World Bank)
+- Corporate leadership pages (Apple, Microsoft, Amazon, Google)
+- Academic institutions (Harvard, etc.)
+- Wikipedia (fallback for comprehensive country coverage)
+
+**Bias Analysis**: Identifies framing issues, assumptions, omissions, and loaded language
+
+**Tone Detection**: Ensures professional, appropriate communication without inappropriate intimacy
+
+**Temporal Validation**: Time-sensitive facts are verified against current authoritative sources using intelligent Claude-based source selection and dynamic URL construction
+
+### Verification Output
+
+Each verification shows:
+- **Fact Summary**: Counts of verified/unverifiable/contradicted claims
+- **Top Bias Issues**: 2-3 most significant framing/assumptions/omissions
+- **Tone Rating**: Overall tone assessment (PROFESSIONAL, CASUAL, etc.)
+- **Actionability**: YES/NO/CAUTION with reasoning
+
+### Performance Impact
+
+Trust verification adds approximately 30-60 seconds per verification (3 API calls: fact extraction, bias analysis, tone detection).
+
+### Opt-Out
+
+Use `--no-verify` flag to skip trust verification:
+```bash
+insightweaver brief --no-verify
+insightweaver forecast --no-verify
 ```
 
 ## Configuration
@@ -221,6 +330,7 @@ insightweaver brief
 - Priority events with impact levels
 - Predictions and scenarios (2-4 week horizon)
 - Civic engagement opportunities
+- Trust verification (facts, bias, tone, actionability)
 
 ### Custom Reports
 
@@ -230,7 +340,52 @@ insightweaver brief report --hours 168
 
 # Month-end review (specific dates)
 insightweaver brief report --start-date 2025-01-01 --end-date 2025-01-31
+
+# National cybersecurity news
+insightweaver brief -cs -n
+
+# Skip trust verification for faster output
+insightweaver brief --no-verify
 ```
+
+### Long-term Forecasting
+
+```bash
+# Generate multi-horizon forecasts (executive briefing)
+insightweaver forecast
+
+# 1-year detailed forecast with scenarios
+insightweaver forecast --horizon 1yr --full --scenarios 3
+
+# Cybersecurity trends forecast
+insightweaver forecast -cs --scenarios 5
+```
+
+**Output:**
+- Trend analysis for each horizon (6mo, 1yr, 3yr, 5yr)
+- Detailed scenarios (if requested)
+- Executive briefing or full detailed analysis
+- Trust verification for predictions and reasoning
+
+### Trust-Verified Queries
+
+```bash
+# Get verified factual information
+insightweaver trust "Who is the current president of the United States?"
+
+# Economic data with verification
+insightweaver trust "What is the current unemployment rate?"
+
+# Corporate leadership verification
+insightweaver trust "Who is the CEO of Microsoft?"
+```
+
+**Output:**
+- AI response with current, verified information
+- Fact verification status (verified/contradicted/unverifiable)
+- Bias analysis
+- Tone rating
+- Compact trust summary
 
 ### System Monitoring
 
