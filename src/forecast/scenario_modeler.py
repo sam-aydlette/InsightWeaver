@@ -4,9 +4,9 @@ Generates detailed scenario branches from baseline forecast
 Explores alternative futures beyond optimistic/baseline/pessimistic
 """
 
-import logging
 import json
-from typing import Dict, Any, List, Optional
+import logging
+from typing import Any
 
 from ..context.claude_client import ClaudeClient
 
@@ -23,7 +23,7 @@ class ScenarioModeler:
     - Scenario comparison and divergence points
     """
 
-    def __init__(self, claude_client: Optional[ClaudeClient] = None):
+    def __init__(self, claude_client: ClaudeClient | None = None):
         """
         Initialize scenario modeler
 
@@ -34,10 +34,10 @@ class ScenarioModeler:
 
     async def generate_scenarios(
         self,
-        baseline_forecast: Dict[str, Any],
-        context: Dict[str, Any],
+        baseline_forecast: dict[str, Any],
+        context: dict[str, Any],
         scenario_count: int = 3
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Generate scenario branches from baseline forecast
 
@@ -74,7 +74,7 @@ class ScenarioModeler:
 
     def _build_scenario_task(
         self,
-        baseline_forecast: Dict[str, Any],
+        baseline_forecast: dict[str, Any],
         scenario_count: int
     ) -> str:
         """
@@ -192,7 +192,7 @@ IMPORTANT:
 
         return task
 
-    def _parse_scenario_response(self, response: str) -> List[Dict[str, Any]]:
+    def _parse_scenario_response(self, response: str) -> list[dict[str, Any]]:
         """
         Parse Claude's scenario response
 

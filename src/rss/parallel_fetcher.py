@@ -5,14 +5,13 @@ Efficiently processes multiple RSS feeds concurrently
 
 import asyncio
 import logging
-from datetime import datetime
-from typing import List, Dict, Tuple, Optional
-from dataclasses import dataclass
 import time
+from dataclasses import dataclass
+from datetime import datetime
 
-from src.rss.fetcher import RSSFetcher
-from src.database.models import RSSFeed
 from src.database.connection import get_db
+from src.database.models import RSSFeed
+from src.rss.fetcher import RSSFetcher
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +22,7 @@ class FetchResult:
     feed_name: str
     success: bool
     articles_count: int
-    error_message: Optional[str]
+    error_message: str | None
     fetch_time: float
 
 class ParallelRSSFetcher:
@@ -81,7 +80,7 @@ class ParallelRSSFetcher:
                     fetch_time=fetch_time
                 )
 
-    async def fetch_all_feeds(self, feeds: List[RSSFeed]) -> Dict[str, any]:
+    async def fetch_all_feeds(self, feeds: list[RSSFeed]) -> dict[str, any]:
         """
         Fetch all feeds in parallel with rate limiting
         Returns summary statistics and results
@@ -137,7 +136,7 @@ class ParallelRSSFetcher:
         finally:
             await fetcher.close()
 
-    def _generate_summary(self, results: List[FetchResult], total_time: float) -> Dict[str, any]:
+    def _generate_summary(self, results: list[FetchResult], total_time: float) -> dict[str, any]:
         """Generate summary statistics from fetch results"""
         successful_feeds = sum(1 for r in results if r.success)
         failed_feeds = len(results) - successful_feeds
@@ -173,7 +172,7 @@ class ParallelRSSFetcher:
             'timestamp': datetime.utcnow().isoformat()
         }
 
-    def _empty_results(self) -> Dict[str, any]:
+    def _empty_results(self) -> dict[str, any]:
         """Return empty results structure"""
         return {
             'total_feeds': 0,
@@ -190,7 +189,7 @@ class ParallelRSSFetcher:
             'timestamp': datetime.utcnow().isoformat()
         }
 
-async def fetch_all_active_feeds(max_concurrent: int = 10, rate_limit: float = 2.0) -> Dict[str, any]:
+async def fetch_all_active_feeds(max_concurrent: int = 10, rate_limit: float = 2.0) -> dict[str, any]:
     """
     Convenience function to fetch all active feeds from database
     """

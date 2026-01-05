@@ -3,11 +3,12 @@ Authoritative Source Matcher
 Matches claims to authoritative web sources for temporal verification
 """
 
-import logging
-import yaml
 import json
+import logging
 from pathlib import Path
-from typing import Optional, Dict, Any, List
+from typing import Any
+
+import yaml
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +19,7 @@ class AuthoritativeSourceMatcher:
     Uses Claude for intelligent source selection
     """
 
-    def __init__(self, config_path: Optional[str] = None, claude_client=None):
+    def __init__(self, config_path: str | Path | None = None, claude_client: Any = None):
         """
         Initialize source matcher
 
@@ -28,17 +29,19 @@ class AuthoritativeSourceMatcher:
         """
         if config_path is None:
             config_path = Path(__file__).parent / "authoritative_sources.yaml"
+        elif isinstance(config_path, str):
+            config_path = Path(config_path)
 
-        self.config_path = config_path
-        self.sources = []
-        self.fallback_config = {}
+        self.config_path: Path = config_path
+        self.sources: list[dict[str, Any]] = []
+        self.fallback_config: dict[str, Any] = {}
         self.claude_client = claude_client
         self._load_sources()
 
     def _load_sources(self):
         """Load authoritative sources from YAML config"""
         try:
-            with open(self.config_path, 'r') as f:
+            with open(self.config_path) as f:
                 config = yaml.safe_load(f)
 
             self.sources = config.get('sources', [])
@@ -56,7 +59,7 @@ class AuthoritativeSourceMatcher:
             self.sources = []
             self.fallback_config = {'enabled': False}
 
-    async def find_source(self, claim_text: str) -> Optional[Dict[str, Any]]:
+    async def find_source(self, claim_text: str) -> dict[str, Any] | None:
         """
         Find authoritative source for a claim using intelligent Claude-based matching
 
@@ -159,7 +162,7 @@ If no source is appropriate, set best_match_id to null."""
             logger.error(f"Source matching via Claude failed: {e}")
             return None
 
-    async def _construct_dynamic_url(self, claim_text: str, source: Dict[str, Any]) -> Optional[str]:
+    async def _construct_dynamic_url(self, claim_text: str, source: dict[str, Any]) -> str | None:
         """
         Construct dynamic URL by extracting country name from claim
 
@@ -235,7 +238,7 @@ Examples:
             logger.error(f"Failed to extract country and construct URL: {e}")
             return None
 
-    def find_source_sync(self, claim_text: str) -> Optional[Dict[str, Any]]:
+    def find_source_sync(self, claim_text: str) -> dict[str, Any] | None:
         """
         Synchronous wrapper for find_source (for backwards compatibility)
         Uses simple keyword matching as fallback when async not available
@@ -276,7 +279,7 @@ Examples:
         logger.info("No authoritative source match found for claim")
         return None
 
-    def get_fallback_config(self) -> Dict[str, Any]:
+    def get_fallback_config(self) -> dict[str, Any]:
         """
         Get fallback configuration
 
@@ -286,7 +289,7 @@ Examples:
         return self.fallback_config
 
 
-def match_claim_to_source(claim_text: str) -> Optional[Dict[str, Any]]:
+async def match_claim_to_source(claim_text: str) -> dict[str, Any] | None:
     """
     Convenience function to match claim to authoritative source
 
@@ -297,4 +300,4 @@ def match_claim_to_source(claim_text: str) -> Optional[Dict[str, Any]]:
         Source dict or None
     """
     matcher = AuthoritativeSourceMatcher()
-    return matcher.find_source(claim_text)
+    return await matcher.find_source(claim_text)

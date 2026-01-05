@@ -2,15 +2,15 @@
 Brief Report Terminal Formatter
 Format intelligence reports for terminal display
 """
-from typing import Dict, Any
 import textwrap
+from typing import Any
 
 
 class BriefFormatter:
     """Format intelligence brief reports for terminal display"""
 
     @staticmethod
-    def format_report(report_data: Dict[str, Any], max_width: int = 80) -> str:
+    def format_report(report_data: dict[str, Any], max_width: int = 80) -> str:
         """
         Format complete intelligence report for terminal
 
@@ -200,7 +200,7 @@ class BriefFormatter:
         return "\n".join(lines)
 
     @staticmethod
-    def format_compact_summary(report_data: Dict[str, Any]) -> str:
+    def format_compact_summary(report_data: dict[str, Any]) -> str:
         """
         Format compact one-line summary of report
 

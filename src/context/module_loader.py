@@ -5,9 +5,9 @@ Loads and manages domain knowledge modules from config files
 
 import json
 import logging
-from pathlib import Path
-from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -35,9 +35,9 @@ class ContextModuleLoader:
             modules_dir: Path to context modules directory
         """
         self.modules_dir = Path(modules_dir)
-        self.loaded_modules: Dict[str, ContextModule] = {}
+        self.loaded_modules: dict[str, ContextModule] = {}
 
-    def load_all_modules(self) -> Dict[str, List[ContextModule]]:
+    def load_all_modules(self) -> dict[str, list[ContextModule]]:
         """
         Load all context modules from directory structure
 
@@ -56,7 +56,7 @@ class ContextModuleLoader:
             return modules_by_type
 
         # Load from each subdirectory
-        for module_type in modules_by_type.keys():
+        for module_type in modules_by_type:
             type_dir = self.modules_dir / module_type
             if type_dir.exists():
                 modules = self._load_modules_from_directory(type_dir, module_type)
@@ -69,13 +69,13 @@ class ContextModuleLoader:
         self,
         directory: Path,
         module_type: str
-    ) -> List[ContextModule]:
+    ) -> list[ContextModule]:
         """Load all JSON modules from a directory"""
         modules = []
 
         for json_file in directory.glob("*.json"):
             try:
-                with open(json_file, 'r', encoding='utf-8') as f:
+                with open(json_file, encoding='utf-8') as f:
                     data = json.load(f)
 
                 module = self._parse_module(data, module_type)
@@ -87,7 +87,7 @@ class ContextModuleLoader:
 
         return modules
 
-    def _parse_module(self, data: Dict[str, Any], module_type: str) -> ContextModule:
+    def _parse_module(self, data: dict[str, Any], module_type: str) -> ContextModule:
         """Parse module JSON into ContextModule object"""
         # Format content for Claude
         formatted_content = self._format_module_content(data)
@@ -102,7 +102,7 @@ class ContextModuleLoader:
             last_updated=data.get('last_updated', 'unknown')
         )
 
-    def _format_module_content(self, data: Dict[str, Any]) -> str:
+    def _format_module_content(self, data: dict[str, Any]) -> str:
         """Format module data into readable context for Claude"""
         parts = []
 
@@ -144,20 +144,20 @@ class ContextModuleLoader:
 
     def get_modules_by_priority(
         self,
-        modules: List[ContextModule],
+        modules: list[ContextModule],
         priority: str = 'high'
-    ) -> List[ContextModule]:
+    ) -> list[ContextModule]:
         """Filter modules by priority level"""
         return [m for m in modules if m.priority == priority]
 
-    def estimate_total_tokens(self, modules: List[ContextModule]) -> int:
+    def estimate_total_tokens(self, modules: list[ContextModule]) -> int:
         """Estimate total tokens for a list of modules"""
         return sum(m.token_estimate for m in modules)
 
     def format_for_claude_context(
         self,
-        modules: List[ContextModule],
-        max_tokens: Optional[int] = None
+        modules: list[ContextModule],
+        max_tokens: int | None = None
     ) -> str:
         """
         Format modules for inclusion in Claude context
@@ -203,11 +203,11 @@ class ContextModuleLoader:
 
         return "\n".join(parts)
 
-    def get_module_by_name(self, name: str) -> Optional[ContextModule]:
+    def get_module_by_name(self, name: str) -> ContextModule | None:
         """Retrieve a specific module by name"""
         return self.loaded_modules.get(name)
 
-    def get_module_summary(self) -> Dict[str, Any]:
+    def get_module_summary(self) -> dict[str, Any]:
         """Get summary of all loaded modules"""
         summary = {
             'total_modules': len(self.loaded_modules),

@@ -4,9 +4,10 @@ Detects unusual patterns in article topics/sources compared to baseline
 """
 
 import logging
-from datetime import datetime, timedelta
-from typing import Dict, List, Any
 from collections import Counter
+from datetime import datetime, timedelta
+from typing import Any
+
 from sqlalchemy.orm import Session
 
 from ..database.models import Article
@@ -29,9 +30,9 @@ class CoverageAnomalyDetector:
     def detect_anomalies(
         self,
         session: Session,
-        current_articles: List[Article],
+        current_articles: list[Article],
         current_hours: int = 48
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Detect coverage anomalies by comparing current period to baseline
 
@@ -114,7 +115,7 @@ class CoverageAnomalyDetector:
             "summary": self._generate_summary(anomalies)
         }
 
-    def _analyze_articles(self, articles: List[Article]) -> Dict[str, Any]:
+    def _analyze_articles(self, articles: list[Article]) -> dict[str, Any]:
         """Analyze articles for patterns"""
         # Extract keywords from titles (simple approach)
         all_words = []
@@ -137,9 +138,9 @@ class CoverageAnomalyDetector:
 
     def _detect_topic_anomalies(
         self,
-        current_keywords: List[tuple],
-        baseline_keywords: List[tuple]
-    ) -> List[Dict[str, Any]]:
+        current_keywords: list[tuple],
+        baseline_keywords: list[tuple]
+    ) -> list[dict[str, Any]]:
         """Detect unusual topic coverage"""
         anomalies = []
 
@@ -175,11 +176,11 @@ class CoverageAnomalyDetector:
 
     def _detect_source_anomalies(
         self,
-        current_sources: Dict[str, int],
-        baseline_sources: Dict[str, int],
+        current_sources: dict[str, int],
+        baseline_sources: dict[str, int],
         current_hours: int,
         baseline_days: int
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Detect unusual source patterns"""
         anomalies = []
 
@@ -212,7 +213,7 @@ class CoverageAnomalyDetector:
 
         return anomalies[:2]  # Limit to top 2 source anomalies
 
-    def _generate_summary(self, anomalies: List[Dict[str, Any]]) -> str:
+    def _generate_summary(self, anomalies: list[dict[str, Any]]) -> str:
         """Generate human-readable summary of anomalies"""
         if not anomalies:
             return "Coverage patterns normal compared to baseline"
@@ -227,7 +228,7 @@ class CoverageAnomalyDetector:
         else:
             return f"Minor deviations from baseline: {len(anomalies)} small anomalies"
 
-    def format_for_context(self, anomaly_report: Dict[str, Any]) -> str:
+    def format_for_context(self, anomaly_report: dict[str, Any]) -> str:
         """Format anomaly report for inclusion in Claude context"""
         if not anomaly_report.get('has_baseline'):
             return ""

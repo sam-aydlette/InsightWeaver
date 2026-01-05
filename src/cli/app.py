@@ -2,12 +2,15 @@
 InsightWeaver CLI Application
 Click-based multi-command interface
 """
+
+import time
+
 import click
+
 from .brief import brief_group
-from .trust import trust_command
 from .forecast import forecast_command
 from .output import set_debug_mode
-
+from .trust import trust_command
 
 ASCII_ART = r"""
     ╔══════════════════════════════════════════════════════════╗
@@ -39,6 +42,10 @@ def interactive_mode():
     click.echo()
     click.echo("Welcome to InsightWeaver - Transform Data Into Trustworthy Insight.")
     click.echo()
+
+    # Pause to let user see the ASCII art and slogan
+    time.sleep(2.5)
+
     click.echo("Available commands:")
     click.echo("  brief               - Generate intelligence brief and report")
     click.echo("  trust [query]       - Get trust-verified AI responses")
@@ -61,7 +68,7 @@ def interactive_mode():
     click.echo("  Same topic/scope filters as brief")
     click.echo()
     click.echo("Trust command:")
-    click.echo("  trust \"your question\"  - Get AI response with fact-checking, bias")
+    click.echo('  trust "your question"  - Get AI response with fact-checking, bias')
     click.echo("                           analysis, and tone verification")
     click.echo()
     click.echo("Examples:")
@@ -72,7 +79,7 @@ def interactive_mode():
     click.echo("  forecast               (multi-horizon forecasts, executive mode)")
     click.echo("  forecast --horizon 1yr --full  (1-year detailed forecast)")
     click.echo("  forecast -cs --scenarios 3     (cybersecurity trends with scenarios)")
-    click.echo("  trust \"Who is the president?\"  (verified factual response)")
+    click.echo('  trust "Who is the president?"  (verified factual response)')
     click.echo()
     click.echo("Tip: Add --debug to any command to see detailed logs")
     click.echo()
@@ -82,10 +89,10 @@ def interactive_mode():
             command = click.prompt("insightweaver", type=str, prompt_suffix=" > ")
             command = command.strip()
 
-            if command in ['exit', 'quit', 'q']:
+            if command in ["exit", "quit", "q"]:
                 click.echo("Thank you for using InsightWeaver!")
                 break
-            elif command in ['help', '?']:
+            elif command in ["help", "?"]:
                 click.echo("\nAvailable commands:")
                 click.echo("  brief               - Generate intelligence brief and report")
                 click.echo("  trust [query]       - Get trust-verified AI responses")
@@ -98,17 +105,23 @@ def interactive_mode():
                 click.echo("  --email             - Send report via email (in addition to saving)")
                 click.echo("  --no-verify         - Skip trust verification of AI output")
                 click.echo("  Topic filters:   --cybersecurity (-cs), --ai (-ai)")
-                click.echo("  Scope filters:   --local (-l), --state (-s), --national (-n), --global (-g)")
+                click.echo(
+                    "  Scope filters:   --local (-l), --state (-s), --national (-n), --global (-g)"
+                )
                 click.echo()
                 click.echo("Forecast command options:")
                 click.echo("  --horizon [6mo|1yr|3yr|5yr]  - Specific time horizon (default: all)")
-                click.echo("  --scenarios N       - Number of detailed scenarios (0 = skip, 3 = standard)")
-                click.echo("  --full              - Show full detailed analysis (default: executive)")
+                click.echo(
+                    "  --scenarios N       - Number of detailed scenarios (0 = skip, 3 = standard)"
+                )
+                click.echo(
+                    "  --full              - Show full detailed analysis (default: executive)"
+                )
                 click.echo("  --no-verify         - Skip trust verification of AI output")
                 click.echo("  Same topic/scope filters as brief")
                 click.echo()
                 click.echo("Trust command:")
-                click.echo("  trust \"your question\"  - Get AI response with fact-checking, bias")
+                click.echo('  trust "your question"  - Get AI response with fact-checking, bias')
                 click.echo("                           analysis, and tone verification")
                 click.echo()
                 click.echo("Examples:")
@@ -119,29 +132,29 @@ def interactive_mode():
                 click.echo("  forecast               (multi-horizon forecasts, executive mode)")
                 click.echo("  forecast --horizon 1yr --full  (1-year detailed forecast)")
                 click.echo("  forecast -cs --scenarios 3     (cybersecurity trends with scenarios)")
-                click.echo("  trust \"Who is the president?\"  (verified factual response)")
+                click.echo('  trust "Who is the president?"  (verified factual response)')
                 click.echo()
                 click.echo("Tip: Add --debug to any command to see detailed logs")
                 click.echo()
-            elif command.startswith('brief'):
+            elif command.startswith("brief"):
                 # Parse command and invoke brief group
-                try:
+                try:  # noqa: SIM105
                     brief_group.main(command.split()[1:], standalone_mode=False)
                 except SystemExit:
                     pass
-            elif command.startswith('trust'):
+            elif command.startswith("trust"):
                 # Parse command and invoke trust command
-                try:
+                try:  # noqa: SIM105
                     trust_command.main(command.split()[1:], standalone_mode=False)
                 except SystemExit:
                     pass
-            elif command.startswith('forecast'):
+            elif command.startswith("forecast"):
                 # Parse command and invoke forecast command
-                try:
+                try:  # noqa: SIM105
                     forecast_command.main(command.split()[1:], standalone_mode=False)
                 except SystemExit:
                     pass
-            elif command == '':
+            elif command == "":
                 continue
             else:
                 click.echo(f"Unknown command: {command}")
@@ -155,7 +168,7 @@ def interactive_mode():
 
 @click.group(invoke_without_command=True)
 @click.pass_context
-@click.option('--debug', is_flag=True, help='Enable debug mode (show logs and detailed output)')
+@click.option("--debug", is_flag=True, help="Enable debug mode (show logs and detailed output)")
 @click.version_option(version="1.0.0", prog_name="InsightWeaver")
 def cli(ctx, debug):
     """
@@ -166,7 +179,7 @@ def cli(ctx, debug):
     """
     set_debug_mode(debug)
     ctx.ensure_object(dict)
-    ctx.obj['DEBUG'] = debug
+    ctx.obj["DEBUG"] = debug
 
     if ctx.invoked_subcommand is None:
         interactive_mode()

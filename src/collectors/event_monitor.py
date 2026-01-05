@@ -4,9 +4,8 @@ Tracks concert tours and live music events for specified artists
 """
 
 import logging
-from datetime import datetime, timedelta
-from typing import List, Dict, Any, Optional
-import os
+from datetime import datetime
+from typing import Any
 
 from .base_collector import BaseCollector
 
@@ -23,7 +22,7 @@ class EventMonitorCollector(BaseCollector):
 
     BANDSINTOWN_API_URL = "https://rest.bandsintown.com/artists/{artist}/events"
 
-    def __init__(self, artists: List[str], app_id: str = "insightweaver"):
+    def __init__(self, artists: list[str], app_id: str = "insightweaver"):
         """
         Initialize event monitor
 
@@ -39,7 +38,7 @@ class EventMonitorCollector(BaseCollector):
         self.artists = artists
         self.app_id = app_id
 
-    def fetch_data(self) -> List[Dict[str, Any]]:
+    def fetch_data(self) -> list[dict[str, Any]]:
         """
         Fetch upcoming events for configured artists
 
@@ -58,7 +57,7 @@ class EventMonitorCollector(BaseCollector):
 
         return all_events
 
-    def _fetch_artist_events(self, artist: str) -> List[Dict[str, Any]]:
+    def _fetch_artist_events(self, artist: str) -> list[dict[str, Any]]:
         """
         Fetch events for a specific artist from Bandsintown
 
@@ -103,7 +102,7 @@ class EventMonitorCollector(BaseCollector):
             logger.error(f"Error fetching Bandsintown events for {artist}: {e}")
             return []
 
-    def _is_local_event(self, event: Dict[str, Any]) -> bool:
+    def _is_local_event(self, event: dict[str, Any]) -> bool:
         """
         Check if event is in DC/Northern Virginia area
 
@@ -144,7 +143,7 @@ class EventMonitorCollector(BaseCollector):
 
         return False
 
-    def parse_item(self, raw_item: Dict[str, Any]) -> Dict[str, Any]:
+    def parse_item(self, raw_item: dict[str, Any]) -> dict[str, Any]:
         """
         Parse raw event into standardized format
 
@@ -201,7 +200,7 @@ class SongkickCollector(BaseCollector):
 
     SONGKICK_API_URL = "https://api.songkick.com/api/3.0/artists/{artist_id}/calendar.json"
 
-    def __init__(self, api_key: str, artist_ids: Dict[str, int]):
+    def __init__(self, api_key: str, artist_ids: dict[str, int]):
         """
         Initialize Songkick collector
 
@@ -217,7 +216,7 @@ class SongkickCollector(BaseCollector):
         )
         self.artist_ids = artist_ids
 
-    def fetch_data(self) -> List[Dict[str, Any]]:
+    def fetch_data(self) -> list[dict[str, Any]]:
         """Fetch events from Songkick"""
         all_events = []
 
@@ -245,7 +244,7 @@ class SongkickCollector(BaseCollector):
 
         return all_events
 
-    def _is_local_songkick_event(self, event: Dict[str, Any]) -> bool:
+    def _is_local_songkick_event(self, event: dict[str, Any]) -> bool:
         """Check if Songkick event is in DC/NoVA area"""
         venue = event.get('venue', {})
         location = venue.get('metroArea', {})
@@ -258,7 +257,7 @@ class SongkickCollector(BaseCollector):
         return any(metro in city for metro in local_metros) or \
                any(st in state for st in local_states)
 
-    def parse_item(self, raw_item: Dict[str, Any]) -> Dict[str, Any]:
+    def parse_item(self, raw_item: dict[str, Any]) -> dict[str, Any]:
         """Parse Songkick event into standardized format"""
         artist = raw_item.get('artist_name', 'Unknown Artist')
         venue = raw_item.get('venue', {})

@@ -3,17 +3,15 @@ Content Engine for InsightWeaver Newsletter
 Generates intelligent narrative summaries using Claude API
 """
 
-import asyncio
 from datetime import datetime, timedelta
-from typing import Dict, List, Any, Optional, Tuple
-from sqlalchemy.orm import Session
+from typing import Any
 
-from ..database.connection import get_db
-from ..database.models import Article, TrendAnalysis, NarrativeSynthesis
-from ..utils.profile_loader import get_user_profile
-from ..context.curator import ContextCurator
-from ..context.claude_client import ClaudeClient
 from ..config.settings import settings
+from ..context.claude_client import ClaudeClient
+from ..context.curator import ContextCurator
+from ..database.connection import get_db
+from ..database.models import Article, NarrativeSynthesis
+from ..utils.profile_loader import get_user_profile
 
 
 class NewsletterContentEngine:
@@ -29,19 +27,20 @@ class NewsletterContentEngine:
             self.user_profile = None
             self.curator = ContextCurator()
             self.claude_client = None
-        except ValueError as e:
+        except ValueError:
             # API key not configured
             self.curator = ContextCurator()
             self.claude_client = None
 
     async def generate_intelligence_report(
         self,
-        start_date: Optional[datetime] = None,
-        end_date: Optional[datetime] = None,
-        hours: Optional[int] = None,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
+        hours: int | None = None,
         max_articles: int = 50,
-        topic_filters: Optional[Dict] = None
-    ) -> Dict[str, Any]:
+        topic_filters: dict | None = None,
+        synthesis_id: int | None = None
+    ) -> dict[str, Any]:
         """
         Generate intelligence report for any time period
 
@@ -51,6 +50,7 @@ class NewsletterContentEngine:
             hours: Look back N hours from end_date (alternative to start_date)
             max_articles: Max articles to analyze
             topic_filters: Optional topic/scope filters for article selection
+            synthesis_id: Optional synthesis ID from pipeline (prevents duplicate generation)
 
         Returns:
             Report data with synthesis
@@ -67,15 +67,46 @@ class NewsletterContentEngine:
 
         start_time = datetime.now()
 
+        # If synthesis_id provided by pipeline, use it directly (prevents duplicate synthesis)
+        if synthesis_id is not None:
+            with get_db() as session:
+                synthesis = session.query(NarrativeSynthesis).filter(
+                    NarrativeSynthesis.id == synthesis_id
+                ).first()
+
+                if synthesis and synthesis.synthesis_data:
+                    print(f"✅ Using synthesis from pipeline (ID: {synthesis_id})")
+                    return self._format_synthesis_report(
+                        synthesis, start_date, end_date, duration_hours
+                    )
+                else:
+                    print(f"⚠️  Warning: Synthesis ID {synthesis_id} not found in database, querying for existing synthesis...")
+
         # Try to get existing synthesis for this window
+        # Prefer syntheses with citation_map (trust-verified with citations)
         with get_db() as session:
-            synthesis = session.query(NarrativeSynthesis).filter(
+            all_syntheses = session.query(NarrativeSynthesis).filter(
                 NarrativeSynthesis.generated_at >= start_date,
                 NarrativeSynthesis.generated_at <= end_date
-            ).order_by(NarrativeSynthesis.generated_at.desc()).first()
+            ).order_by(NarrativeSynthesis.generated_at.desc()).all()
+
+            # Look for synthesis with citations first
+            synthesis = None
+            for s in all_syntheses:
+                if s.synthesis_data and 'metadata' in s.synthesis_data:
+                    if 'citation_map' in s.synthesis_data.get('metadata', {}):
+                        synthesis = s
+                        print(f"✨ Using existing trust-verified synthesis with citations from {s.generated_at}")
+                        break
+
+            # Fallback to most recent synthesis if no citation-enhanced one found
+            if not synthesis and all_syntheses:
+                synthesis = all_syntheses[0]
+                print(f"⚠️  Using older synthesis without citations from {synthesis.generated_at}")
+                print("    Generating new synthesis with citations...")
+                synthesis = None  # Force regeneration
 
             if synthesis and synthesis.synthesis_data:
-                print(f"✨ Using existing synthesis from {synthesis.generated_at}")
                 return self._format_synthesis_report(
                     synthesis, start_date, end_date, duration_hours
                 )
@@ -101,12 +132,24 @@ class NewsletterContentEngine:
         # Calculate hours for synthesizer
         synthesis_hours = int(duration_hours) + 1
 
-        # Use reflection-enhanced synthesis for deeper insights
-        synthesis_result = await synthesizer.synthesize_with_reflection(
-            hours=synthesis_hours,
-            max_articles=max_articles,
-            depth_threshold=settings.reflection_depth_threshold
-        )
+        # Use trust-verified synthesis with citations (default)
+        # Falls back to reflection-enhanced synthesis if trust verification disabled
+        use_trust_verification = getattr(settings, 'enable_trust_verification', True)
+
+        if use_trust_verification:
+            print("🔒 Generating trust-verified synthesis with citations...")
+            synthesis_result = await synthesizer.synthesize_with_trust_verification(
+                hours=synthesis_hours,
+                max_articles=max_articles,
+                max_retries=3
+            )
+        else:
+            print("📝 Generating synthesis with reflection (trust verification disabled)...")
+            synthesis_result = await synthesizer.synthesize_with_reflection(
+                hours=synthesis_hours,
+                max_articles=max_articles,
+                depth_threshold=settings.reflection_depth_threshold
+            )
 
         # Handle case where no synthesis was created (no articles)
         if synthesis_result['synthesis_id'] is None:
@@ -131,7 +174,7 @@ class NewsletterContentEngine:
         start_date: datetime,
         end_date: datetime,
         duration_hours: float
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Format synthesis into report data structure"""
 
         # Validate synthesis data
@@ -150,6 +193,9 @@ class NewsletterContentEngine:
         if missing_fields:
             raise ValueError(f"Synthesis data missing required fields: {missing_fields}")
 
+        # Extract trust verification metadata if present
+        trust_verification = synthesis_data.get('trust_verification', {})
+
         return {
             "start_date": start_date,
             "end_date": end_date,
@@ -163,7 +209,8 @@ class NewsletterContentEngine:
                 "professional_domains": self.user_profile.get_professional_domains()
             } if self.user_profile else {},
             "synthesis_id": synthesis.id,
-            "processing_time": f"{(datetime.now() - synthesis.generated_at).total_seconds():.1f}s"
+            "processing_time": f"{(datetime.now() - synthesis.generated_at).total_seconds():.1f}s",
+            "trust_verification": trust_verification  # Include trust verification metadata
         }
 
     def _determine_report_type(self, duration_hours: float) -> str:
@@ -182,7 +229,7 @@ class NewsletterContentEngine:
         start_date: datetime,
         end_date: datetime,
         duration_hours: float
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Generate empty report structure when no articles found"""
         return {
             "start_date": start_date,

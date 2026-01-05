@@ -6,8 +6,6 @@ Uses hybrid approach: keyword matching + NLP heuristics
 """
 
 import re
-from typing import Tuple, Optional, List
-from textblob import TextBlob
 
 
 class ContentFilter:
@@ -69,7 +67,7 @@ class ContentFilter:
         if user_profile:
             self.excluded_topics = [topic.lower() for topic in user_profile.get_excluded_topics()]
 
-    def should_filter(self, title: str, description: str = "", content: str = "") -> Tuple[bool, Optional[str]]:
+    def should_filter(self, title: str, description: str = "", content: str = "") -> tuple[bool, str | None]:
         """
         Determine if article should be filtered based on content
 
@@ -173,7 +171,7 @@ class ContentFilter:
         # Threshold: 1+ entertainment keywords = likely entertainment content
         return matches >= 1
 
-    def filter_articles(self, articles: List) -> Tuple[List, List]:
+    def filter_articles(self, articles: list) -> tuple[list, list]:
         """
         Filter a list of articles, marking filtered ones
 
@@ -202,7 +200,7 @@ class ContentFilter:
 
         return kept, filtered
 
-    def get_filter_stats(self, articles: List) -> dict:
+    def get_filter_stats(self, articles: list) -> dict:
         """
         Get statistics about filtered articles
 

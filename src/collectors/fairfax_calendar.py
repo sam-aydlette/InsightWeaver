@@ -4,10 +4,11 @@ Fetches county board meetings, FCPS meetings, and other civic events
 """
 
 import logging
-from datetime import datetime, timedelta
-from typing import List, Dict, Any
-from bs4 import BeautifulSoup
 import re
+from datetime import datetime, timedelta
+from typing import Any
+
+from bs4 import BeautifulSoup
 
 from .base_collector import BaseCollector
 
@@ -37,7 +38,7 @@ class FairfaxCalendarCollector(BaseCollector):
             endpoint_url=self.SOURCES['board_of_supervisors']
         )
 
-    def fetch_data(self) -> List[Dict[str, Any]]:
+    def fetch_data(self) -> list[dict[str, Any]]:
         """
         Fetch calendar events from Fairfax County sources
 
@@ -64,7 +65,7 @@ class FairfaxCalendarCollector(BaseCollector):
 
         return all_events
 
-    def _fetch_board_of_supervisors(self) -> List[Dict[str, Any]]:
+    def _fetch_board_of_supervisors(self) -> list[dict[str, Any]]:
         """Fetch Fairfax County Board of Supervisors meetings"""
         events = []
         url = self.SOURCES['board_of_supervisors']
@@ -112,7 +113,7 @@ class FairfaxCalendarCollector(BaseCollector):
 
         return events
 
-    def _fetch_fcps_meetings(self) -> List[Dict[str, Any]]:
+    def _fetch_fcps_meetings(self) -> list[dict[str, Any]]:
         """Fetch FCPS School Board meetings"""
         events = []
         url = self.SOURCES['fcps_school_board']
@@ -185,7 +186,7 @@ class FairfaxCalendarCollector(BaseCollector):
         logger.warning(f"Could not parse date: {date_str}")
         return None
 
-    def _generate_fallback_bos_meetings(self) -> List[Dict[str, Any]]:
+    def _generate_fallback_bos_meetings(self) -> list[dict[str, Any]]:
         """
         Generate fallback Board of Supervisors meetings
         Based on typical schedule (2nd and 4th Tuesday each month)
@@ -216,7 +217,7 @@ class FairfaxCalendarCollector(BaseCollector):
 
         return events
 
-    def _generate_fallback_fcps_meetings(self) -> List[Dict[str, Any]]:
+    def _generate_fallback_fcps_meetings(self) -> list[dict[str, Any]]:
         """
         Generate fallback FCPS School Board meetings
         Based on typical schedule (2nd and 4th Thursday each month)
@@ -270,7 +271,7 @@ class FairfaxCalendarCollector(BaseCollector):
 
         return nth_occurrence
 
-    def parse_item(self, raw_item: Dict[str, Any]) -> Dict[str, Any]:
+    def parse_item(self, raw_item: dict[str, Any]) -> dict[str, Any]:
         """
         Parse raw calendar event into standardized format
 

@@ -3,13 +3,14 @@ Trust Command - AI Response Verification
 Provides trust-verified Claude queries with transparency
 """
 import asyncio
+
 import click
-from pathlib import Path
+
 from ..config.settings import settings
 from ..trust.trust_pipeline import TrustPipeline
 from ..trust.trust_report import TrustReportFormatter
 from .loading import loading
-from .output import get_output_manager, is_debug_mode
+from .output import is_debug_mode
 
 
 @click.command()
@@ -70,17 +71,21 @@ def trust_command(query, no_verify, verify_facts_only, check_bias_only, check_to
         check_bias = not no_verify
         check_intimacy = not no_verify
 
-    # Run the trust pipeline
-    asyncio.run(_run_trust_pipeline(
-        query=query,
-        verify_response=not no_verify,
-        verify_facts=verify_facts,
-        check_bias=check_bias,
-        check_intimacy=check_intimacy,
-        export_path=export,
-        export_format=format,
-        verbose=verbose
-    ))
+    # Run the trust pipeline with loading indicator
+    debug = is_debug_mode()
+    loading_msg = "Processing query with trust verification"
+
+    with loading(loading_msg, debug=debug):
+        asyncio.run(_run_trust_pipeline(
+            query=query,
+            verify_response=not no_verify,
+            verify_facts=verify_facts,
+            check_bias=check_bias,
+            check_intimacy=check_intimacy,
+            export_path=export,
+            export_format=format,
+            verbose=verbose
+        ))
 
 
 async def _run_trust_pipeline(
@@ -110,8 +115,6 @@ async def _run_trust_pipeline(
     debug = is_debug_mode()
 
     # Initialize pipeline
-    if debug or verbose:
-        click.echo("\n🔍 Querying Claude with trust constraints...")
     pipeline = TrustPipeline()
 
     try:
@@ -126,13 +129,10 @@ async def _run_trust_pipeline(
         )
 
         # Display response
-        click.echo(formatter.format_response_display(result["response"]))
+        click.echo("\n" + formatter.format_response_display(result["response"]))
 
         # Display analysis (if verification was run)
         if verify_response:
-            if debug or verbose:
-                click.echo("\n🔍 Analyzing response...")
-
             if "analysis" in result:
                 # Show analysis
                 if verbose:

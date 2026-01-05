@@ -4,9 +4,9 @@ Provides async wrappers for web fetching functionality using httpx + BeautifulSo
 """
 
 import logging
+
 import httpx
 from bs4 import BeautifulSoup
-from typing import Optional
 from markdownify import markdownify as md
 
 logger = logging.getLogger(__name__)

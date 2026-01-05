@@ -6,8 +6,7 @@ for long-term trend forecasting
 
 import logging
 from datetime import datetime
-from typing import List, Dict, Any, Optional
-import os
+from typing import Any
 
 from ..base_collector import BaseCollector
 
@@ -54,7 +53,7 @@ class WorldBankCollector(BaseCollector):
             api_key=None  # No API key required
         )
 
-    def fetch_data(self) -> List[Dict[str, Any]]:
+    def fetch_data(self) -> list[dict[str, Any]]:
         """
         Fetch data from World Bank API
 
@@ -71,7 +70,7 @@ class WorldBankCollector(BaseCollector):
         logger.info(f"Fetched {len(all_data)} data points from World Bank")
         return all_data
 
-    def _fetch_indicator(self, indicator_code: str, indicator_name: str) -> List[Dict[str, Any]]:
+    def _fetch_indicator(self, indicator_code: str, indicator_name: str) -> list[dict[str, Any]]:
         """
         Fetch data for a specific indicator
 
@@ -125,7 +124,7 @@ class WorldBankCollector(BaseCollector):
             logger.error(f"Error fetching World Bank indicator {indicator_name}: {e}")
             return []
 
-    def parse_item(self, raw_item: Dict[str, Any]) -> Dict[str, Any]:
+    def parse_item(self, raw_item: dict[str, Any]) -> dict[str, Any]:
         """
         Parse raw World Bank data into standardized format
 
@@ -153,7 +152,7 @@ class WorldBankCollector(BaseCollector):
         description += f"Country: {country_name}\n"
         description += f"Year: {year}\n"
         description += f"Value: {value}\n"
-        description += f"Source: World Bank Open Data\n"
+        description += "Source: World Bank Open Data\n"
 
         # Parse collection date
         collection_date_str = raw_item.get('collection_date')
@@ -176,9 +175,9 @@ class WorldBankCollector(BaseCollector):
 
     def score_relevance(
         self,
-        item: Dict[str, Any],
-        decision_context: Optional[Dict] = None
-    ) -> tuple[float, List[str]]:
+        item: dict[str, Any],
+        decision_context: dict | None = None
+    ) -> tuple[float, list[str]]:
         """
         Score World Bank data relevance for forecasting
 

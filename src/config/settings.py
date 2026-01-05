@@ -1,8 +1,8 @@
 import os
 from pathlib import Path
-from typing import Optional
-from pydantic_settings import BaseSettings
+
 from dotenv import load_dotenv
+from pydantic_settings import BaseSettings
 
 load_dotenv()
 
@@ -30,6 +30,11 @@ class Settings(BaseSettings):
     reflection_depth_threshold: float = float(os.getenv("REFLECTION_DEPTH_THRESHOLD", "8.0"))
     enable_semantic_memory: bool = os.getenv("ENABLE_SEMANTIC_MEMORY", "False").lower() == "true"  # Phase 2
     enable_perception: bool = os.getenv("ENABLE_PERCEPTION", "False").lower() == "true"  # Phase 3
+
+    # Performance Optimizations
+    enable_smart_rss_fetch: bool = os.getenv("ENABLE_SMART_RSS_FETCH", "True").lower() == "true"
+    smart_rss_fetch_threshold_minutes: int = int(os.getenv("SMART_RSS_FETCH_THRESHOLD_MINUTES", "60"))
+    enable_trust_verification: bool = os.getenv("ENABLE_TRUST_VERIFICATION", "True").lower() == "true"
 
     # Data Retention Policies (in days)
     retention_articles_days: int = int(os.getenv("RETENTION_ARTICLES_DAYS", "90"))

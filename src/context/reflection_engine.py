@@ -6,7 +6,7 @@ Self-critique and iterative refinement for deeper analysis
 import json
 import logging
 from dataclasses import dataclass
-from typing import Dict, Any, List, Optional
+from typing import Any
 
 from .claude_client import ClaudeClient
 
@@ -20,7 +20,7 @@ class ShallowArea:
     issue: str
     deeper_question: str
 
-    def to_dict(self) -> Dict[str, str]:
+    def to_dict(self) -> dict[str, str]:
         return {
             "topic": self.topic,
             "issue": self.issue,
@@ -32,12 +32,12 @@ class ShallowArea:
 class ReflectionResult:
     """Results of synthesis depth evaluation"""
     depth_score: float  # 0-10
-    shallow_areas: List[ShallowArea]
-    missing_connections: List[str]
-    recommendations: List[str]
-    evaluation_metadata: Dict[str, Any]
+    shallow_areas: list[ShallowArea]
+    missing_connections: list[str]
+    recommendations: list[str]
+    evaluation_metadata: dict[str, Any]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "depth_score": self.depth_score,
             "shallow_areas": [area.to_dict() for area in self.shallow_areas],
@@ -56,8 +56,8 @@ class ReflectionEngine:
 
     async def evaluate_depth(
         self,
-        synthesis_data: Dict[str, Any],
-        context: Dict[str, Any]
+        synthesis_data: dict[str, Any],
+        context: dict[str, Any]
     ) -> ReflectionResult:
         """
         Evaluate synthesis for analytical depth
@@ -108,9 +108,9 @@ class ReflectionEngine:
 
     async def generate_refinement_prompt(
         self,
-        synthesis_data: Dict[str, Any],
+        synthesis_data: dict[str, Any],
         reflection: ReflectionResult,
-        context: Dict[str, Any]
+        context: dict[str, Any]
     ) -> str:
         """
         Generate prompt for synthesis refinement
@@ -215,7 +215,7 @@ Focus on QUALITY over QUANTITY - every statement should provide insight, not jus
 
         return prompt
 
-    def _format_synthesis_for_evaluation(self, synthesis_data: Dict[str, Any]) -> str:
+    def _format_synthesis_for_evaluation(self, synthesis_data: dict[str, Any]) -> str:
         """Format synthesis data as readable text for evaluation"""
         sections = []
 
@@ -266,7 +266,7 @@ Focus on QUALITY over QUANTITY - every statement should provide insight, not jus
     def _build_reflection_prompt(
         self,
         synthesis_text: str,
-        context: Dict[str, Any]
+        context: dict[str, Any]
     ) -> str:
         """Build prompt for depth evaluation"""
 
@@ -350,7 +350,7 @@ Return ONLY valid JSON in this structure:
 
 Be critical but constructive. The goal is to identify genuine opportunities for deeper insight."""
 
-    def _parse_reflection_response(self, response: str) -> Dict[str, Any]:
+    def _parse_reflection_response(self, response: str) -> dict[str, Any]:
         """Parse Claude's reflection JSON response"""
         try:
             # Clean markdown formatting
@@ -385,7 +385,7 @@ Be critical but constructive. The goal is to identify genuine opportunities for 
                 "parse_error": str(e)
             }
 
-    def _build_reflection_result(self, reflection_data: Dict[str, Any]) -> ReflectionResult:
+    def _build_reflection_result(self, reflection_data: dict[str, Any]) -> ReflectionResult:
         """Convert parsed data to ReflectionResult object"""
 
         # Extract shallow areas

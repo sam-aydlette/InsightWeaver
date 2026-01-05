@@ -1,14 +1,15 @@
 import asyncio
 import logging
 from datetime import datetime
-from typing import List, Dict, Optional, Tuple
+
 import feedparser
 import httpx
 from bs4 import BeautifulSoup
-from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
-from src.database.models import RSSFeed, Article
+from sqlalchemy.orm import Session
+
 from src.database.connection import get_db
+from src.database.models import Article, RSSFeed
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +23,7 @@ class RSSFetcher:
         """Close HTTP client session"""
         await self.session.aclose()
 
-    async def fetch_feed(self, feed_url: str) -> Tuple[bool, Optional[Dict], Optional[str]]:
+    async def fetch_feed(self, feed_url: str) -> tuple[bool, dict | None, str | None]:
         """
         Fetch and parse an RSS feed
         Returns: (success, parsed_feed_data, error_message)
@@ -54,7 +55,7 @@ class RSSFetcher:
 
         return False, None, "Max retries exceeded"
 
-    def normalize_article(self, entry, feed_info: Dict) -> Dict:
+    def normalize_article(self, entry, feed_info: dict) -> dict:
         """Normalize an RSS entry into our article format"""
 
         # Extract published date
@@ -112,7 +113,7 @@ class RSSFetcher:
 
         return clean_text
 
-    async def fetch_and_store_feed(self, feed_id: int) -> Tuple[bool, int, Optional[str]]:
+    async def fetch_and_store_feed(self, feed_id: int) -> tuple[bool, int, str | None]:
         """
         Fetch a specific feed and store articles in database with enhanced retry logic
         Returns: (success, articles_count, error_message)
@@ -189,7 +190,7 @@ class RSSFetcher:
             # Commit with integrity error handling
             try:
                 db.commit()
-            except IntegrityError as e:
+            except IntegrityError:
                 db.rollback()
                 logger.warning(f"Duplicate articles detected in {feed.name} during commit, skipping duplicates")
                 # Re-process articles one by one to identify duplicates
@@ -226,7 +227,7 @@ class RSSFetcher:
             logger.info(log_msg)
             return True, articles_count, None
 
-    async def _fetch_with_retry(self, url: str, feed_name: str) -> Tuple[bool, Optional[Dict], Optional[str]]:
+    async def _fetch_with_retry(self, url: str, feed_name: str) -> tuple[bool, dict | None, str | None]:
         """Enhanced fetch with smarter retry logic"""
         last_error = None
 

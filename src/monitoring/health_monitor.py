@@ -5,16 +5,14 @@ Tracks system health metrics and operational statistics
 
 import logging
 from datetime import datetime, timedelta
-from typing import Dict, Any, Optional
 from pathlib import Path
+from typing import Any
+
 from sqlalchemy import func
 
-from ..database.connection import get_db
-from ..database.models import (
-    Article, NarrativeSynthesis, MemoryFact,
-    RSSFeed, AnalysisRun
-)
 from ..config.settings import settings
+from ..database.connection import get_db
+from ..database.models import Article, MemoryFact, NarrativeSynthesis, RSSFeed
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +20,7 @@ logger = logging.getLogger(__name__)
 class HealthMonitor:
     """Monitor system health and performance metrics"""
 
-    def get_system_health(self) -> Dict[str, Any]:
+    def get_system_health(self) -> dict[str, Any]:
         """
         Get comprehensive system health status
 
@@ -72,7 +70,7 @@ class HealthMonitor:
 
         return health
 
-    def _check_database_health(self, session) -> Dict[str, Any]:
+    def _check_database_health(self, session) -> dict[str, Any]:
         """Check database health and size"""
         db_path = Path(settings.database_url.replace("sqlite:///", ""))
 
@@ -84,7 +82,7 @@ class HealthMonitor:
             "total_facts": session.query(MemoryFact).count(),
         }
 
-    def _check_feed_health(self, session) -> Dict[str, Any]:
+    def _check_feed_health(self, session) -> dict[str, Any]:
         """Check RSS feed collection health"""
         total_feeds = session.query(RSSFeed).count()
         active_feeds = session.query(RSSFeed).filter(RSSFeed.is_active == True).count()
@@ -123,7 +121,7 @@ class HealthMonitor:
             "issues": issues
         }
 
-    def _check_synthesis_health(self, session) -> Dict[str, Any]:
+    def _check_synthesis_health(self, session) -> dict[str, Any]:
         """Check synthesis generation health"""
         # Recent syntheses (last 7 days)
         recent_threshold = datetime.utcnow() - timedelta(days=7)
@@ -157,7 +155,7 @@ class HealthMonitor:
             "issues": issues
         }
 
-    def _check_memory_health(self, session) -> Dict[str, Any]:
+    def _check_memory_health(self, session) -> dict[str, Any]:
         """Check semantic memory health"""
         total_facts = session.query(MemoryFact).count()
 
@@ -184,7 +182,7 @@ class HealthMonitor:
             "facts_by_type": {ft: count for ft, count in fact_types}
         }
 
-    def _check_retention_status(self, session) -> Dict[str, Any]:
+    def _check_retention_status(self, session) -> dict[str, Any]:
         """Check data retention policy status"""
         article_cutoff = datetime.utcnow() - timedelta(days=settings.retention_articles_days)
         synthesis_cutoff = datetime.utcnow() - timedelta(days=settings.retention_syntheses_days)
@@ -213,7 +211,7 @@ class HealthMonitor:
             "issues": issues
         }
 
-    def _check_disk_space(self) -> Dict[str, Any]:
+    def _check_disk_space(self) -> dict[str, Any]:
         """Check disk space usage"""
         data_dir = settings.data_dir
 
@@ -237,7 +235,7 @@ class HealthMonitor:
             "issues": issues
         }
 
-    def _determine_overall_status(self, health: Dict[str, Any]) -> str:
+    def _determine_overall_status(self, health: dict[str, Any]) -> str:
         """Determine overall system status from individual metrics"""
         statuses = [
             metric.get("status", "healthy")
@@ -260,7 +258,7 @@ class HealthMonitor:
         else:
             return "healthy"
 
-    def get_performance_metrics(self, days: int = 7) -> Dict[str, Any]:
+    def get_performance_metrics(self, days: int = 7) -> dict[str, Any]:
         """
         Get performance metrics for recent operations
 
@@ -309,13 +307,13 @@ class HealthMonitor:
         return metrics
 
 
-def get_system_health() -> Dict[str, Any]:
+def get_system_health() -> dict[str, Any]:
     """Convenience function to get system health"""
     monitor = HealthMonitor()
     return monitor.get_system_health()
 
 
-def get_performance_metrics(days: int = 7) -> Dict[str, Any]:
+def get_performance_metrics(days: int = 7) -> dict[str, Any]:
     """Convenience function to get performance metrics"""
     monitor = HealthMonitor()
     return monitor.get_performance_metrics(days=days)

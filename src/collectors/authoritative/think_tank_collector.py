@@ -5,8 +5,9 @@ Uses RSS feeds for research publications
 """
 
 import logging
-from datetime import datetime, timedelta
-from typing import List, Dict, Any, Optional
+from datetime import UTC, datetime, timedelta
+from typing import Any
+
 import feedparser
 
 from ..base_collector import BaseCollector
@@ -47,7 +48,7 @@ class ThinkTankCollector(BaseCollector):
             api_key=None
         )
 
-    def fetch_data(self) -> List[Dict[str, Any]]:
+    def fetch_data(self) -> list[dict[str, Any]]:
         """
         Fetch research publications from think tank RSS feeds
 
@@ -99,7 +100,7 @@ class ThinkTankCollector(BaseCollector):
         logger.info(f"Fetched {len(all_data)} total think tank publications")
         return all_data
 
-    def parse_item(self, raw_item: Dict[str, Any]) -> Dict[str, Any]:
+    def parse_item(self, raw_item: dict[str, Any]) -> dict[str, Any]:
         """
         Parse raw think tank publication into standardized format
 
@@ -126,7 +127,7 @@ class ThinkTankCollector(BaseCollector):
         if summary:
             description += f"Summary: {summary[:500]}...\n"
         description += f"URL: {link}\n"
-        description += f"Source Type: Policy Research\n"
+        description += "Source Type: Policy Research\n"
 
         # Parse published date
         published_str = raw_item.get('published')
@@ -149,9 +150,9 @@ class ThinkTankCollector(BaseCollector):
 
     def score_relevance(
         self,
-        item: Dict[str, Any],
-        decision_context: Optional[Dict] = None
-    ) -> tuple[float, List[str]]:
+        item: dict[str, Any],
+        decision_context: dict | None = None
+    ) -> tuple[float, list[str]]:
         """
         Score think tank research relevance for forecasting
 
@@ -172,8 +173,7 @@ class ThinkTankCollector(BaseCollector):
         if item.get('published_date'):
             published_date = item['published_date']
             if published_date.tzinfo is not None:
-                from datetime import timezone
-                now = datetime.now(timezone.utc)
+                now = datetime.now(UTC)
             else:
                 now = datetime.utcnow()
 

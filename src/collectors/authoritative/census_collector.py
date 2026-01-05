@@ -5,9 +5,9 @@ for long-term trend forecasting
 """
 
 import logging
-from datetime import datetime
-from typing import List, Dict, Any, Optional
 import os
+from datetime import UTC, datetime
+from typing import Any
 
 from ..base_collector import BaseCollector
 
@@ -34,7 +34,7 @@ class CensusBureauCollector(BaseCollector):
     ACS_ENDPOINT = "https://api.census.gov/data/2022/acs/acs5"  # American Community Survey
     ECONOMIC_ENDPOINT = "https://api.census.gov/data/timeseries/eits/resconst"  # Construction
 
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, api_key: str | None = None):
         """
         Initialize Census Bureau collector
 
@@ -50,7 +50,7 @@ class CensusBureauCollector(BaseCollector):
             api_key=self.api_key
         )
 
-    def fetch_data(self) -> List[Dict[str, Any]]:
+    def fetch_data(self) -> list[dict[str, Any]]:
         """
         Fetch data from Census Bureau API endpoints
 
@@ -75,7 +75,7 @@ class CensusBureauCollector(BaseCollector):
         logger.info(f"Fetched {len(all_data)} data points from Census Bureau")
         return all_data
 
-    def _fetch_population_data(self) -> List[Dict[str, Any]]:
+    def _fetch_population_data(self) -> list[dict[str, Any]]:
         """
         Fetch population estimates and projections
 
@@ -123,7 +123,7 @@ class CensusBureauCollector(BaseCollector):
             logger.error(f"Error fetching population data: {e}")
             return []
 
-    def _fetch_economic_data(self) -> List[Dict[str, Any]]:
+    def _fetch_economic_data(self) -> list[dict[str, Any]]:
         """
         Fetch economic indicators from American Community Survey
 
@@ -170,7 +170,7 @@ class CensusBureauCollector(BaseCollector):
             logger.error(f"Error fetching economic data: {e}")
             return []
 
-    def _fetch_demographic_data(self) -> List[Dict[str, Any]]:
+    def _fetch_demographic_data(self) -> list[dict[str, Any]]:
         """
         Fetch demographic trends from ACS
 
@@ -217,7 +217,7 @@ class CensusBureauCollector(BaseCollector):
             logger.error(f"Error fetching demographic data: {e}")
             return []
 
-    def parse_item(self, raw_item: Dict[str, Any]) -> Dict[str, Any]:
+    def parse_item(self, raw_item: dict[str, Any]) -> dict[str, Any]:
         """
         Parse raw Census data into standardized format
 
@@ -251,7 +251,7 @@ class CensusBureauCollector(BaseCollector):
         # Build description
         description = f"Category: {category.capitalize()}\n"
         description += f"Geography: {geography}\n"
-        description += f"Source: US Census Bureau\n"
+        description += "Source: US Census Bureau\n"
         description += f"Collection Date: {raw_item.get('collection_date', 'Unknown')}\n"
 
         # Add metric-specific details
@@ -279,9 +279,9 @@ class CensusBureauCollector(BaseCollector):
 
     def score_relevance(
         self,
-        item: Dict[str, Any],
-        decision_context: Optional[Dict] = None
-    ) -> tuple[float, List[str]]:
+        item: dict[str, Any],
+        decision_context: dict | None = None
+    ) -> tuple[float, list[str]]:
         """
         Score Census data relevance for forecasting
 
@@ -319,8 +319,7 @@ class CensusBureauCollector(BaseCollector):
         if item.get('published_date'):
             published_date = item['published_date']
             if published_date.tzinfo is not None:
-                from datetime import timezone
-                now = datetime.now(timezone.utc)
+                now = datetime.now(UTC)
             else:
                 now = datetime.utcnow()
 

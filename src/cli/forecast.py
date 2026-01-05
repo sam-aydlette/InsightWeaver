@@ -4,18 +4,20 @@ Long-term trend forecasting interface for InsightWeaver
 MVP: 1-year horizon only
 """
 
-import click
 import asyncio
 import logging
-from datetime import datetime
-from typing import Optional, Dict
+
+import click
 
 from ..forecast.orchestrator import ForecastOrchestrator
-from ..database.connection import get_db
-from ..database.models import ForecastRun
 from ..utils.profile_loader import get_user_profile
+from .forecast_verifier import (
+    format_forecast_trust_section,
+    verify_forecast_aggregate,
+    verify_forecast_horizon,
+)
+from .loading import loading
 from .output import is_debug_mode
-from .forecast_verifier import verify_forecast_horizon, verify_forecast_aggregate, format_forecast_trust_section
 
 logger = logging.getLogger(__name__)
 
@@ -90,16 +92,25 @@ def forecast_command(
         filter_global
     )
 
-    # Run forecast
-    asyncio.run(_run_forecast(horizon, scenarios, full, no_verify, topic_filters))
+    # Run forecast with loading indicator
+    debug = is_debug_mode()
+
+    # Determine loading message
+    if horizon:
+        loading_msg = f"Generating {horizon} forecast"
+    else:
+        loading_msg = "Generating multi-horizon forecasts"
+
+    with loading(loading_msg, debug=debug):
+        asyncio.run(_run_forecast(horizon, scenarios, full, no_verify, topic_filters))
 
 
 async def _run_forecast(
-    horizon: Optional[str],
+    horizon: str | None,
     scenarios: int,
     full: bool,
     no_verify: bool,
-    topic_filters: Optional[Dict]
+    topic_filters: dict | None
 ):
     """
     Execute forecast generation using orchestrator
@@ -115,12 +126,8 @@ async def _run_forecast(
         # Determine horizons
         if horizon:
             horizons = [horizon]
-            click.echo(f"Generating {horizon} forecast...")
         else:
             horizons = None  # Orchestrator will use all default horizons
-            click.echo("Generating multi-horizon forecasts (6mo, 1yr, 3yr, 5yr)...")
-
-        click.echo()
 
         # Initialize orchestrator
         user_profile = get_user_profile()
@@ -133,22 +140,12 @@ async def _run_forecast(
             click.echo(f"Initialized orchestrator with filters: {topic_filters}")
 
         # Run forecast
-        if horizons and len(horizons) == 1:
-            click.echo("Curating historical context...")
-            click.echo("Analyzing trends and generating forecast...")
-            click.echo("This may take 30-90 seconds...")
-        else:
-            click.echo("Generating forecasts for multiple horizons...")
-            click.echo("This may take several minutes...")
-
-        click.echo()
-
         result = await orchestrator.run_forecast(
             horizons=horizons,
             scenario_count=scenarios
         )
 
-        click.echo(f"✓ Generated {result['successful_horizons']} forecast(s) successfully!")
+        click.echo(f"\n✓ Generated {result['successful_horizons']} forecast(s) successfully!")
         click.echo()
 
         # Display forecasts using appropriate formatter
@@ -174,8 +171,15 @@ async def _run_forecast(
                     horizon_text = f"{trend_description}\n\n{scenarios_text}".strip()
 
                     if horizon_text:
-                        click.echo(f"\nVerifying {horizon_name} forecast for trustworthiness...")
+                        click.echo()  # Add spacing
+                        # We're inside async context, can't use loading context manager easily
+                        # So we'll show a progress message using original stderr to bypass output suppression
+                        import sys
+                        sys.__stderr__.write(f"⠋ Verifying {horizon_name} forecast for trustworthiness...\r")
+                        sys.__stderr__.flush()
                         trust_analysis = await verify_forecast_horizon(horizon_text, horizon_name)
+                        sys.__stderr__.write(" " * 80 + "\r")  # Clear the line
+                        sys.__stderr__.flush()
                         trust_section = format_forecast_trust_section(trust_analysis, horizon_name)
                         if trust_section:
                             click.echo(trust_section)
@@ -216,8 +220,13 @@ async def _run_forecast(
                 executive_text = '\n\n'.join(all_trend_descriptions + all_scenarios).strip()
 
                 if executive_text:
-                    click.echo("\nVerifying forecast executive summary for trustworthiness...")
+                    click.echo()  # Add spacing
+                    import sys
+                    sys.__stderr__.write("⠋ Verifying forecast executive summary for trustworthiness...\r")
+                    sys.__stderr__.flush()
                     trust_analysis = await verify_forecast_aggregate(executive_text)
+                    sys.__stderr__.write(" " * 80 + "\r")  # Clear the line
+                    sys.__stderr__.flush()
                     trust_section = format_forecast_trust_section(trust_analysis)
                     if trust_section:
                         click.echo(trust_section)
@@ -238,7 +247,7 @@ def _build_topic_filters(
     filter_state: bool,
     filter_national: bool,
     filter_global: bool
-) -> Optional[Dict]:
+) -> dict | None:
     """
     Build topic filters dictionary from CLI flags
 

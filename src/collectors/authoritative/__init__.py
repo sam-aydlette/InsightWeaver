@@ -4,10 +4,10 @@ Includes government statistical agencies, international organizations, and resea
 """
 
 from .census_collector import CensusBureauCollector
-from .world_bank_collector import WorldBankCollector
-from .un_data_collector import UNDataCollector
-from .think_tank_collector import ThinkTankCollector
 from .cia_factbook_collector import CIAFactbookCollector
+from .think_tank_collector import ThinkTankCollector
+from .un_data_collector import UNDataCollector
+from .world_bank_collector import WorldBankCollector
 
 __all__ = [
     'CensusBureauCollector',

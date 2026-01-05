@@ -5,8 +5,8 @@ Main orchestrator for intelligence briefing generation and delivery
 
 import asyncio
 from datetime import datetime, timedelta
-from typing import Dict, Any, Optional, List
 from pathlib import Path
+from typing import Any
 
 from .content_engine import NewsletterContentEngine
 from .email_sender import NewsletterScheduler
@@ -22,13 +22,14 @@ class NewsletterSystem:
 
     async def generate_report(
         self,
-        start_date: Optional[datetime] = None,
-        end_date: Optional[datetime] = None,
-        hours: Optional[int] = None,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
+        hours: int | None = None,
         save_local: bool = True,
         send_email: bool = False,
-        topic_filters: Optional[Dict] = None
-    ) -> Dict[str, Any]:
+        topic_filters: dict | None = None,
+        synthesis_id: int | None = None
+    ) -> dict[str, Any]:
         """
         Generate intelligence report for any time period
 
@@ -39,6 +40,7 @@ class NewsletterSystem:
             save_local: Save HTML to data/newsletters/
             send_email: Send via email
             topic_filters: Optional topic/scope filters for article selection
+            synthesis_id: Optional synthesis ID from pipeline (prevents duplicate generation)
 
         Returns:
             Report generation results
@@ -48,8 +50,13 @@ class NewsletterSystem:
             start_date=start_date,
             end_date=end_date,
             hours=hours,
-            topic_filters=topic_filters
+            topic_filters=topic_filters,
+            synthesis_id=synthesis_id
         )
+
+        # Check trust verification status
+        trust_verification = content_data.get('trust_verification', {})
+        trust_passed = trust_verification.get('passed', True)  # Default to True for old syntheses
 
         results = {
             "success": True,
@@ -62,11 +69,20 @@ class NewsletterSystem:
             "processing_time": content_data.get('processing_time'),
             "executive_summary": content_data.get('executive_summary', ''),
             "synthesis_data": content_data.get('synthesis_data', {}),
+            "trust_verification": trust_verification,  # Include trust verification metadata
             "local_saved": False,
             "email_sent": False
         }
 
         try:
+            # Skip HTML generation and saving if trust verification failed
+            # (unless explicitly disabled - let CLI decide what to do)
+            if not trust_passed:
+                print("⚠️  Trust verification failed - skipping HTML report generation")
+                results["success"] = False
+                results["trust_verification_failed"] = True
+                return results
+
             # Render template
             html_content = DailyBriefTemplate.generate_html(content_data)
 
@@ -99,7 +115,7 @@ class NewsletterSystem:
             results["error"] = str(e)
             return results
 
-    def _save_report_local(self, content_data: Dict[str, Any], html_content: str) -> Path:
+    def _save_report_local(self, content_data: dict[str, Any], html_content: str) -> Path:
         """Save report with descriptive filename"""
         newsletters_dir = Path("data/newsletters")
         newsletters_dir.mkdir(parents=True, exist_ok=True)
@@ -116,7 +132,7 @@ class NewsletterSystem:
 
         return filepath
 
-    async def test_system(self) -> Dict[str, Any]:
+    async def test_system(self) -> dict[str, Any]:
         """Test the newsletter system components"""
         print("🧪 Testing newsletter system...")
 
@@ -187,8 +203,8 @@ class NewsletterSystem:
             test_results["error"] = str(e)
             return test_results
 
-    async def preview_report(self, start_date: Optional[datetime] = None,
-                            end_date: Optional[datetime] = None, hours: Optional[int] = None) -> str:
+    async def preview_report(self, start_date: datetime | None = None,
+                            end_date: datetime | None = None, hours: int | None = None) -> str:
         """
         Generate preview of intelligence report (HTML content only)
 
@@ -207,7 +223,7 @@ class NewsletterSystem:
         )
         return DailyBriefTemplate.generate_html(content_data)
 
-    def get_system_status(self) -> Dict[str, Any]:
+    def get_system_status(self) -> dict[str, Any]:
         """Get current system status"""
         email_status = self.scheduler.get_email_status()
 

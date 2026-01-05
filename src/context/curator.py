@@ -7,19 +7,21 @@ Implements token budget management following Anthropic's context engineering gui
 import json
 import logging
 from datetime import datetime, timedelta
-from typing import Dict, List, Any, Optional
+from typing import Any
+
 from sqlalchemy.orm import Session
 
+from ..config.settings import settings
 from ..database.connection import get_db
 from ..database.models import Article, NarrativeSynthesis
-from ..utils.profile_loader import get_user_profile, UserProfile
-from .perspectives import get_perspective, Perspective
-from .module_loader import ContextModuleLoader
+from ..utils.profile_loader import UserProfile, get_user_profile
+from ..utils.profiler import profile
 from .anomaly_detector import CoverageAnomalyDetector
-from .semantic_memory import SemanticMemory
+from .module_loader import ContextModuleLoader
 from .perception import PerceptionEngine
+from .perspectives import get_perspective
+from .semantic_memory import SemanticMemory
 from .topic_matcher import TopicMatcher
-from ..config.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -42,9 +44,9 @@ class ContextCurator:
 
     def __init__(
         self,
-        user_profile: Optional[UserProfile] = None,
-        perspective_id: Optional[str] = None,
-        topic_filters: Optional[Dict] = None
+        user_profile: UserProfile | None = None,
+        perspective_id: str | None = None,
+        topic_filters: dict | None = None
     ):
         """
         Initialize context curator
@@ -93,7 +95,7 @@ class ContextCurator:
         self,
         hours: int = 48,
         max_articles: int = 50
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Curate context for narrative synthesis with token budget enforcement
 
@@ -104,51 +106,59 @@ class ContextCurator:
         Returns:
             Curated context dictionary with token metadata
         """
-        with get_db() as session:
-            # Cleanup expired facts (if semantic memory enabled)
-            if getattr(settings, 'enable_semantic_memory', False):
-                try:
-                    semantic_memory = SemanticMemory(session)
-                    deleted_count = semantic_memory.cleanup_expired_facts()
-                    if deleted_count > 0:
-                        logger.info(f"Cleaned up {deleted_count} expired facts from memory")
-                except Exception as e:
-                    logger.warning(f"Failed to cleanup expired facts (non-fatal): {e}")
+        with profile("CONTEXT_CURATION_TOTAL"):
+            with get_db() as session:
+                # Cleanup expired facts (if semantic memory enabled)
+                if getattr(settings, 'enable_semantic_memory', False):
+                    try:
+                        semantic_memory = SemanticMemory(session)
+                        deleted_count = semantic_memory.cleanup_expired_facts()
+                        if deleted_count > 0:
+                            logger.info(f"Cleaned up {deleted_count} expired facts from memory")
+                    except Exception as e:
+                        logger.warning(f"Failed to cleanup expired facts (non-fatal): {e}")
 
-            # Get recent unfiltered articles
-            articles = self._get_recent_articles(session, hours, max_articles)
+                # Get recent unfiltered articles
+                with profile("DB_QUERY_ARTICLES"):
+                    articles = self._get_recent_articles(session, hours, max_articles)
 
-            # Get historical context (now 5 syntheses with enhanced format)
-            memory = self._get_historical_memory(session)
+                # Get historical context (now 5 syntheses with enhanced format)
+                with profile("DB_QUERY_SYNTHESES"):
+                    memory = self._get_historical_memory(session)
 
-            # Get semantic memory facts (if enabled)
-            semantic_facts = ""
-            if getattr(settings, 'enable_semantic_memory', False):
-                try:
-                    semantic_memory = SemanticMemory(session)
-                    relevant_facts = semantic_memory.retrieve_relevant_facts(
-                        articles,
-                        max_facts=20
+                # Get semantic memory facts (if enabled)
+                semantic_facts = ""
+                if getattr(settings, 'enable_semantic_memory', False):
+                    try:
+                        semantic_memory = SemanticMemory(session)
+                        relevant_facts = semantic_memory.retrieve_relevant_facts(
+                            articles,
+                            max_facts=20
+                        )
+                        semantic_facts = semantic_memory.build_historical_context(relevant_facts)
+                        if semantic_facts:
+                            logger.info(f"Added {len(relevant_facts)} facts from semantic memory")
+                    except Exception as e:
+                        logger.error(f"Failed to retrieve semantic memory (non-fatal): {e}")
+
+                # Load decision context module
+                modules = self.module_loader.load_all_modules()
+                decision_context = self._format_decision_context(modules.get('core', []))
+
+                # Extract perception (cross-article patterns)
+                with profile("PERCEPTION_EXTRACTION"):
+                    perception_data = await self.perception_engine.extract_perception(articles)
+                    perception_context = self.perception_engine.format_for_context(perception_data)
+
+                # Detect coverage anomalies
+                with profile("ANOMALY_DETECTION"):
+                    anomaly_report = self.anomaly_detector.detect_anomalies(
+                        session, articles, current_hours=hours
                     )
-                    semantic_facts = semantic_memory.build_historical_context(relevant_facts)
-                    if semantic_facts:
-                        logger.info(f"Added {len(relevant_facts)} facts from semantic memory")
-                except Exception as e:
-                    logger.error(f"Failed to retrieve semantic memory (non-fatal): {e}")
+                    anomaly_context = self.anomaly_detector.format_for_context(anomaly_report)
 
-            # Load decision context module
-            modules = self.module_loader.load_all_modules()
-            decision_context = self._format_decision_context(modules.get('core', []))
-
-            # Extract perception (cross-article patterns)
-            perception_data = await self.perception_engine.extract_perception(articles)
-            perception_context = self.perception_engine.format_for_context(perception_data)
-
-            # Detect coverage anomalies
-            anomaly_report = self.anomaly_detector.detect_anomalies(
-                session, articles, current_hours=hours
-            )
-            anomaly_context = self.anomaly_detector.format_for_context(anomaly_report)
+                # Format articles while session is still active (prevents DetachedInstanceError)
+                formatted_articles = self._format_articles(articles)
 
             # Combine historical memory with semantic facts
             combined_memory = memory
@@ -159,7 +169,7 @@ class ContextCurator:
             context = {
                 "user_profile": self._format_user_profile(),
                 "decision_context": decision_context,
-                "articles": self._format_articles(articles),
+                "articles": formatted_articles,
                 "perception": perception_context,
                 "anomaly_analysis": anomaly_context,
                 "memory": combined_memory,
@@ -173,9 +183,9 @@ class ContextCurator:
 
     def curate_for_summary(
         self,
-        articles: List[Article],
+        articles: list[Article],
         brief_type: str = "daily"
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Curate context for executive summary generation
 
@@ -199,7 +209,7 @@ class ContextCurator:
         session: Session,
         hours: int,
         max_articles: int
-    ) -> List[Article]:
+    ) -> list[Article]:
         """
         Get recent unfiltered articles from database with optional topic filtering
 
@@ -331,7 +341,7 @@ class ContextCurator:
 
         return "\n".join(memory_parts)
 
-    def _enforce_token_budget(self, context: Dict[str, Any]) -> Dict[str, Any]:
+    def _enforce_token_budget(self, context: dict[str, Any]) -> dict[str, Any]:
         """
         Enforce token budget by compressing context if needed
 
@@ -400,7 +410,7 @@ class ContextCurator:
         logger.info(f"Compressed context: ~{tokens['total']} tokens")
         return context
 
-    def _estimate_tokens(self, context: Dict[str, Any]) -> Dict[str, int]:
+    def _estimate_tokens(self, context: dict[str, Any]) -> dict[str, int]:
         """
         Estimate token count for context components
 
@@ -437,7 +447,7 @@ class ContextCurator:
             'total': (system_chars + decision_chars + articles_chars + perception_chars + anomaly_chars + memory_chars) // 4
         }
 
-    def _format_user_profile(self) -> Dict[str, Any]:
+    def _format_user_profile(self) -> dict[str, Any]:
         """Format user profile for context"""
         if not self.user_profile:
             return {
@@ -455,7 +465,7 @@ class ContextCurator:
             "civic_interests": self.user_profile.get_civic_interests()
         }
 
-    def _format_decision_context(self, core_modules: List) -> str:
+    def _format_decision_context(self, core_modules: list) -> str:
         """Format decision context from modules"""
         decision_modules = [m for m in core_modules if 'decision_context' in m.name.lower()]
 
@@ -465,7 +475,7 @@ class ContextCurator:
         # Use the module loader to format
         return self.module_loader.format_for_claude_context(decision_modules)
 
-    def _format_articles(self, articles: List[Article]) -> List[Dict[str, Any]]:
+    def _format_articles(self, articles: list[Article]) -> list[dict[str, Any]]:
         """Format articles for context inclusion"""
         formatted = []
 

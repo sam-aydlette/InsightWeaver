@@ -17,23 +17,22 @@ class LoadingIndicator:
         self.thread = None
 
     def _animate(self):
-        """Animation loop - dots appear one by one, then disappear and repeat"""
-        dots = 0
+        """Animation loop - spinner cycles continuously"""
+        frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
+        idx = 0
         while self.is_running:
-            # Create the dot display (0 dots, 1 dot, 2 dots, 3 dots, then back to 0)
-            dot_display = '.' * dots
-            # Pad with spaces to ensure consistent width (3 spaces for max 3 dots)
-            padding = ' ' * (3 - dots)
-            sys.stdout.write(f"\r{self.message}{dot_display}{padding}")
-            sys.stdout.flush()
+            frame = frames[idx % len(frames)]
+            # Write to __stderr__ which is the original stderr before any redirection
+            # This prevents the output manager from suppressing the spinner
+            sys.__stderr__.write(f"\r{frame} {self.message}... ")
+            sys.__stderr__.flush()
 
-            # Cycle through 0, 1, 2, 3 dots
-            dots = (dots + 1) % 4
-            time.sleep(0.4)
+            idx += 1
+            time.sleep(0.1)
 
         # Clear the line when done
-        sys.stdout.write("\r" + " " * (len(self.message) + 3) + "\r")
-        sys.stdout.flush()
+        sys.__stderr__.write("\r" + " " * (len(self.message) + 10) + "\r")
+        sys.__stderr__.flush()
 
     def start(self):
         """Start the loading animation"""

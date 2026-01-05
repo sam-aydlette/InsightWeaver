@@ -6,11 +6,10 @@ Runs before synthesis to help Claude identify connections
 
 import json
 import logging
-from typing import Dict, List, Any
-from datetime import datetime
+from typing import Any
 
-from .claude_client import ClaudeClient
 from ..database.models import Article
+from .claude_client import ClaudeClient
 
 logger = logging.getLogger(__name__)
 
@@ -24,8 +23,8 @@ class PerceptionEngine:
 
     async def extract_perception(
         self,
-        articles: List[Article]
-    ) -> Dict[str, Any]:
+        articles: list[Article]
+    ) -> dict[str, Any]:
         """
         Extract cross-article patterns and relationships
 
@@ -68,7 +67,7 @@ class PerceptionEngine:
             logger.error(f"Perception extraction failed: {e}", exc_info=True)
             return self._empty_perception()
 
-    def format_for_context(self, perception: Dict[str, Any]) -> str:
+    def format_for_context(self, perception: dict[str, Any]) -> str:
         """
         Format perception data as context string for synthesis
 
@@ -114,7 +113,7 @@ class PerceptionEngine:
 
         return "\n".join(parts)
 
-    def _format_articles(self, articles: List[Article]) -> str:
+    def _format_articles(self, articles: list[Article]) -> str:
         """Format articles for perception extraction"""
         formatted = []
 
@@ -177,7 +176,7 @@ Return ONLY valid JSON with this structure:
 
 Return ONLY the JSON, no markdown formatting or additional text."""
 
-    def _parse_response(self, response: str) -> Dict[str, Any]:
+    def _parse_response(self, response: str) -> dict[str, Any]:
         """Parse Claude's perception extraction response"""
         try:
             # Remove markdown code blocks if present
@@ -208,7 +207,7 @@ Return ONLY the JSON, no markdown formatting or additional text."""
             logger.debug(f"Response was: {response[:500]}...")
             return self._empty_perception()
 
-    def _empty_perception(self) -> Dict[str, Any]:
+    def _empty_perception(self) -> dict[str, Any]:
         """Return empty perception structure"""
         return {
             'entity_mentions': [],

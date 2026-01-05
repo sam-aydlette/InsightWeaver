@@ -6,12 +6,13 @@ Persistent fact storage and historical context retrieval
 import json
 import logging
 from datetime import datetime, timedelta
-from typing import Dict, List, Any, Optional
+from typing import Any
+
 from sqlalchemy.orm import Session
 
-from .claude_client import ClaudeClient
-from ..database.models import MemoryFact, Article
 from ..config.settings import settings
+from ..database.models import Article, MemoryFact
+from .claude_client import ClaudeClient
 
 logger = logging.getLogger(__name__)
 
@@ -31,9 +32,9 @@ class SemanticMemory:
 
     async def extract_facts_from_synthesis(
         self,
-        synthesis_data: Dict[str, Any],
+        synthesis_data: dict[str, Any],
         source_synthesis_id: int
-    ) -> List[MemoryFact]:
+    ) -> list[MemoryFact]:
         """
         Extract structured facts from synthesis output
 
@@ -89,7 +90,7 @@ class SemanticMemory:
             logger.error(f"Fact extraction failed: {e}", exc_info=True)
             return []
 
-    def store_facts(self, facts: List[MemoryFact]) -> int:
+    def store_facts(self, facts: list[MemoryFact]) -> int:
         """
         Store facts in database
 
@@ -117,9 +118,9 @@ class SemanticMemory:
 
     def retrieve_relevant_facts(
         self,
-        articles: List[Article],
+        articles: list[Article],
         max_facts: int = 20
-    ) -> List[MemoryFact]:
+    ) -> list[MemoryFact]:
         """
         Retrieve facts relevant to current article set
 
@@ -170,7 +171,7 @@ class SemanticMemory:
         logger.info(f"Retrieved {len(unique_facts)} relevant facts from memory")
         return unique_facts
 
-    def build_historical_context(self, facts: List[MemoryFact]) -> str:
+    def build_historical_context(self, facts: list[MemoryFact]) -> str:
         """
         Format facts as context string for synthesis
 
@@ -307,7 +308,7 @@ class SemanticMemory:
             self.session.rollback()
             return 0
 
-    def _format_synthesis_for_extraction(self, synthesis_data: Dict[str, Any]) -> str:
+    def _format_synthesis_for_extraction(self, synthesis_data: dict[str, Any]) -> str:
         """Format synthesis data for fact extraction"""
         sections = []
 
@@ -405,7 +406,7 @@ Return ONLY valid JSON array:
 
 Extract 5-15 most significant facts. Prioritize civic events with specific dates/deadlines. Return ONLY the JSON array, no additional text."""
 
-    def _parse_extraction_response(self, response: str) -> List[Dict[str, Any]]:
+    def _parse_extraction_response(self, response: str) -> list[dict[str, Any]]:
         """Parse Claude's fact extraction response"""
         try:
             # Clean markdown formatting
@@ -431,7 +432,7 @@ Extract 5-15 most significant facts. Prioritize civic events with specific dates
             logger.debug(f"Response was: {response[:500]}...")
             return []
 
-    def _calculate_expiration(self, fact_type: str) -> Optional[datetime]:
+    def _calculate_expiration(self, fact_type: str) -> datetime | None:
         """
         Calculate expiration date based on fact type
 
@@ -451,9 +452,7 @@ Extract 5-15 most significant facts. Prioritize civic events with specific dates
             return now + timedelta(days=60)
         elif fact_type == 'civic_event':
             return now + timedelta(days=90)
-        elif fact_type == 'policy_position':
-            return now + timedelta(days=180)
-        elif fact_type == 'trend':
+        elif fact_type == 'policy_position' or fact_type == 'trend':
             return now + timedelta(days=180)
         elif fact_type in ['metric', 'relationship']:
             return now + timedelta(days=365)
@@ -461,7 +460,7 @@ Extract 5-15 most significant facts. Prioritize civic events with specific dates
             # Default to metric retention for unknown types
             return now + timedelta(days=365)
 
-    def _extract_keywords_from_articles(self, articles: List[Article]) -> List[str]:
+    def _extract_keywords_from_articles(self, articles: list[Article]) -> list[str]:
         """Extract keywords from articles for fact matching"""
         keywords = set()
 

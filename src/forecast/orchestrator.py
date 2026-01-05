@@ -5,12 +5,12 @@ Manages multi-horizon forecast execution and coordinates all forecast components
 
 import logging
 from datetime import datetime, timedelta
-from typing import List, Dict, Any, Optional
+from typing import Any
 
 from ..database.connection import get_db
 from ..database.models import ForecastRun, LongTermForecast
-from .engine import ForecastEngine
 from .context_curator import ForecastContextCurator
+from .engine import ForecastEngine
 from .scenario_modeler import ScenarioModeler
 
 logger = logging.getLogger(__name__)
@@ -39,7 +39,7 @@ class ForecastOrchestrator:
     def __init__(
         self,
         user_profile=None,
-        topic_filters: Optional[Dict] = None
+        topic_filters: dict | None = None
     ):
         """
         Initialize forecast orchestrator
@@ -59,9 +59,9 @@ class ForecastOrchestrator:
 
     async def run_forecast(
         self,
-        horizons: Optional[List[str]] = None,
+        horizons: list[str] | None = None,
         scenario_count: int = 0
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Run forecast for specified horizons
 
@@ -145,7 +145,7 @@ class ForecastOrchestrator:
         run_id: int,
         horizon: str,
         scenario_count: int
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Generate forecast for a single horizon
 

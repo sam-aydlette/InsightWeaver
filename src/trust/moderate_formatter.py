@@ -4,10 +4,10 @@ Formats trust analysis results with moderate detail (between compact and verbose
 """
 
 import textwrap
-from typing import Dict, Any, List, Tuple
+from typing import Any
 
 
-def calculate_actionability(analysis: Dict[str, Any]) -> Tuple[str, str]:
+def calculate_actionability(analysis: dict[str, Any]) -> tuple[str, str]:
     """
     Calculate actionability rating based on trust analysis
 
@@ -54,7 +54,7 @@ def calculate_actionability(analysis: Dict[str, Any]) -> Tuple[str, str]:
     return ("CAUTION", "Mixed verification quality")
 
 
-def count_high_severity_bias(bias: Dict[str, Any]) -> int:
+def count_high_severity_bias(bias: dict[str, Any]) -> int:
     """
     Count high-severity bias issues
 
@@ -93,7 +93,7 @@ def count_high_severity_bias(bias: Dict[str, Any]) -> int:
     return count
 
 
-def select_top_bias_issues(bias: Dict[str, Any], max_count: int = 3) -> List[str]:
+def select_top_bias_issues(bias: dict[str, Any], max_count: int = 3) -> list[str]:
     """
     Select top bias issues by priority
 
@@ -186,7 +186,7 @@ def select_top_bias_issues(bias: Dict[str, Any], max_count: int = 3) -> List[str
     return selected_issues[:max_count]
 
 
-def format_moderate_trust_summary(analysis: Dict[str, Any], max_width: int = 80) -> str:
+def format_moderate_trust_summary(analysis: dict[str, Any], max_width: int = 80) -> str:
     """
     Format trust analysis as moderate-detail summary
 
@@ -264,7 +264,7 @@ def format_moderate_trust_summary(analysis: Dict[str, Any], max_width: int = 80)
     return "\n".join(lines)
 
 
-def format_compact_trust_summary(analysis: Dict[str, Any]) -> str:
+def format_compact_trust_summary(analysis: dict[str, Any]) -> str:
     """
     Format trust analysis as ultra-compact one-liner
 

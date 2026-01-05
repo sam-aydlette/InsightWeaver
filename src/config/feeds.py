@@ -802,9 +802,9 @@ def validate_feeds():
 
 # Print summary when module is run directly
 if __name__ == "__main__":
-    print(f"RSS Feed Configuration Summary:")
+    print("RSS Feed Configuration Summary:")
     print(f"Total feeds configured: {get_feed_count()}")
-    print(f"\nFeeds by category group:")
+    print("\nFeeds by category group:")
     for category_group in RSS_FEEDS:
         count = len(RSS_FEEDS[category_group])
         print(f"  {category_group}: {count} feeds")
@@ -814,8 +814,8 @@ if __name__ == "__main__":
     # Validate configuration
     issues = validate_feeds()
     if issues:
-        print(f"\nConfiguration issues found:")
+        print("\nConfiguration issues found:")
         for issue in issues:
             print(f"  - {issue}")
     else:
-        print(f"\nConfiguration validated successfully!")
+        print("\nConfiguration validated successfully!")

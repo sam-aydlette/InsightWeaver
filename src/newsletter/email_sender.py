@@ -3,16 +3,14 @@ Email System for InsightWeaver Newsletter
 Handles Gmail API integration and email delivery
 """
 
+import os
 import smtplib
 import ssl
 from datetime import datetime
-from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from email.mime.base import MIMEBase
-from email import encoders
-from typing import Dict, Any, Optional, List
-import os
+from email.mime.text import MIMEText
 from pathlib import Path
+from typing import Any
 
 from .templates import PersonalizedNarrativeTemplate
 
@@ -33,7 +31,7 @@ class EmailSender:
         else:
             self.email_enabled = True
 
-    async def send_daily_brief(self, content_data: Dict[str, Any], recipient_email: str) -> bool:
+    async def send_daily_brief(self, content_data: dict[str, Any], recipient_email: str) -> bool:
         """Send daily intelligence brief via email"""
         print(f"📧 Preparing daily brief for {recipient_email}")
 
@@ -74,7 +72,7 @@ class EmailSender:
             self._save_newsletter_locally(content_data, "daily", PersonalizedNarrativeTemplate.generate_html(content_data))
             return False
 
-    async def send_weekly_trends(self, content_data: Dict[str, Any], recipient_email: str) -> bool:
+    async def send_weekly_trends(self, content_data: dict[str, Any], recipient_email: str) -> bool:
         """Send weekly trend analysis via email"""
         print(f"📈 Preparing weekly trends for {recipient_email}")
 
@@ -151,7 +149,7 @@ class EmailSender:
             print(f"❌ Email sending failed: {e}")
             return False
 
-    def _save_newsletter_locally(self, content_data: Dict[str, Any], newsletter_type: str, html_content: str):
+    def _save_newsletter_locally(self, content_data: dict[str, Any], newsletter_type: str, html_content: str):
         """Save newsletter to local file as fallback"""
         try:
             # Create newsletters directory
@@ -201,7 +199,7 @@ class EmailSender:
             if success:
                 print(f"✅ Test email sent successfully to {recipient_email}")
             else:
-                print(f"❌ Test email failed")
+                print("❌ Test email failed")
 
             return success
 
@@ -213,12 +211,12 @@ class EmailSender:
 class NewsletterScheduler:
     """Handles scheduling and delivery of newsletters"""
 
-    def __init__(self, email_sender: Optional[EmailSender] = None):
+    def __init__(self, email_sender: EmailSender | None = None):
         self.email_sender = email_sender or EmailSender()
         self.default_recipient = os.getenv('RECIPIENT_EMAIL')
 
-    async def send_daily_briefing(self, date: Optional[datetime] = None,
-                                recipient: Optional[str] = None) -> bool:
+    async def send_daily_briefing(self, date: datetime | None = None,
+                                recipient: str | None = None) -> bool:
         """Send daily briefing for specified date"""
         from .content_engine import NewsletterContentEngine
 
@@ -245,8 +243,8 @@ class NewsletterScheduler:
             print(f"❌ Daily briefing failed: {e}")
             return False
 
-    async def send_weekly_analysis(self, end_date: Optional[datetime] = None,
-                                 recipient: Optional[str] = None) -> bool:
+    async def send_weekly_analysis(self, end_date: datetime | None = None,
+                                 recipient: str | None = None) -> bool:
         """Send weekly trend analysis"""
         from .content_engine import NewsletterContentEngine
 
@@ -282,7 +280,7 @@ class NewsletterScheduler:
 
         return await self.email_sender.send_test_email(recipient)
 
-    def get_email_status(self) -> Dict[str, Any]:
+    def get_email_status(self) -> dict[str, Any]:
         """Get status of email configuration"""
         return {
             "email_enabled": self.email_sender.email_enabled,

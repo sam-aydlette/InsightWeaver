@@ -5,9 +5,9 @@ Runs daily intelligence report generation and optional maintenance tasks
 Called by systemd timer or cron
 """
 
-import sys
 import asyncio
 import logging
+import sys
 from datetime import datetime
 from pathlib import Path
 
@@ -15,22 +15,23 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from src.config.settings import settings
-from src.newsletter.newsletter_system import NewsletterSystem
-from src.maintenance.data_retention import cleanup_old_data
-
+from src.config.settings import settings  # noqa: E402
+from src.maintenance.data_retention import cleanup_old_data  # noqa: E402
+from src.newsletter.newsletter_system import NewsletterSystem  # noqa: E402
 
 # Configure logging
-log_file = project_root / "data" / "logs" / f"scheduled_report_{datetime.now().strftime('%Y%m%d')}.log"
+log_file = (
+    project_root / "data" / "logs" / f"scheduled_report_{datetime.now().strftime('%Y%m%d')}.log"
+)
 log_file.parent.mkdir(parents=True, exist_ok=True)
 
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     handlers=[
         logging.FileHandler(log_file),
-        logging.StreamHandler()  # Also log to console for systemd journal
-    ]
+        logging.StreamHandler(),  # Also log to console for systemd journal
+    ],
 )
 logger = logging.getLogger(__name__)
 
@@ -46,7 +47,7 @@ async def run_scheduled_tasks():
         "started_at": start_time.isoformat(),
         "report_generated": False,
         "cleanup_performed": False,
-        "errors": []
+        "errors": [],
     }
 
     try:
@@ -57,9 +58,7 @@ async def run_scheduled_tasks():
 
             try:
                 report_result = await newsletter.generate_report(
-                    hours=settings.daily_report_hours,
-                    save_local=True,
-                    send_email=True
+                    hours=settings.daily_report_hours, save_local=True, send_email=True
                 )
 
                 if report_result.get("success"):
@@ -68,7 +67,7 @@ async def run_scheduled_tasks():
                         "articles_analyzed": report_result.get("articles_analyzed"),
                         "duration_hours": report_result.get("duration_hours"),
                         "local_path": report_result.get("local_path"),
-                        "email_sent": report_result.get("email_sent")
+                        "email_sent": report_result.get("email_sent"),
                     }
                     logger.info(
                         f"Report generated successfully: {report_result.get('articles_analyzed')} articles, "
@@ -95,7 +94,7 @@ async def run_scheduled_tasks():
                 results["cleanup_details"] = {
                     "articles_deleted": cleanup_result["articles"].get("deleted", 0),
                     "syntheses_deleted": cleanup_result["syntheses"].get("deleted", 0),
-                    "space_freed_mb": cleanup_result.get("total_freed_mb", 0)
+                    "space_freed_mb": cleanup_result.get("total_freed_mb", 0),
                 }
                 logger.info(
                     f"Cleanup complete: {cleanup_result['articles'].get('deleted', 0)} articles, "

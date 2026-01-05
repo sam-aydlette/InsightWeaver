@@ -4,9 +4,9 @@ Condensed multi-horizon forecast output for quick consumption
 """
 
 import textwrap
-from datetime import datetime
-from typing import Dict, Any, List, Tuple
 from collections import Counter
+from datetime import datetime
+from typing import Any
 
 
 class ExecutiveForecastFormatter:
@@ -30,7 +30,7 @@ class ExecutiveForecastFormatter:
 
     def format_executive_briefing(
         self,
-        forecasts: List[Dict[str, Any]],
+        forecasts: list[dict[str, Any]],
         report_path: str = None
     ) -> str:
         """
@@ -130,8 +130,8 @@ class ExecutiveForecastFormatter:
 
     def _extract_top_trends(
         self,
-        forecasts: List[Dict[str, Any]]
-    ) -> List[str]:
+        forecasts: list[dict[str, Any]]
+    ) -> list[str]:
         """
         Extract top 2-3 trends appearing most frequently across horizons
 
@@ -183,9 +183,9 @@ class ExecutiveForecastFormatter:
 
     def _build_trend_comparison_table(
         self,
-        top_trends: List[str],
-        forecasts: List[Dict[str, Any]]
-    ) -> List[str]:
+        top_trends: list[str],
+        forecasts: list[dict[str, Any]]
+    ) -> list[str]:
         """
         Build ASCII table showing trend evolution across horizons
 
@@ -237,8 +237,8 @@ class ExecutiveForecastFormatter:
     def _get_trend_outcomes_by_horizon(
         self,
         trend_name: str,
-        forecasts: List[Dict[str, Any]]
-    ) -> Dict[str, str]:
+        forecasts: list[dict[str, Any]]
+    ) -> dict[str, str]:
         """
         Get projected outcomes for a specific trend across all horizons
 
@@ -309,8 +309,8 @@ class ExecutiveForecastFormatter:
 
     def _extract_action_triggers(
         self,
-        forecast: Dict[str, Any]
-    ) -> List[str]:
+        forecast: dict[str, Any]
+    ) -> list[str]:
         """
         Extract action triggers (early warning signals) from forecast
 
@@ -347,8 +347,8 @@ class ExecutiveForecastFormatter:
 
     def _identify_critical_uncertainties(
         self,
-        forecasts: List[Dict[str, Any]]
-    ) -> List[str]:
+        forecasts: list[dict[str, Any]]
+    ) -> list[str]:
         """
         Identify most critical uncertainties across all forecasts
 

@@ -2,8 +2,8 @@
 Output management for CLI commands
 Handles output suppression and debug mode
 """
-import sys
 import logging
+import sys
 from contextlib import contextmanager
 from io import StringIO
 

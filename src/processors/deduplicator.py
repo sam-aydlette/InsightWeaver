@@ -3,15 +3,15 @@ Article Deduplication System
 Identifies and handles duplicate articles across different RSS feeds
 """
 
-import logging
 import hashlib
-from typing import List, Set, Dict, Tuple, Optional
+import logging
 from datetime import datetime, timedelta
-from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_
 
-from src.database.models import Article
+from sqlalchemy import and_
+from sqlalchemy.orm import Session
+
 from src.database.connection import get_db
+from src.database.models import Article
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +60,7 @@ class ArticleDeduplicator:
 
         return text
 
-    def find_exact_duplicates(self, article: Article, db: Session) -> List[Article]:
+    def find_exact_duplicates(self, article: Article, db: Session) -> list[Article]:
         """Find exact duplicates based on content hash"""
         if not article.title or not article.normalized_content:
             return []
@@ -98,7 +98,7 @@ class ArticleDeduplicator:
 
         return exact_duplicates
 
-    def find_near_duplicates(self, article: Article, db: Session) -> List[Article]:
+    def find_near_duplicates(self, article: Article, db: Session) -> list[Article]:
         """Find near-duplicates based on title similarity and URL"""
         if not article.title:
             return []
@@ -177,7 +177,7 @@ class ArticleDeduplicator:
 
         return hash1 == hash2 and hash1 != ""
 
-    def _stage1_url_duplicates(self, db: Session, unprocessed_ids: List[int], time_cutoff: datetime) -> Dict[str, int]:
+    def _stage1_url_duplicates(self, db: Session, unprocessed_ids: list[int], time_cutoff: datetime) -> dict[str, int]:
         """
         Stage 1: Quick URL duplicate detection - instant wins
         Groups articles by URL and marks later ones as duplicates
@@ -213,7 +213,7 @@ class ArticleDeduplicator:
 
         return {'url_duplicates': url_duplicates}
 
-    def _stage2_exact_duplicates(self, db: Session, unprocessed_ids: List[int], time_cutoff: datetime) -> Dict[str, int]:
+    def _stage2_exact_duplicates(self, db: Session, unprocessed_ids: list[int], time_cutoff: datetime) -> dict[str, int]:
         """
         Stage 2: Exact content hash matches - fast hash-based detection
         Only processes articles that survived Stage 1
@@ -253,7 +253,7 @@ class ArticleDeduplicator:
 
         return {'exact_duplicates': exact_duplicates}
 
-    def _stage3_title_similarity(self, db: Session, unprocessed_ids: List[int], time_cutoff: datetime) -> Dict[str, int]:
+    def _stage3_title_similarity(self, db: Session, unprocessed_ids: list[int], time_cutoff: datetime) -> dict[str, int]:
         """
         Stage 3: Title similarity analysis - slowest but most thorough
         Only processes articles that survived Stages 1 & 2
@@ -290,7 +290,7 @@ class ArticleDeduplicator:
 
         return {'title_duplicates': title_duplicates}
 
-    def deduplicate_recent_articles(self, hours: int = 24) -> Dict[str, int]:
+    def deduplicate_recent_articles(self, hours: int = 24) -> dict[str, int]:
         """
         Staged deduplication processing for optimal performance:
         Stage 1: Quick URL duplicate detection
@@ -345,7 +345,7 @@ class ArticleDeduplicator:
                 'total_duplicates': total_duplicates
             }
 
-    def get_duplicate_statistics(self) -> Dict[str, int]:
+    def get_duplicate_statistics(self) -> dict[str, int]:
         """Get statistics about duplicates in the database"""
         with get_db() as db:
             total_articles = db.query(Article).count()
@@ -370,7 +370,7 @@ class ArticleDeduplicator:
                 'duplication_rate': duplicate_articles / total_articles if total_articles > 0 else 0.0
             }
 
-def run_deduplication(hours: int = 24) -> Dict[str, int]:
+def run_deduplication(hours: int = 24) -> dict[str, int]:
     """Convenience function to run deduplication on recent articles"""
     deduplicator = ArticleDeduplicator()
     return deduplicator.deduplicate_recent_articles(hours=hours)

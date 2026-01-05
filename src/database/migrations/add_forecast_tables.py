@@ -4,7 +4,7 @@ Adds ForecastRun, LongTermForecast, ForecastScenario, and CausalChain tables
 for long-term trend forecasting feature
 """
 from src.database.connection import engine
-from src.database.models import ForecastRun, LongTermForecast, ForecastScenario, CausalChain
+from src.database.models import CausalChain, ForecastRun, ForecastScenario, LongTermForecast
 
 
 def upgrade():

@@ -3,12 +3,13 @@ Minimal Claude API Client
 Simple wrapper focused on context-driven analysis
 """
 
-import asyncio
 import logging
-from typing import Dict, List, Any, Optional
-from anthropic import Anthropic, AsyncAnthropic
+from typing import Any
+
+from anthropic import AsyncAnthropic
+
 from ..config.settings import settings
-from .examples import get_few_shot_examples, format_examples_for_prompt
+from .examples import format_examples_for_prompt, get_few_shot_examples
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +17,7 @@ logger = logging.getLogger(__name__)
 class ClaudeClient:
     """Minimal Claude API client for context-driven analysis"""
 
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, api_key: str | None = None):
         """
         Initialize Claude client
 
@@ -36,7 +37,7 @@ class ClaudeClient:
         system_prompt: str,
         user_message: str,
         temperature: float = 1.0,
-        max_tokens: Optional[int] = None
+        max_tokens: int | None = None
     ) -> str:
         """
         Send analysis request to Claude
@@ -70,7 +71,7 @@ class ClaudeClient:
 
     async def analyze_with_context(
         self,
-        context: Dict[str, Any],
+        context: dict[str, Any],
         task: str,
         temperature: float = 1.0
     ) -> str:
@@ -88,7 +89,7 @@ class ClaudeClient:
         system_prompt = self._build_system_prompt(context)
         return await self.analyze(system_prompt, task, temperature)
 
-    def _build_system_prompt(self, context: Dict[str, Any]) -> str:
+    def _build_system_prompt(self, context: dict[str, Any]) -> str:
         """
         Build system prompt from curated context with few-shot examples
 
@@ -103,7 +104,7 @@ class ClaudeClient:
         # Add user profile context
         if "user_profile" in context:
             profile = context["user_profile"]
-            parts.append(f"## User Context")
+            parts.append("## User Context")
             parts.append(f"Location: {profile.get('location', 'Unknown')}")
             parts.append(f"Professional Domains: {', '.join(profile.get('professional_domains', []))}")
             parts.append(f"Civic Interests: {', '.join(profile.get('civic_interests', []))}")

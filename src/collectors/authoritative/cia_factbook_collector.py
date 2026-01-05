@@ -6,7 +6,7 @@ Note: This is a placeholder - full implementation requires web scraping or data 
 
 import logging
 from datetime import datetime
-from typing import List, Dict, Any, Optional
+from typing import Any
 
 from ..base_collector import BaseCollector
 
@@ -44,7 +44,7 @@ class CIAFactbookCollector(BaseCollector):
             api_key=None
         )
 
-    def fetch_data(self) -> List[Dict[str, Any]]:
+    def fetch_data(self) -> list[dict[str, Any]]:
         """
         Fetch data from CIA World Factbook
 
@@ -66,7 +66,7 @@ class CIAFactbookCollector(BaseCollector):
         logger.info(f"Fetched {len(all_data)} data points from CIA Factbook")
         return all_data
 
-    def parse_item(self, raw_item: Dict[str, Any]) -> Dict[str, Any]:
+    def parse_item(self, raw_item: dict[str, Any]) -> dict[str, Any]:
         """
         Parse raw Factbook data into standardized format
 
@@ -94,9 +94,9 @@ class CIAFactbookCollector(BaseCollector):
 
     def score_relevance(
         self,
-        item: Dict[str, Any],
-        decision_context: Optional[Dict] = None
-    ) -> tuple[float, List[str]]:
+        item: dict[str, Any],
+        decision_context: dict | None = None
+    ) -> tuple[float, list[str]]:
         """
         Score CIA Factbook data relevance for forecasting
 

@@ -2,16 +2,16 @@
 Base collector class for API and structured data sources
 """
 
-import json
 import logging
 from abc import ABC, abstractmethod
-from datetime import datetime, timedelta
-from typing import List, Dict, Any, Optional
+from datetime import datetime
+from typing import Any
+
 import httpx
 from sqlalchemy.orm import Session
 
-from ..database.models import APIDataSource, APIDataPoint
 from ..database.connection import get_db
+from ..database.models import APIDataPoint, APIDataSource
 
 logger = logging.getLogger(__name__)
 
@@ -33,8 +33,8 @@ class BaseCollector(ABC):
         self,
         source_name: str,
         source_type: str,
-        endpoint_url: Optional[str] = None,
-        api_key: Optional[str] = None
+        endpoint_url: str | None = None,
+        api_key: str | None = None
     ):
         """
         Initialize collector
@@ -92,7 +92,7 @@ class BaseCollector(ABC):
         return source
 
     @abstractmethod
-    def fetch_data(self) -> List[Dict[str, Any]]:
+    def fetch_data(self) -> list[dict[str, Any]]:
         """
         Fetch data from the source
 
@@ -102,7 +102,7 @@ class BaseCollector(ABC):
         pass
 
     @abstractmethod
-    def parse_item(self, raw_item: Dict[str, Any]) -> Dict[str, Any]:
+    def parse_item(self, raw_item: dict[str, Any]) -> dict[str, Any]:
         """
         Parse a raw data item into standardized format
 
@@ -124,9 +124,9 @@ class BaseCollector(ABC):
 
     def score_relevance(
         self,
-        item: Dict[str, Any],
-        decision_context: Optional[Dict] = None
-    ) -> tuple[float, List[str]]:
+        item: dict[str, Any],
+        decision_context: dict | None = None
+    ) -> tuple[float, list[str]]:
         """
         Score item relevance against user's active decisions
 
@@ -172,9 +172,9 @@ class BaseCollector(ABC):
 
     def collect_and_store(
         self,
-        decision_context: Optional[Dict] = None,
+        decision_context: dict | None = None,
         max_items: int = 100
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Main collection method: fetch, parse, score, and store data
 

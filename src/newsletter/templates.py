@@ -4,7 +4,7 @@ Story-driven, temporal-layered intelligence briefings
 """
 
 from datetime import datetime
-from typing import Dict, List, Any, Optional
+from typing import Any
 
 
 class NewsletterTemplate:
@@ -27,7 +27,7 @@ class PersonalizedNarrativeTemplate(NewsletterTemplate):
     """Personalized narrative-driven intelligence brief template"""
 
     @staticmethod
-    def generate_html(data: Dict[str, Any]) -> str:
+    def generate_html(data: dict[str, Any]) -> str:
         """
         Generate HTML version of intelligence brief
 
@@ -575,7 +575,7 @@ class PersonalizedNarrativeTemplate(NewsletterTemplate):
         return html.strip()
 
     @staticmethod
-    def _render_bottom_line(bottom_line: Dict[str, Any]) -> str:
+    def _render_bottom_line(bottom_line: dict[str, Any]) -> str:
         """Render bottom line section"""
         if not bottom_line:
             return ""
@@ -606,7 +606,7 @@ class PersonalizedNarrativeTemplate(NewsletterTemplate):
         return html
 
     @staticmethod
-    def _render_trends_and_patterns(trends: Dict[str, List[Dict[str, Any]]], niche_field: str) -> str:
+    def _render_trends_and_patterns(trends: dict[str, list[dict[str, Any]]], niche_field: str) -> str:
         """Render trends organized by geographic scope"""
         if not trends:
             return ""
@@ -663,7 +663,7 @@ class PersonalizedNarrativeTemplate(NewsletterTemplate):
         return html
 
     @staticmethod
-    def _render_priority_events(events: List[Dict[str, Any]]) -> str:
+    def _render_priority_events(events: list[dict[str, Any]]) -> str:
         """Render priority events table"""
         if not events:
             return ""
@@ -710,7 +710,7 @@ class PersonalizedNarrativeTemplate(NewsletterTemplate):
         return html
 
     @staticmethod
-    def _render_predictions(predictions: Dict[str, List[Dict[str, Any]]], niche_field: str) -> str:
+    def _render_predictions(predictions: dict[str, list[dict[str, Any]]], niche_field: str) -> str:
         """Render predictions with confidence indicators"""
         if not predictions:
             return ""
@@ -767,7 +767,7 @@ class PersonalizedNarrativeTemplate(NewsletterTemplate):
         return html
 
     @staticmethod
-    def _render_civic_engagement(events: List[Dict[str, Any]]) -> str:
+    def _render_civic_engagement(events: list[dict[str, Any]]) -> str:
         """Render civic engagement section with government meetings, public hearings, and civic deadlines"""
         if not events:
             return ""

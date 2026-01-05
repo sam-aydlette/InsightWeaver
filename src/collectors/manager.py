@@ -7,14 +7,14 @@ import json
 import logging
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, List, Any, Optional
+from typing import Any
 
-from .fairfax_calendar import FairfaxCalendarCollector
-from .event_monitor import EventMonitorCollector
-from .job_market import JobMarketCollector
-from .vulncheck_kev import VulnCheckKEVCollector
 from ..database.connection import get_db
 from ..database.models import APIDataSource
+from .event_monitor import EventMonitorCollector
+from .fairfax_calendar import FairfaxCalendarCollector
+from .job_market import JobMarketCollector
+from .vulncheck_kev import VulnCheckKEVCollector
 
 logger = logging.getLogger(__name__)
 
@@ -41,16 +41,16 @@ class CollectorManager:
         self.config = self._load_config()
         self.collectors = {}
 
-    def _load_config(self) -> Dict:
+    def _load_config(self) -> dict:
         """Load collector configuration from JSON"""
         if not self.config_path.exists():
             logger.warning(f"Collector config not found: {self.config_path}")
             return {'collectors': {}}
 
-        with open(self.config_path, 'r') as f:
+        with open(self.config_path) as f:
             return json.load(f)
 
-    def initialize_collectors(self, decision_context: Optional[Dict] = None) -> None:
+    def initialize_collectors(self, decision_context: dict | None = None) -> None:
         """
         Initialize all enabled collectors
 
@@ -75,7 +75,7 @@ class CollectorManager:
             except Exception as e:
                 logger.error(f"Failed to initialize collector '{name}': {e}")
 
-    def _create_collector(self, name: str, config: Dict) -> Optional[Any]:
+    def _create_collector(self, name: str, config: dict) -> Any | None:
         """
         Create collector instance based on configuration
 
@@ -114,9 +114,9 @@ class CollectorManager:
 
     def collect_all(
         self,
-        decision_context: Optional[Dict] = None,
+        decision_context: dict | None = None,
         force: bool = False
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Run all collectors that are due for refresh
 
@@ -174,7 +174,7 @@ class CollectorManager:
 
         return summary
 
-    def _should_collect(self, collector: Any, config: Dict) -> bool:
+    def _should_collect(self, collector: Any, config: dict) -> bool:
         """
         Check if collector should run based on last fetch time
 
@@ -200,7 +200,7 @@ class CollectorManager:
             next_fetch = source.last_fetched + timedelta(hours=refresh_hours)
             return datetime.utcnow() >= next_fetch
 
-    def get_collection_status(self) -> Dict[str, Any]:
+    def get_collection_status(self) -> dict[str, Any]:
         """
         Get status of all collectors
 
@@ -226,8 +226,8 @@ class CollectorManager:
     def run_specific_collector(
         self,
         collector_name: str,
-        decision_context: Optional[Dict] = None
-    ) -> Dict[str, Any]:
+        decision_context: dict | None = None
+    ) -> dict[str, Any]:
         """
         Run a specific collector by name
 

@@ -6,12 +6,13 @@ Prevents database bloat while maintaining historical context
 
 import logging
 from datetime import datetime, timedelta
-from typing import Dict, Any
+from typing import Any
+
 from sqlalchemy.orm import Session
 
+from ..config.settings import settings
 from ..database.connection import get_db
 from ..database.models import Article, NarrativeSynthesis
-from ..config.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +25,7 @@ class DataRetentionManager:
         self.retention_syntheses = settings.retention_syntheses_days
         self.retention_feed_health = settings.retention_feed_health_days
 
-    def cleanup_all(self, dry_run: bool = False) -> Dict[str, Any]:
+    def cleanup_all(self, dry_run: bool = False) -> dict[str, Any]:
         """
         Run all cleanup operations
 
@@ -81,7 +82,7 @@ class DataRetentionManager:
 
         return results
 
-    def _cleanup_old_articles(self, session: Session, dry_run: bool) -> Dict[str, Any]:
+    def _cleanup_old_articles(self, session: Session, dry_run: bool) -> dict[str, Any]:
         """
         Remove articles older than retention period
 
@@ -150,7 +151,7 @@ class DataRetentionManager:
             session.rollback()
             return {"deleted": 0, "error": str(e)}
 
-    def _cleanup_old_syntheses(self, session: Session, dry_run: bool) -> Dict[str, Any]:
+    def _cleanup_old_syntheses(self, session: Session, dry_run: bool) -> dict[str, Any]:
         """
         Remove syntheses older than retention period
 
@@ -219,7 +220,7 @@ class DataRetentionManager:
             session.rollback()
             return {"deleted": 0, "error": str(e)}
 
-    def get_retention_status(self) -> Dict[str, Any]:
+    def get_retention_status(self) -> dict[str, Any]:
         """
         Get current status of data retention
 
@@ -287,7 +288,7 @@ class DataRetentionManager:
         }
 
 
-def cleanup_old_data(dry_run: bool = False) -> Dict[str, Any]:
+def cleanup_old_data(dry_run: bool = False) -> dict[str, Any]:
     """
     Convenience function for cleanup operations
 
@@ -301,7 +302,7 @@ def cleanup_old_data(dry_run: bool = False) -> Dict[str, Any]:
     return manager.cleanup_all(dry_run=dry_run)
 
 
-def get_retention_status() -> Dict[str, Any]:
+def get_retention_status() -> dict[str, Any]:
     """
     Convenience function to get retention status
 

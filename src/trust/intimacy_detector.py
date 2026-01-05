@@ -4,7 +4,8 @@ Detect emotional claims, false empathy, and anthropomorphization using Claude
 """
 import json
 import logging
-from typing import List, Dict, Any
+from typing import Any
+
 from ..context.claude_client import ClaudeClient
 from .trust_prompts import INTIMACY_DETECTION_PROMPT
 
@@ -38,7 +39,7 @@ class IntimacyIssue:
         self.severity = severity.upper()
         self.professional_alternative = professional_alternative
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary"""
         return {
             "category": self.category,
@@ -54,7 +55,7 @@ class IntimacyAnalysis:
 
     def __init__(
         self,
-        issues: List[IntimacyIssue],
+        issues: list[IntimacyIssue],
         overall_tone: str,
         summary: str
     ):
@@ -70,7 +71,7 @@ class IntimacyAnalysis:
         self.overall_tone = overall_tone.upper()
         self.summary = summary
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary"""
         return {
             "issues": [i.to_dict() for i in self.issues],

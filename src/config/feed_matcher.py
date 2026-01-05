@@ -5,9 +5,9 @@ Matches RSS feeds to user profiles based on applicability tags
 
 import json
 import logging
-from pathlib import Path
-from typing import List, Dict, Any, Tuple
 from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -17,10 +17,10 @@ class Feed:
     """Represents an RSS feed with applicability metadata"""
     name: str
     url: str
-    scope: List[str]  # always, global, national, regional, local
-    geo_tags: List[str]  # virginia, northern_virginia, usa, etc.
-    domain_tags: List[str]  # cybersecurity, technology, etc.
-    specialty_tags: List[str]  # threat_intelligence, education, etc.
+    scope: list[str]  # always, global, national, regional, local
+    geo_tags: list[str]  # virginia, northern_virginia, usa, etc.
+    domain_tags: list[str]  # cybersecurity, technology, etc.
+    specialty_tags: list[str]  # threat_intelligence, education, etc.
     relevance_score: float  # 0-1, how generally useful
     source_file: str  # which JSON file it came from
 
@@ -36,7 +36,7 @@ class FeedMatcher:
             feeds_directory: Path to feeds directory structure
         """
         self.feeds_dir = Path(feeds_directory)
-        self.all_feeds: List[Feed] = []
+        self.all_feeds: list[Feed] = []
         self._load_all_feeds()
 
     def _load_all_feeds(self) -> None:
@@ -48,7 +48,7 @@ class FeedMatcher:
         # Load feeds from all JSON files recursively
         for json_file in self.feeds_dir.rglob("*.json"):
             try:
-                with open(json_file, 'r', encoding='utf-8') as f:
+                with open(json_file, encoding='utf-8') as f:
                     data = json.load(f)
 
                 for feed_data in data.get('feeds', []):
@@ -73,7 +73,7 @@ class FeedMatcher:
 
         logger.info(f"Loaded {len(self.all_feeds)} total feeds from {self.feeds_dir}")
 
-    def match_feeds_to_profile(self, user_profile) -> List[Dict[str, Any]]:
+    def match_feeds_to_profile(self, user_profile) -> list[dict[str, Any]]:
         """
         Match feeds to user profile based on tags
 
@@ -109,7 +109,7 @@ class FeedMatcher:
         logger.info(f"Matched {len(matched_feeds)} feeds to user profile")
         return matched_feeds
 
-    def _calculate_match_score(self, feed: Feed, preferences: Dict[str, Any]) -> float:
+    def _calculate_match_score(self, feed: Feed, preferences: dict[str, Any]) -> float:
         """
         Calculate match score for a feed based on user preferences
 
@@ -165,7 +165,7 @@ class FeedMatcher:
 
         return score
 
-    def _get_default_preferences(self) -> Dict[str, Any]:
+    def _get_default_preferences(self) -> dict[str, Any]:
         """Get default feed preferences for users without configuration"""
         return {
             'required_scopes': ['always', 'national'],
@@ -175,7 +175,7 @@ class FeedMatcher:
             'excluded_topics': []
         }
 
-    def get_feed_statistics(self) -> Dict[str, Any]:
+    def get_feed_statistics(self) -> dict[str, Any]:
         """Get statistics about loaded feeds"""
         stats = {
             'total_feeds': len(self.all_feeds),
@@ -203,7 +203,7 @@ class FeedMatcher:
 
         return stats
 
-    def get_available_tags(self) -> Dict[str, List[str]]:
+    def get_available_tags(self) -> dict[str, list[str]]:
         """Get all available tags for user reference"""
         scopes = set()
         geo_tags = set()

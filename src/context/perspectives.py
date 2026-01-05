@@ -4,7 +4,6 @@ Generic, modular frameworks for intelligence analysis that adapt to user configu
 """
 
 from dataclasses import dataclass
-from typing import List, Dict, Any, Optional
 
 
 @dataclass
@@ -145,7 +144,7 @@ WEEKLY_DIGEST = Perspective(
 
 
 # Perspective registry
-PERSPECTIVES: Dict[str, Perspective] = {
+PERSPECTIVES: dict[str, Perspective] = {
     "daily_intelligence_brief": DAILY_INTELLIGENCE_BRIEF,
     "executive_summary": EXECUTIVE_SUMMARY,
     "weekly_digest": WEEKLY_DIGEST,
@@ -171,7 +170,7 @@ def get_perspective(perspective_id: str) -> Perspective:
     return PERSPECTIVES[perspective_id]
 
 
-def list_perspectives() -> List[str]:
+def list_perspectives() -> list[str]:
     """List available perspective IDs"""
     return list(PERSPECTIVES.keys())
 

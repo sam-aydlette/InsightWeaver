@@ -4,7 +4,7 @@ Verifies AI-generated brief outputs for trustworthiness
 """
 
 import logging
-from typing import Optional, Dict, Any
+from typing import Any
 
 from ..trust.trust_pipeline import TrustPipeline
 from ..trust.trust_report import TrustReportFormatter
@@ -12,7 +12,7 @@ from ..trust.trust_report import TrustReportFormatter
 logger = logging.getLogger(__name__)
 
 
-async def verify_brief_output(executive_summary: str) -> Optional[Dict[str, Any]]:
+async def verify_brief_output(executive_summary: str) -> dict[str, Any] | None:
     """
     Verify executive summary from brief
 
@@ -47,7 +47,7 @@ async def verify_brief_output(executive_summary: str) -> Optional[Dict[str, Any]
         }
 
 
-def format_brief_trust_section(analysis: Optional[Dict[str, Any]]) -> str:
+def format_brief_trust_section(analysis: dict[str, Any] | None) -> str:
     """
     Format trust analysis for display in brief output
 

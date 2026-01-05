@@ -4,7 +4,9 @@ Applies new indexes to existing database for query optimization
 """
 
 import logging
-from sqlalchemy import text, inspect
+
+from sqlalchemy import inspect, text
+
 from ..database.connection import engine
 
 logger = logging.getLogger(__name__)
@@ -94,7 +96,7 @@ def apply_indexes(dry_run: bool = False):
     print("="*60)
 
     if dry_run:
-        print(f"\nDRY RUN MODE - No changes made")
+        print("\nDRY RUN MODE - No changes made")
 
     if results['created']:
         print(f"\nIndexes created ({len(results['created'])}):")

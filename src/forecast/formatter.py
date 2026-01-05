@@ -4,15 +4,15 @@ Formats forecast data for terminal display and HTML reports
 """
 
 import textwrap
-from pathlib import Path
 from datetime import datetime
-from typing import Dict, Any, List
+from pathlib import Path
+from typing import Any
 
 
 class ForecastFormatter:
     """Formats forecast data for human-readable output"""
 
-    def format_forecast(self, forecast: Dict[str, Any], max_width: int = 80) -> str:
+    def format_forecast(self, forecast: dict[str, Any], max_width: int = 80) -> str:
         """
         Format forecast for terminal display
 
@@ -67,8 +67,8 @@ class ForecastFormatter:
 
     def _format_trend_extrapolations(
         self,
-        lines: List[str],
-        forecast_data: Dict[str, Any],
+        lines: list[str],
+        forecast_data: dict[str, Any],
         max_width: int
     ) -> None:
         """Format trend extrapolation section"""
@@ -109,8 +109,8 @@ class ForecastFormatter:
 
     def _format_scenarios(
         self,
-        lines: List[str],
-        forecast_data: Dict[str, Any],
+        lines: list[str],
+        forecast_data: dict[str, Any],
         max_width: int
     ) -> None:
         """Format scenario modeling section"""
@@ -151,8 +151,8 @@ class ForecastFormatter:
 
     def _format_historical_patterns(
         self,
-        lines: List[str],
-        forecast_data: Dict[str, Any],
+        lines: list[str],
+        forecast_data: dict[str, Any],
         max_width: int
     ) -> None:
         """Format pattern recognition section"""
@@ -185,8 +185,8 @@ class ForecastFormatter:
 
     def _format_causal_chains(
         self,
-        lines: List[str],
-        forecast_data: Dict[str, Any],
+        lines: list[str],
+        forecast_data: dict[str, Any],
         max_width: int
     ) -> None:
         """Format causal chain analysis section"""
@@ -232,8 +232,8 @@ class ForecastFormatter:
 
     def _format_event_risks(
         self,
-        lines: List[str],
-        forecast_data: Dict[str, Any],
+        lines: list[str],
+        forecast_data: dict[str, Any],
         max_width: int
     ) -> None:
         """Format event risk categorization section (Rumsfeld framework)"""
@@ -309,7 +309,7 @@ class ForecastFormatter:
 
             lines.append("")
 
-    def save_html_report(self, result: Dict[str, Any]) -> Path:
+    def save_html_report(self, result: dict[str, Any]) -> Path:
         """
         Generate and save HTML report
 
@@ -348,7 +348,7 @@ class ForecastFormatter:
         for forecast in result.get('forecasts', []):
             forecast_data = forecast['forecast_data']
 
-            html_parts.append(f"<div class='metadata'>")
+            html_parts.append("<div class='metadata'>")
             html_parts.append(f"<strong>Time Horizon:</strong> {forecast['time_horizon']}<br>")
             html_parts.append(f"<strong>Target Date:</strong> {forecast['target_date']}")
             html_parts.append("</div>")

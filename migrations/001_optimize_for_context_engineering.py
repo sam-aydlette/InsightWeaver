@@ -17,9 +17,10 @@ from pathlib import Path
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from sqlalchemy import create_engine, text
-from src.config.settings import settings
+from sqlalchemy import text
+
 from src.database.connection import get_db
+
 
 def migrate_up():
     """Apply migration"""

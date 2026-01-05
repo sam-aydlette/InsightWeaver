@@ -3,7 +3,7 @@ Topic Matcher - Article filtering by topic and geographic scope
 Uses keyword matching and metadata to filter articles without AI inference
 """
 import logging
-from typing import List, Dict, Tuple, Optional
+
 from src.database.models import Article
 from src.utils.profile_loader import UserProfile
 
@@ -167,7 +167,7 @@ class TopicMatcher:
     def __init__(self):
         self.topic_keywords = TOPIC_KEYWORDS
 
-    def matches_topic(self, article: Article, topic: str) -> Tuple[bool, float]:
+    def matches_topic(self, article: Article, topic: str) -> tuple[bool, float]:
         """
         Check if article matches topic using metadata and weighted scoring
 
@@ -252,7 +252,7 @@ class TopicMatcher:
         self,
         article: Article,
         scope: str,
-        user_location: Dict
+        user_location: dict
     ) -> bool:
         """
         Check if article matches geographic scope
@@ -355,10 +355,10 @@ class TopicMatcher:
 
     def filter_articles(
         self,
-        articles: List[Article],
-        topic_filters: Dict,
+        articles: list[Article],
+        topic_filters: dict,
         user_profile: UserProfile
-    ) -> List[Article]:
+    ) -> list[Article]:
         """
         Apply topic and scope filters to article list
 

@@ -3,8 +3,7 @@ Few-Shot Examples for Claude Analysis
 Demonstrates desired output format and quality
 """
 
-from typing import List, Dict, Any
-
+from typing import Any
 
 # Example synthesis output showing desired structure and style
 # Generic example that demonstrates format without location-specific assumptions
@@ -148,7 +147,7 @@ SYNTHESIS_EXAMPLE = {
 }
 
 
-def get_few_shot_examples() -> List[Dict[str, Any]]:
+def get_few_shot_examples() -> list[dict[str, Any]]:
     """
     Get few-shot examples for synthesis prompts
 
@@ -158,7 +157,7 @@ def get_few_shot_examples() -> List[Dict[str, Any]]:
     return [SYNTHESIS_EXAMPLE]
 
 
-def format_examples_for_prompt(examples: List[Dict[str, Any]]) -> str:
+def format_examples_for_prompt(examples: list[dict[str, Any]]) -> str:
     """
     Format examples for inclusion in system prompt
 

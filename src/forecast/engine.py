@@ -3,10 +3,10 @@ Forecast Engine
 Core forecasting logic implementing 5 analysis types for long-term trend prediction
 """
 
-import logging
 import json
+import logging
 from datetime import datetime, timedelta
-from typing import Dict, Any, Optional, List
+from typing import Any
 
 from ..context.claude_client import ClaudeClient
 
@@ -25,7 +25,7 @@ class ForecastEngine:
     5. Event Risk Categorization - Rumsfeld framework (known knowns/unknowns/unknown unknowns)
     """
 
-    def __init__(self, claude_client: Optional[ClaudeClient] = None):
+    def __init__(self, claude_client: ClaudeClient | None = None):
         """
         Initialize forecast engine
 
@@ -37,8 +37,8 @@ class ForecastEngine:
     async def generate_forecast(
         self,
         horizon: str,
-        context: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        context: dict[str, Any]
+    ) -> dict[str, Any]:
         """
         Generate comprehensive forecast for specified time horizon
 
@@ -253,7 +253,7 @@ IMPORTANT:
 
         return task
 
-    def _parse_forecast_response(self, response: str) -> Dict[str, Any]:
+    def _parse_forecast_response(self, response: str) -> dict[str, Any]:
         """
         Parse Claude's response into structured forecast data
 
@@ -288,7 +288,7 @@ IMPORTANT:
             logger.error(f"Response was: {response[:500]}...")
             raise ValueError(f"Invalid JSON response from Claude: {e}")
 
-    def _validate_forecast_structure(self, forecast: Dict[str, Any]) -> None:
+    def _validate_forecast_structure(self, forecast: dict[str, Any]) -> None:
         """
         Validate that forecast contains all required analysis types
 

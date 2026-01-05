@@ -4,10 +4,19 @@ Simplified schema focusing on context curation and synthesis outputs
 """
 
 from datetime import datetime
-from typing import Optional, Dict, Any
+
 from sqlalchemy import (
-    Column, Integer, String, Text, DateTime,
-    Float, JSON, Boolean, ForeignKey, Index, UniqueConstraint
+    JSON,
+    Boolean,
+    Column,
+    DateTime,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
 )
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship

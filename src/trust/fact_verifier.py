@@ -2,13 +2,15 @@
 Fact Verification Module
 Extract and verify factual claims using Claude
 """
+import asyncio
 import json
 import logging
-from typing import List, Dict, Any, Optional
 from datetime import datetime
+from typing import Any
+
 from ..context.claude_client import ClaudeClient
-from .trust_prompts import FACT_EXTRACTION_PROMPT, FACT_VERIFICATION_PROMPT
 from .source_matcher import AuthoritativeSourceMatcher
+from .trust_prompts import FACT_EXTRACTION_PROMPT, FACT_VERIFICATION_PROMPT
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +47,7 @@ class Claim:
         self.confidence = confidence
         self.reasoning = reasoning
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary"""
         return {
             "text": self.text,
@@ -64,9 +66,9 @@ class FactVerification:
         verdict: str,
         confidence: float,
         reasoning: str,
-        caveats: List[str] = None,
-        contradictions: List[str] = None,
-        temporal_check: Optional[Dict[str, Any]] = None
+        caveats: list[str] = None,
+        contradictions: list[str] = None,
+        temporal_check: dict[str, Any] | None = None
     ):
         """
         Initialize verification result
@@ -88,7 +90,7 @@ class FactVerification:
         self.contradictions = contradictions or []
         self.temporal_check = temporal_check
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary"""
         result = {
             "claim": self.claim.to_dict(),
@@ -123,7 +125,7 @@ class FactVerifier:
         self.client = client
         self.source_matcher = AuthoritativeSourceMatcher(claude_client=client)
 
-    async def verify(self, response: str, skip_temporal_validation: bool = False) -> List[FactVerification]:
+    async def verify(self, response: str, skip_temporal_validation: bool = False) -> list[FactVerification]:
         """
         Complete fact verification pipeline
 
@@ -143,16 +145,34 @@ class FactVerifier:
         claims = await self._extract_claims(response)
         logger.info(f"Extracted {len(claims)} claims")
 
-        # Step 2: Verify each claim
-        verifications = []
-        for claim in claims:
-            verification = await self._verify_claim(claim, skip_temporal_validation=skip_temporal_validation)
-            verifications.append(verification)
+        # Step 2: Verify all claims in parallel (significant performance improvement)
+        verification_tasks = [
+            self._verify_claim(claim, skip_temporal_validation=skip_temporal_validation)
+            for claim in claims
+        ]
 
-        logger.info(f"Verified {len(verifications)} claims")
-        return verifications
+        verifications = await asyncio.gather(*verification_tasks, return_exceptions=True)
 
-    async def _extract_claims(self, response: str) -> List[Claim]:
+        # Handle any exceptions from parallel execution
+        verified_results = []
+        for i, result in enumerate(verifications):
+            if isinstance(result, Exception):
+                logger.error(f"Claim {i+1} verification failed: {result}")
+                # Create error verification result
+                verified_results.append(FactVerification(
+                    claim=claims[i],
+                    verdict="ERROR",
+                    confidence=0.0,
+                    reasoning=f"Verification failed: {str(result)}",
+                    sources_checked=[]
+                ))
+            else:
+                verified_results.append(result)
+
+        logger.info(f"Verified {len(verified_results)} claims in parallel")
+        return verified_results
+
+    async def _extract_claims(self, response: str) -> list[Claim]:
         """
         Extract claims from response using Claude
 
@@ -265,7 +285,7 @@ class FactVerifier:
                 claim=claim,
                 verdict="ERROR",
                 confidence=0.0,
-                reasoning=f"Verification failed: JSON parse error",
+                reasoning="Verification failed: JSON parse error",
                 caveats=[],
                 contradictions=[]
             )
@@ -293,7 +313,7 @@ class FactVerifier:
         text_lower = claim.text.lower()
         return any(keyword in text_lower for keyword in TIME_SENSITIVE_KEYWORDS)
 
-    async def _check_temporal_validity(self, claim: Claim, verification: FactVerification) -> Optional[Dict[str, Any]]:
+    async def _check_temporal_validity(self, claim: Claim, verification: FactVerification) -> dict[str, Any] | None:
         """
         Check if a verified fact is still current as of today using authoritative sources
 

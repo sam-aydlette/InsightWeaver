@@ -4,7 +4,8 @@ Detect framing, assumptions, omissions, and loaded language using Claude
 """
 import json
 import logging
-from typing import List, Dict, Any
+from typing import Any
+
 from ..context.claude_client import ClaudeClient
 from .trust_prompts import BIAS_FRAMING_PROMPT
 
@@ -35,7 +36,7 @@ class FramingIssue:
         self.effect = effect
         self.alternative = alternative
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary"""
         return {
             "frame_type": self.frame_type,
@@ -66,7 +67,7 @@ class Assumption:
         self.basis = basis
         self.impact = impact
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary"""
         return {
             "assumption": self.assumption,
@@ -96,7 +97,7 @@ class Omission:
         self.relevance = relevance
         self.suggestion = suggestion
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary"""
         return {
             "missing_perspective": self.missing_perspective,
@@ -126,7 +127,7 @@ class LoadedTerm:
         self.connotation = connotation
         self.neutral_alternative = neutral_alternative
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary"""
         return {
             "term": self.term,
@@ -140,10 +141,10 @@ class BiasAnalysis:
 
     def __init__(
         self,
-        framing_issues: List[FramingIssue],
-        assumptions: List[Assumption],
-        omissions: List[Omission],
-        loaded_terms: List[LoadedTerm]
+        framing_issues: list[FramingIssue],
+        assumptions: list[Assumption],
+        omissions: list[Omission],
+        loaded_terms: list[LoadedTerm]
     ):
         """
         Initialize bias analysis results
@@ -159,7 +160,7 @@ class BiasAnalysis:
         self.omissions = omissions
         self.loaded_terms = loaded_terms
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary"""
         return {
             "framing_issues": [f.to_dict() for f in self.framing_issues],

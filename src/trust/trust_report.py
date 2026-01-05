@@ -2,7 +2,7 @@
 Trust Report Formatting
 Format trust analysis results for terminal display and export
 """
-from typing import Dict, Any, Optional
+from typing import Any
 
 from .moderate_formatter import format_moderate_trust_summary
 
@@ -16,7 +16,7 @@ class TrustReportFormatter:
     """
 
     @staticmethod
-    def format_response_display(response: str, max_length: Optional[int] = None) -> str:
+    def format_response_display(response: str, max_length: int | None = None) -> str:
         """
         Format Claude response for terminal display
 
@@ -42,7 +42,7 @@ class TrustReportFormatter:
         return "\n".join(lines)
 
     @staticmethod
-    def format_trust_analysis(analysis: Dict[str, Any]) -> str:
+    def format_trust_analysis(analysis: dict[str, Any]) -> str:
         """
         Format trust analysis results
 
@@ -102,7 +102,7 @@ class TrustReportFormatter:
                     elif still_current is True:
                         lines.append(f"   ✓ TEMPORAL CHECK: Still current as of {checked_date}")
                     else:
-                        lines.append(f"   ⚠ TEMPORAL CHECK: Could not verify current status")
+                        lines.append("   ⚠ TEMPORAL CHECK: Could not verify current status")
 
                 # Show caveats if present
                 caveats = verification.get("caveats", [])
@@ -120,7 +120,7 @@ class TrustReportFormatter:
         if "bias" in analysis:
             bias = analysis["bias"]
             if not bias.get("analyzed", False):
-                lines.append(f"\n## BIAS ANALYSIS\n")
+                lines.append("\n## BIAS ANALYSIS\n")
                 lines.append(f"{bias.get('message', 'Not analyzed')}\n")
             else:
                 lines.append("\n## BIAS ANALYSIS\n")
@@ -175,7 +175,7 @@ class TrustReportFormatter:
         if "intimacy" in analysis:
             intimacy = analysis["intimacy"]
             if not intimacy.get("analyzed", False):
-                lines.append(f"\n## INTIMACY DETECTION\n")
+                lines.append("\n## INTIMACY DETECTION\n")
                 lines.append(f"{intimacy.get('message', 'Not analyzed')}\n")
             else:
                 lines.append("\n## INTIMACY DETECTION\n")
@@ -225,9 +225,9 @@ class TrustReportFormatter:
         return "\n".join(lines)
 
     @staticmethod
-    def format_compact_summary(analysis: Dict[str, Any]) -> str:
+    def format_compact_summary(analysis: dict[str, Any]) -> str:
         """
-        Format compact one-line trust summary
+        Format compact one-line trust summary with unverifiable fact details
 
         Stage 2B: Fact verification implemented
         Stage 2C-2E: Will add bias and intimacy
@@ -236,7 +236,7 @@ class TrustReportFormatter:
             analysis: Analysis results dictionary
 
         Returns:
-            One-line summary string
+            Summary string with unverifiable fact details
         """
         if not analysis.get("analyzed", False):
             return "Trust analysis not yet run"
@@ -325,13 +325,94 @@ class TrustReportFormatter:
             else:
                 parts.append("Tone: pending")
 
+        summary_lines = []
         if parts:
-            return " | ".join(parts)
+            summary_lines.append(" | ".join(parts))
         else:
-            return "No analysis results"
+            summary_lines.append("No analysis results")
+
+        # Add details for problematic facts (unverifiable, contradicted, outdated)
+        if "facts" in analysis and analysis["facts"]:
+            facts = analysis["facts"]
+
+            # Collect facts that need explanation
+            unverifiable_facts = []
+            contradicted_facts = []
+            outdated_facts = []
+
+            for v in facts.get("verifications", []):
+                verdict = v.get("verdict")
+                if verdict == "UNVERIFIABLE":
+                    unverifiable_facts.append(v)
+                elif verdict == "CONTRADICTED":
+                    contradicted_facts.append(v)
+                elif verdict == "OUTDATED":
+                    outdated_facts.append(v)
+
+            # Show unverifiable facts
+            if unverifiable_facts:
+                summary_lines.append("")
+                summary_lines.append("Unverifiable Facts:")
+                for i, verification in enumerate(unverifiable_facts, 1):
+                    claim_text = verification.get("claim", {}).get("text", "Unknown claim")
+                    reasoning = verification.get("reasoning", "No reason provided")
+
+                    # Truncate long claims for compact display
+                    if len(claim_text) > 80:
+                        claim_text = claim_text[:77] + "..."
+
+                    # Extract brief reason (first sentence or up to 100 chars)
+                    brief_reason = reasoning.split('.')[0]
+                    if len(brief_reason) > 100:
+                        brief_reason = brief_reason[:97] + "..."
+
+                    summary_lines.append(f"  {i}. {claim_text}")
+                    summary_lines.append(f"     Reason: {brief_reason}")
+
+            # Show contradicted facts
+            if contradicted_facts:
+                summary_lines.append("")
+                summary_lines.append("Contradicted Facts:")
+                for i, verification in enumerate(contradicted_facts, 1):
+                    claim_text = verification.get("claim", {}).get("text", "Unknown claim")
+                    reasoning = verification.get("reasoning", "No reason provided")
+
+                    # Truncate long claims for compact display
+                    if len(claim_text) > 80:
+                        claim_text = claim_text[:77] + "..."
+
+                    # Extract brief reason (first sentence or up to 100 chars)
+                    brief_reason = reasoning.split('.')[0]
+                    if len(brief_reason) > 100:
+                        brief_reason = brief_reason[:97] + "..."
+
+                    summary_lines.append(f"  {i}. {claim_text}")
+                    summary_lines.append(f"     Contradiction: {brief_reason}")
+
+            # Show outdated facts
+            if outdated_facts:
+                summary_lines.append("")
+                summary_lines.append("Outdated Facts:")
+                for i, verification in enumerate(outdated_facts, 1):
+                    claim_text = verification.get("claim", {}).get("text", "Unknown claim")
+                    reasoning = verification.get("reasoning", "No reason provided")
+
+                    # Truncate long claims for compact display
+                    if len(claim_text) > 80:
+                        claim_text = claim_text[:77] + "..."
+
+                    # Extract brief reason (first sentence or up to 100 chars)
+                    brief_reason = reasoning.split('.')[0]
+                    if len(brief_reason) > 100:
+                        brief_reason = brief_reason[:97] + "..."
+
+                    summary_lines.append(f"  {i}. {claim_text}")
+                    summary_lines.append(f"     Update: {brief_reason}")
+
+        return "\n".join(summary_lines)
 
     @staticmethod
-    def format_moderate_summary(analysis: Dict[str, Any]) -> str:
+    def format_moderate_summary(analysis: dict[str, Any]) -> str:
         """
         Format moderate-detail trust summary
 
@@ -353,7 +434,7 @@ class TrustReportFormatter:
         return "\n" + format_moderate_trust_summary(analysis) + "\n"
 
     @staticmethod
-    def export_to_json(result: Dict[str, Any]) -> str:
+    def export_to_json(result: dict[str, Any]) -> str:
         """
         Export full results to JSON format
 
@@ -367,7 +448,7 @@ class TrustReportFormatter:
         return json.dumps(result, indent=2, ensure_ascii=False)
 
     @staticmethod
-    def export_to_text(result: Dict[str, Any]) -> str:
+    def export_to_text(result: dict[str, Any]) -> str:
         """
         Export full results to detailed text format
 

@@ -5,11 +5,10 @@ Uses tag-based feed matching to user profiles
 """
 
 import logging
-from typing import List, Dict, Tuple, Optional
-from sqlalchemy.orm import Session
+
+from src.config.feed_matcher import FeedMatcher
 from src.database.connection import get_db
 from src.database.models import RSSFeed
-from src.config.feed_matcher import FeedMatcher
 from src.utils.profile_loader import UserProfile, get_user_profile
 
 logger = logging.getLogger(__name__)
@@ -17,7 +16,7 @@ logger = logging.getLogger(__name__)
 class FeedManager:
     """Manages RSS feed configuration and database operations with modular feed matching"""
 
-    def __init__(self, user_profile: Optional[UserProfile] = None):
+    def __init__(self, user_profile: UserProfile | None = None):
         """
         Initialize feed manager with user profile for personalized feed selection
 
@@ -28,7 +27,7 @@ class FeedManager:
         self.feed_matcher = FeedMatcher()
         self.configured_feeds = self.feed_matcher.match_feeds_to_profile(self.user_profile)
 
-    def load_feeds_to_database(self) -> Tuple[int, int, int]:
+    def load_feeds_to_database(self) -> tuple[int, int, int]:
         """
         Load all configured feeds into the database
         Returns: (added_count, updated_count, total_count)
@@ -66,7 +65,7 @@ class FeedManager:
         logger.info(f"Feed loading complete: {added_count} added, {updated_count} updated, {total_count} total active")
         return added_count, updated_count, total_count
 
-    def get_active_feeds(self) -> List[RSSFeed]:
+    def get_active_feeds(self) -> list[RSSFeed]:
         """Get all active feeds from database"""
         with get_db() as db:
             return db.query(RSSFeed).filter(RSSFeed.is_active == True).all()
@@ -91,7 +90,7 @@ class FeedManager:
 
         return deactivated_count
 
-    def get_feed_statistics(self) -> Dict:
+    def get_feed_statistics(self) -> dict:
         """Get statistics about feeds in the database and matcher"""
         with get_db() as db:
             total_feeds = db.query(RSSFeed).count()

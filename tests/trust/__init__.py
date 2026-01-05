@@ -1,0 +1,3 @@
+"""
+Trust module test suite
+"""

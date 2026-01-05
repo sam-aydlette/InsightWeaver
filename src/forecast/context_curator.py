@@ -6,13 +6,13 @@ Extends base ContextCurator with stratified historical sampling and external dat
 
 import logging
 from datetime import datetime, timedelta
-from typing import Dict, List, Any, Optional
+from typing import Any
+
 from sqlalchemy.orm import Session
 
 from ..context.curator import ContextCurator
 from ..database.connection import get_db
-from ..database.models import Article, APIDataPoint
-from ..utils.profile_loader import UserProfile
+from ..database.models import APIDataPoint, Article
 
 logger = logging.getLogger(__name__)
 
@@ -44,8 +44,8 @@ class ForecastContextCurator(ContextCurator):
     async def curate_for_horizon(
         self,
         horizon_months: int,
-        topic_filters: Optional[Dict] = None
-    ) -> Dict[str, Any]:
+        topic_filters: dict | None = None
+    ) -> dict[str, Any]:
         """
         Curate context for specific forecast horizon
 
@@ -101,7 +101,7 @@ class ForecastContextCurator(ContextCurator):
         session: Session,
         months: int,
         articles_per_month: int
-    ) -> List[Article]:
+    ) -> list[Article]:
         """
         Get articles evenly distributed across time period (stratified sampling)
 
@@ -146,7 +146,7 @@ class ForecastContextCurator(ContextCurator):
         self,
         session: Session,
         horizon_months: int
-    ) -> List[APIDataPoint]:
+    ) -> list[APIDataPoint]:
         """
         Get authoritative data from external sources for forecasting
 
@@ -183,7 +183,7 @@ class ForecastContextCurator(ContextCurator):
     def _get_forecast_memory(
         self,
         session: Session,
-        articles: List[Article]
+        articles: list[Article]
     ) -> str:
         """
         Get historical memory relevant to forecasting
@@ -224,7 +224,7 @@ class ForecastContextCurator(ContextCurator):
 
         return "\n\n".join(memory_parts)
 
-    def _format_authoritative_data(self, data_points: List[APIDataPoint]) -> str:
+    def _format_authoritative_data(self, data_points: list[APIDataPoint]) -> str:
         """
         Format authoritative data for context inclusion
 
@@ -308,7 +308,7 @@ Return structured JSON with all 5 analysis types as specified in the forecast en
 
         return instructions
 
-    def _enforce_forecast_token_budget(self, context: Dict[str, Any]) -> Dict[str, Any]:
+    def _enforce_forecast_token_budget(self, context: dict[str, Any]) -> dict[str, Any]:
         """
         Enforce forecast-specific token budget
 

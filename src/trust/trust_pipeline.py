@@ -2,15 +2,17 @@
 Trust Pipeline - Main Orchestrator
 Coordinates trust-enhanced queries and analysis
 """
+import asyncio
 import logging
-from typing import Optional, Dict, Any, List
+from typing import Any
+
 from ..context.claude_client import ClaudeClient
-from .trust_prompts import TRUST_ENHANCED_SYSTEM_PROMPT
-from .fact_verifier import FactVerifier, FactVerification, TIME_SENSITIVE_KEYWORDS
-from .bias_analyzer import BiasAnalyzer, BiasAnalysis
-from .intimacy_detector import IntimacyDetector, IntimacyAnalysis
-from .source_matcher import AuthoritativeSourceMatcher
 from ..utils.web_tools import web_fetch
+from .bias_analyzer import BiasAnalyzer
+from .fact_verifier import FactVerifier
+from .intimacy_detector import IntimacyDetector
+from .source_matcher import AuthoritativeSourceMatcher
+from .trust_prompts import TRUST_ENHANCED_SYSTEM_PROMPT
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +26,7 @@ class TrustPipeline:
     Stage 2B-2D: Will add fact verification, bias analysis, intimacy detection
     """
 
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, api_key: str | None = None):
         """
         Initialize trust pipeline
 
@@ -94,7 +96,7 @@ Please answer the user's query using the current verified information provided a
         check_bias: bool = True,
         check_intimacy: bool = True,
         skip_temporal_validation: bool = False
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Analyze Claude response for trust issues
 
@@ -114,46 +116,75 @@ Please answer the user's query using the current verified information provided a
         Returns:
             Dictionary with analysis results
         """
-        logger.info("Starting trust analysis")
+        logger.info("Starting trust analysis (parallel execution)")
 
         analysis = {
             "analyzed": True,
             "response_length": len(response)
         }
 
-        # Stage 2B: Fact Verification
+        # Queue all verification tasks for parallel execution
+        tasks = {}
+        task_keys = []
+
         if verify_facts:
-            logger.info("Running fact verification")
-            fact_results = await self.fact_verifier.verify(
+            logger.info("Queuing fact verification")
+            tasks['facts'] = self.fact_verifier.verify(
                 response,
                 skip_temporal_validation=skip_temporal_validation
             )
-            analysis["facts"] = {
-                "verifications": [v.to_dict() for v in fact_results],
-                "total_claims": len(fact_results),
-                "verified_count": sum(1 for v in fact_results if v.verdict == "VERIFIED"),
-                "uncertain_count": sum(1 for v in fact_results if v.verdict == "UNVERIFIABLE"),
-                "contradicted_count": sum(1 for v in fact_results if v.verdict == "CONTRADICTED"),
-                "error_count": sum(1 for v in fact_results if v.verdict == "ERROR")
-            }
+            task_keys.append('facts')
 
-        # Stage 2C: Bias Analysis
         if check_bias:
-            logger.info("Running bias analysis")
-            bias_results = await self.bias_analyzer.analyze(response)
-            analysis["bias"] = bias_results.to_dict()
-            analysis["bias"]["analyzed"] = True
+            logger.info("Queuing bias analysis")
+            tasks['bias'] = self.bias_analyzer.analyze(response)
+            task_keys.append('bias')
 
-        # Stage 2D: Intimacy Detection
         if check_intimacy:
-            logger.info("Running intimacy detection")
-            intimacy_results = await self.intimacy_detector.detect(response)
-            analysis["intimacy"] = intimacy_results.to_dict()
-            analysis["intimacy"]["analyzed"] = True
+            logger.info("Queuing intimacy detection")
+            tasks['intimacy'] = self.intimacy_detector.detect(response)
+            task_keys.append('intimacy')
+
+        # Execute all tasks concurrently
+        if tasks:
+            logger.info(f"Executing {len(tasks)} verification tasks in parallel")
+            results = await asyncio.gather(
+                *[tasks[key] for key in task_keys],
+                return_exceptions=True
+            )
+
+            # Map results back and handle individual task failures gracefully
+            for i, key in enumerate(task_keys):
+                result = results[i]
+
+                if isinstance(result, Exception):
+                    logger.error(f"Task '{key}' failed with error: {result}")
+                    analysis[key] = {
+                        "analyzed": False,
+                        "error": str(result)
+                    }
+                elif key == 'facts':
+                    fact_results = result
+                    analysis["facts"] = {
+                        "verifications": [v.to_dict() for v in fact_results],
+                        "total_claims": len(fact_results),
+                        "verified_count": sum(1 for v in fact_results if v.verdict == "VERIFIED"),
+                        "uncertain_count": sum(1 for v in fact_results if v.verdict == "UNVERIFIABLE"),
+                        "contradicted_count": sum(1 for v in fact_results if v.verdict == "CONTRADICTED"),
+                        "error_count": sum(1 for v in fact_results if v.verdict == "ERROR")
+                    }
+                elif key == 'bias':
+                    bias_results = result
+                    analysis["bias"] = bias_results.to_dict()
+                    analysis["bias"]["analyzed"] = True
+                elif key == 'intimacy':
+                    intimacy_results = result
+                    analysis["intimacy"] = intimacy_results.to_dict()
+                    analysis["intimacy"]["analyzed"] = True
 
         return analysis
 
-    async def _analyze_query_for_time_sensitivity(self, query: str) -> Optional[Dict[str, Any]]:
+    async def _analyze_query_for_time_sensitivity(self, query: str) -> dict[str, Any] | None:
         """
         Use Claude to intelligently analyze if query is time-sensitive
 
@@ -231,7 +262,7 @@ Respond with JSON:
             # Fail safe - don't fetch if we can't analyze
             return None
 
-    async def _fetch_current_facts_if_needed(self, query: str) -> Optional[str]:
+    async def _fetch_current_facts_if_needed(self, query: str) -> str | None:
         """
         Intelligently fetch current facts from authoritative sources if query is time-sensitive
 
@@ -305,7 +336,7 @@ Facts verified: {', '.join(facts_needed) if facts_needed else 'general current i
         check_bias: bool = True,
         check_intimacy: bool = True,
         temperature: float = 1.0
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Run complete trust pipeline: enhanced query + analysis
 

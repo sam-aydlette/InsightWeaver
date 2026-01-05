@@ -6,10 +6,7 @@ Implements fail-fast approach - requires actual user_profile.json to exist.
 """
 
 import json
-import os
 from pathlib import Path
-from typing import Dict, List, Optional, Set
-from datetime import datetime
 
 
 class ProfileValidationError(Exception):
@@ -36,7 +33,7 @@ class UserProfile:
         'content_preferences': {'excluded_topics'}
     }
 
-    def __init__(self, profile_path: Optional[str] = None):
+    def __init__(self, profile_path: str | None = None):
         """
         Initialize profile loader
 
@@ -49,9 +46,9 @@ class UserProfile:
             profile_path = project_root / "config" / "user_profile.json"
 
         self.profile_path = Path(profile_path)
-        self._profile_data: Optional[Dict] = None
+        self._profile_data: dict | None = None
 
-    def _validate_profile(self, profile_data: Dict) -> None:
+    def _validate_profile(self, profile_data: dict) -> None:
         """
         Validate that profile contains required sections and fields
 
@@ -77,7 +74,7 @@ class UserProfile:
                         f"Section '{section}' missing required fields: {', '.join(missing_fields)}"
                     )
 
-    def load_profile(self) -> Dict:
+    def load_profile(self) -> dict:
         """
         Load user profile from JSON file
 
@@ -96,7 +93,7 @@ class UserProfile:
                 f"See config/user_profile.example.json"
             )
 
-        with open(self.profile_path, 'r', encoding='utf-8') as f:
+        with open(self.profile_path, encoding='utf-8') as f:
             self._profile_data = json.load(f)
 
         # Validate profile structure
@@ -105,41 +102,41 @@ class UserProfile:
         return self._profile_data
 
     @property
-    def profile(self) -> Dict:
+    def profile(self) -> dict:
         """Get cached profile data, load if not already loaded"""
         if self._profile_data is None:
             self.load_profile()
         return self._profile_data
 
-    def get_geographic_context(self) -> Dict:
+    def get_geographic_context(self) -> dict:
         """Extract geographic context from profile"""
         return self.profile.get('geographic_context', {})
 
-    def get_professional_context(self) -> Dict:
+    def get_professional_context(self) -> dict:
         """Extract professional context from profile"""
         return self.profile.get('professional_context', {})
 
-    def get_civic_interests(self) -> Dict:
+    def get_civic_interests(self) -> dict:
         """Extract civic interests from profile"""
         return self.profile.get('civic_interests', {})
 
-    def get_personal_priorities(self) -> Dict:
+    def get_personal_priorities(self) -> dict:
         """Extract personal priorities from profile"""
         return self.profile.get('personal_priorities', {})
 
-    def get_content_preferences(self) -> Dict:
+    def get_content_preferences(self) -> dict:
         """Extract content preferences from profile"""
         return self.profile.get('content_preferences', {})
 
-    def get_excluded_topics(self) -> List[str]:
+    def get_excluded_topics(self) -> list[str]:
         """Get list of topics to exclude from analysis"""
         return self.get_content_preferences().get('excluded_topics', [])
 
-    def get_professional_domains(self) -> List[str]:
+    def get_professional_domains(self) -> list[str]:
         """Get list of professional domains for relevance scoring"""
         return self.get_professional_context().get('professional_domains', [])
 
-    def get_primary_location(self) -> Dict:
+    def get_primary_location(self) -> dict:
         """Get primary location (city, state, region)"""
         return self.get_geographic_context().get('primary_location', {})
 
@@ -195,7 +192,7 @@ Use this context to filter, prioritize, and frame all analysis through the user'
 
 
 # Singleton instance for easy access throughout the application
-_global_profile: Optional[UserProfile] = None
+_global_profile: UserProfile | None = None
 
 
 def get_user_profile() -> UserProfile:

@@ -4,9 +4,9 @@ Monitors job postings relevant to user's career decisions
 """
 
 import logging
-from datetime import datetime, timedelta
-from typing import List, Dict, Any, Optional
 import os
+from datetime import datetime
+from typing import Any
 
 from .base_collector import BaseCollector
 
@@ -30,10 +30,10 @@ class JobMarketCollector(BaseCollector):
 
     def __init__(
         self,
-        api_key: Optional[str] = None,
-        email: Optional[str] = None,
-        keywords: Optional[List[str]] = None,
-        location_codes: Optional[List[str]] = None
+        api_key: str | None = None,
+        email: str | None = None,
+        keywords: list[str] | None = None,
+        location_codes: list[str] | None = None
     ):
         """
         Initialize job market collector
@@ -62,7 +62,7 @@ class JobMarketCollector(BaseCollector):
         self.keywords = keywords or ['cybersecurity', 'information security', 'software engineer']
         self.location_codes = location_codes or ['Virginia']
 
-    def fetch_data(self) -> List[Dict[str, Any]]:
+    def fetch_data(self) -> list[dict[str, Any]]:
         """
         Fetch job postings from USAJobs
 
@@ -91,7 +91,7 @@ class JobMarketCollector(BaseCollector):
         logger.info(f"Total unique jobs after deduplication: {len(unique_jobs)}")
         return unique_jobs
 
-    def _fetch_usajobs(self, keyword: str) -> List[Dict[str, Any]]:
+    def _fetch_usajobs(self, keyword: str) -> list[dict[str, Any]]:
         """
         Fetch jobs from USAJobs API
 
@@ -142,7 +142,7 @@ class JobMarketCollector(BaseCollector):
             logger.error(f"Error fetching USAJobs for '{keyword}': {e}")
             return []
 
-    def parse_item(self, raw_item: Dict[str, Any]) -> Dict[str, Any]:
+    def parse_item(self, raw_item: dict[str, Any]) -> dict[str, Any]:
         """
         Parse raw job posting into standardized format
 
@@ -225,7 +225,7 @@ class ClearedJobsCollector(BaseCollector):
 
     CLEARANCE_JOBS_URL = "https://www.clearancejobs.com/jobs"
 
-    def __init__(self, keywords: List[str], location: str = "Virginia"):
+    def __init__(self, keywords: list[str], location: str = "Virginia"):
         super().__init__(
             source_name="ClearedJobs Scraper",
             source_type="job_market",
@@ -234,7 +234,7 @@ class ClearedJobsCollector(BaseCollector):
         self.keywords = keywords
         self.location = location
 
-    def fetch_data(self) -> List[Dict[str, Any]]:
+    def fetch_data(self) -> list[dict[str, Any]]:
         """
         Scrape job listings from ClearedJobs.net
 
@@ -244,7 +244,7 @@ class ClearedJobsCollector(BaseCollector):
         logger.warning("ClearedJobs scraping not yet implemented - requires HTML parsing")
         return []
 
-    def parse_item(self, raw_item: Dict[str, Any]) -> Dict[str, Any]:
+    def parse_item(self, raw_item: dict[str, Any]) -> dict[str, Any]:
         """Parse scraped job posting"""
         return {
             'data_type': 'job_posting',

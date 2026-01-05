@@ -3,18 +3,18 @@ Brief Command - Intelligence Brief Generation
 Preserves all existing InsightWeaver functionality
 """
 import asyncio
-import click
 import logging
 from datetime import datetime
 
-from ..pipeline.orchestrator import run_pipeline
-from ..feed_manager import setup_feeds
+import click
+
 from ..config.settings import settings
 from ..database.connection import create_tables
+from ..feed_manager import setup_feeds
+from ..pipeline.orchestrator import run_pipeline
+from .brief_formatter import BriefFormatter
 from .loading import loading
 from .output import get_output_manager, is_debug_mode
-from .brief_formatter import BriefFormatter
-from .brief_verifier import verify_brief_output, format_brief_trust_section
 
 logger = logging.getLogger(__name__)
 
@@ -184,13 +184,13 @@ async def run_full_pipeline():
             report_result = await newsletter_system.generate_report(hours=24, send_email=True)
 
             if report_result["success"]:
-                print(f"✅ Report generated successfully")
+                print("✅ Report generated successfully")
                 print(f"   • Articles analyzed: {report_result['articles_analyzed']}")
                 print(f"   • Report type: {report_result['report_type']}")
                 if report_result.get("local_saved"):
                     print(f"   • Saved to: {report_result['local_path']}")
                 if report_result.get("email_sent"):
-                    print(f"   • Email sent successfully")
+                    print("   • Email sent successfully")
 
             results["report_results"] = report_result
 
@@ -222,8 +222,8 @@ def setup_database():
 
 def query_priorities(min_score=0.5, limit=10):
     """Query and display prioritized articles"""
-    from ..database.models import Article
     from ..database.connection import get_db
+    from ..database.models import Article
 
     with get_db() as db:
         articles = db.query(Article).filter(
@@ -328,15 +328,26 @@ def brief_group(ctx, hours, email, no_verify, filter_cybersecurity, filter_ai, f
         # Run pipeline and generate report
         async def run_brief():
             # Step 1: Run pipeline (fetch, deduplicate, filter, synthesize)
-            pipeline_result = await run_pipeline(topic_filters=topic_filters)
+            # Pass hours parameter to ensure synthesis time window matches report window
+            # Invert no_verify flag to get verify_trust boolean
+            pipeline_result = await run_pipeline(
+                prioritize_hours=hours,
+                topic_filters=topic_filters,
+                verify_trust=not no_verify
+            )
 
             # Step 2: Generate report from synthesis
             from ..newsletter.newsletter_system import NewsletterSystem
             system = NewsletterSystem()
+
+            # Extract synthesis_id from pipeline to prevent duplicate synthesis generation
+            synthesis_id = pipeline_result.get('stages', {}).get('synthesis', {}).get('synthesis_id')
+
             report_result = await system.generate_report(
                 hours=hours,
                 send_email=email,
-                topic_filters=topic_filters
+                topic_filters=topic_filters,
+                synthesis_id=synthesis_id
             )
 
             return {
@@ -344,9 +355,8 @@ def brief_group(ctx, hours, email, no_verify, filter_cybersecurity, filter_ai, f
                 'report': report_result
             }
 
-        with loading(loading_msg, debug=debug):
-            with output_mgr.suppress_output():
-                result = asyncio.run(run_brief())
+        with loading(loading_msg, debug=debug), output_mgr.suppress_output():
+            result = asyncio.run(run_brief())
 
         # Display results
         if result:
@@ -374,20 +384,90 @@ def brief_group(ctx, hours, email, no_verify, filter_cybersecurity, filter_ai, f
                 click.echo("  • Run without filters to see all available content")
                 click.echo("=" * 80)
             elif report_result.get("success") and articles_analyzed > 0:
-                # Display formatted report
-                formatter = BriefFormatter()
-                formatted_report = formatter.format_report(report_result)
-                click.echo(formatted_report)
+                # Check trust verification status (verification already happened during synthesis)
+                trust_verification = report_result.get('trust_verification', {})
+                trust_passed = trust_verification.get('passed', True)  # Default to True for old syntheses
 
-                # Trust verification (unless --no-verify flag is set)
-                if not no_verify:
-                    executive_summary = report_result.get('executive_summary', '')
-                    if executive_summary:
-                        click.echo("\nVerifying AI output for trustworthiness...")
-                        trust_analysis = asyncio.run(verify_brief_output(executive_summary))
-                        trust_section = format_brief_trust_section(trust_analysis)
-                        if trust_section:
-                            click.echo(trust_section)
+                # If --no-verify flag is set, skip trust check and display anyway
+                if no_verify or trust_passed:
+                    # Display formatted report
+                    formatter = BriefFormatter()
+                    formatted_report = formatter.format_report(report_result)
+                    click.echo(formatted_report)
+
+                    # Show trust verification summary if available (but don't re-verify)
+                    if trust_verification and not no_verify:
+                        attempts = trust_verification.get('attempts', 1)
+                        if trust_passed:
+                            click.echo("\n" + "=" * 80)
+                            click.echo("TRUST VERIFICATION")
+                            click.echo("=" * 80)
+                            click.echo(f"✓ Synthesis verified trustworthy (attempts: {attempts})")
+                            click.echo("  • Factual accuracy: PASS")
+                            click.echo("  • Neutral framing: PASS")
+                            click.echo("  • Professional tone: PASS")
+                            click.echo("=" * 80)
+                else:
+                    # Trust verification failed - show failure report instead of brief
+                    click.echo("\n" + "!" * 80)
+                    click.echo("BRIEF GENERATION FAILED: TRUST VERIFICATION")
+                    click.echo("!" * 80)
+                    click.echo()
+                    click.echo("The AI-generated synthesis did not meet trust standards after 3 attempts.")
+                    click.echo()
+
+                    # Show what failed
+                    verification_history = trust_verification.get('verification_history', [])
+                    if verification_history:
+                        final_analysis = verification_history[-1].get('analysis', {})
+
+                        click.echo("VERIFICATION FAILURES:")
+                        click.echo("-" * 80)
+
+                        # Fact verification
+                        facts = final_analysis.get('facts', {})
+                        contradicted = facts.get('contradicted_count', 0)
+                        total_claims = facts.get('total_claims', 0)
+                        if total_claims > 0:
+                            contradicted_ratio = contradicted / total_claims
+                            status = "FAIL" if contradicted_ratio > 0.05 else "PASS"
+                            click.echo(f"• Factual Accuracy: {status}")
+                            click.echo(f"  - Contradicted claims: {contradicted}/{total_claims} ({contradicted_ratio:.1%})")
+                            click.echo("  - Threshold: Max 5%")
+                            if contradicted > 0:
+                                contradicted_claims = facts.get('contradicted', [])
+                                for claim in contradicted_claims[:3]:  # Show first 3
+                                    click.echo(f"    → {claim.get('claim', 'N/A')[:80]}...")
+
+                        # Bias check
+                        bias = final_analysis.get('bias', {})
+                        loaded_language = bias.get('loaded_language', [])
+                        status = "FAIL" if len(loaded_language) > 3 else "PASS"
+                        click.echo(f"\n• Neutral Framing: {status}")
+                        click.echo(f"  - Loaded language instances: {len(loaded_language)}")
+                        click.echo("  - Threshold: Max 3")
+                        if loaded_language:
+                            for item in loaded_language[:3]:  # Show first 3
+                                click.echo(f"    → \"{item.get('term', 'N/A')}\" - {item.get('issue', 'N/A')[:60]}")
+
+                        # Intimacy/tone check
+                        intimacy = final_analysis.get('intimacy', {})
+                        high_issues = [i for i in intimacy.get('issues', []) if i.get('severity') == 'HIGH']
+                        status = "FAIL" if len(high_issues) > 0 else "PASS"
+                        click.echo(f"\n• Professional Tone: {status}")
+                        click.echo(f"  - High-severity intimacy issues: {len(high_issues)}")
+                        click.echo("  - Threshold: 0 allowed")
+                        if high_issues:
+                            for issue in high_issues[:3]:  # Show first 3
+                                click.echo(f"    → {issue.get('issue_type', 'N/A')}: {issue.get('explanation', 'N/A')[:60]}")
+
+                    click.echo()
+                    click.echo("NEXT STEPS:")
+                    click.echo("  • The system attempted 3 times with progressively stricter prompts")
+                    click.echo("  • No brief was generated to prevent showing unverified information")
+                    click.echo("  • Try running again - may succeed on next attempt")
+                    click.echo("  • Or use --no-verify to generate brief without verification")
+                    click.echo("!" * 80)
 
             # Display summary footer
             click.echo("\n" + "=" * 80)
@@ -402,10 +482,16 @@ def brief_group(ctx, hours, email, no_verify, filter_cybersecurity, filter_ai, f
                 if report_result.get("local_saved"):
                     click.echo(f"Saved to: {report_result.get('local_path', 'unknown')}")
                 if report_result.get("email_sent"):
-                    click.echo(f"Email sent successfully")
+                    click.echo("Email sent successfully")
 
             click.echo(f"Duration: {pipeline_summary.get('duration_seconds', 0):.1f}s")
             click.echo("=" * 80)
+
+            # Print profiling report in debug mode
+            if debug:
+                from ..utils.profiler import get_profiler
+                profiler = get_profiler()
+                profiler.print_summary()
 
 
 # ============================================================================
@@ -424,9 +510,8 @@ def fetch_cmd():
     debug = is_debug_mode()
     output_mgr = get_output_manager()
 
-    with loading("Fetching RSS feeds", debug=debug):
-        with output_mgr.suppress_output():
-            result = asyncio.run(run_fetch_only())
+    with loading("Fetching RSS feeds", debug=debug), output_mgr.suppress_output():
+        result = asyncio.run(run_fetch_only())
 
     if result:
         click.echo(f"\n✓ Fetched {result['total_articles']} articles from {result['successful_feeds']}/{result['total_feeds']} feeds")
@@ -441,16 +526,15 @@ def collect_cmd(force, name):
     output_mgr = get_output_manager()
 
     message = f"Running collector: {name}" if name else "Running data collectors"
-    with loading(message, debug=debug):
-        with output_mgr.suppress_output():
-            result = asyncio.run(run_collectors(force=force, collector_name=name))
+    with loading(message, debug=debug), output_mgr.suppress_output():
+        result = asyncio.run(run_collectors(force=force, collector_name=name))
 
     if result and not debug:
         if name:
             click.echo(f"\n✓ Collector '{name}' completed")
             click.echo(f"  • New items: {result.get('new_items', 0)}")
         else:
-            click.echo(f"\n✓ Data collection completed")
+            click.echo("\n✓ Data collection completed")
             click.echo(f"  • Collectors run: {result.get('collectors_run', 0)}")
             click.echo(f"  • Total items collected: {result.get('total_items_collected', 0)}")
 
@@ -468,7 +552,10 @@ def prioritize_cmd():
         print("⚠️  Warning: ANTHROPIC_API_KEY not configured")
         print("Analysis requires Claude API access")
         raise click.Abort()
-    asyncio.run(run_analysis_only())
+
+    debug = is_debug_mode()
+    with loading("Running prioritization", debug=debug):
+        asyncio.run(run_analysis_only())
 
 
 @brief_group.command(name="trends")
@@ -478,13 +565,18 @@ def trends_cmd():
         print("⚠️  Warning: ANTHROPIC_API_KEY not configured")
         print("Analysis requires Claude API access")
         raise click.Abort()
-    asyncio.run(run_analysis_only())
+
+    debug = is_debug_mode()
+    with loading("Running trend analysis", debug=debug):
+        asyncio.run(run_analysis_only())
 
 
 @brief_group.command(name="test-newsletter")
 def test_newsletter_cmd():
     """Test reporting system configuration"""
-    asyncio.run(test_newsletter())
+    debug = is_debug_mode()
+    with loading("Testing newsletter system", debug=debug):
+        asyncio.run(test_newsletter())
 
 
 @brief_group.command(name="query")
@@ -510,11 +602,11 @@ def cleanup_cmd(dry_run):
 
     results = cleanup_old_data(dry_run=dry_run)
 
-    print(f"\n📅 Retention Policies:")
+    print("\n📅 Retention Policies:")
     print(f"  • Articles: {settings.retention_articles_days} days")
     print(f"  • Syntheses: {settings.retention_syntheses_days} days")
 
-    print(f"\n🗑️  Cleanup Results:")
+    print("\n🗑️  Cleanup Results:")
     articles_deleted = results['articles'].get('deleted', 0)
     syntheses_deleted = results['syntheses'].get('deleted', 0)
 
@@ -522,13 +614,13 @@ def cleanup_cmd(dry_run):
         cutoff = results['articles'].get('cutoff_date', 'N/A')
         print(f"  • Articles: {articles_deleted} {'would be' if dry_run else ''} deleted (older than {cutoff[:10]})")
     else:
-        print(f"  • Articles: No articles to delete")
+        print("  • Articles: No articles to delete")
 
     if syntheses_deleted > 0:
         cutoff = results['syntheses'].get('cutoff_date', 'N/A')
         print(f"  • Syntheses: {syntheses_deleted} {'would be' if dry_run else ''} deleted (older than {cutoff[:10]})")
     else:
-        print(f"  • Syntheses: No syntheses to delete")
+        print("  • Syntheses: No syntheses to delete")
 
     if dry_run:
         print(f"\n💾 Estimated space to be freed: ~{results['total_freed_mb']} MB")
@@ -553,7 +645,7 @@ def retention_status_cmd():
     print("\n📋 Retention Policies:")
     print(f"  • Articles: {status['retention_policies']['articles_days']} days")
     print(f"  • Syntheses: {status['retention_policies']['syntheses_days']} days")
-    print(f"  • Semantic Facts: Type-based (60-365 days)")
+    print("  • Semantic Facts: Type-based (60-365 days)")
 
     print("\n📊 Current Data:")
     articles = status['current_data']['articles']
@@ -565,7 +657,7 @@ def retention_status_cmd():
     if articles['pending_deletion'] > 0:
         print(f"    • ⚠️  Pending deletion: {articles['pending_deletion']}")
     else:
-        print(f"    • ✓ No articles pending deletion")
+        print("    • ✓ No articles pending deletion")
 
     syntheses = status['current_data']['syntheses']
     print(f"\n  Syntheses ({syntheses['total']} total):")
@@ -576,7 +668,7 @@ def retention_status_cmd():
     if syntheses['pending_deletion'] > 0:
         print(f"    • ⚠️  Pending deletion: {syntheses['pending_deletion']}")
     else:
-        print(f"    • ✓ No syntheses pending deletion")
+        print("    • ✓ No syntheses pending deletion")
 
     print("\n" + "=" * 70)
 
@@ -605,7 +697,7 @@ def health_cmd():
 
     # Database
     db = health["metrics"]["database"]
-    print(f"\n📊 Database:")
+    print("\n📊 Database:")
     print(f"  • Size: {db['size_mb']} MB")
     print(f"  • Articles: {db['total_articles']:,}")
     print(f"  • Syntheses: {db['total_syntheses']}")
@@ -636,7 +728,7 @@ def health_cmd():
 
     # Memory
     memory = health["metrics"]["memory"]
-    print(f"\n💾 Semantic Memory:")
+    print("\n💾 Semantic Memory:")
     print(f"  • Total facts: {memory['total_facts']}")
     print(f"  • Active: {memory['active_facts']}")
     print(f"  • Expired: {memory['expired_facts']}")
@@ -681,14 +773,14 @@ def metrics_cmd(days):
     print("=" * 70)
     print(f"\nPeriod: {metrics['start_date']} to {metrics['end_date']}")
 
-    print(f"\n📰 Article Collection:")
+    print("\n📰 Article Collection:")
     print(f"  • Total collected: {metrics.get('articles_collected', 0):,}")
     print(f"  • Per day: {metrics.get('articles_per_day', 0)}")
 
-    print(f"\n🧠 Synthesis Generation:")
+    print("\n🧠 Synthesis Generation:")
     print(f"  • Total syntheses: {metrics.get('syntheses_generated', 0)}")
 
-    print(f"\n💾 Semantic Memory:")
+    print("\n💾 Semantic Memory:")
     print(f"  • Facts created: {metrics.get('facts_created', 0)}")
 
     print("\n" + "=" * 70)

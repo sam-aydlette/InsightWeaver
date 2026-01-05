@@ -4,7 +4,7 @@ Verifies AI-generated forecast outputs for trustworthiness
 """
 
 import logging
-from typing import Optional, Dict, Any, List
+from typing import Any
 
 from ..trust.trust_pipeline import TrustPipeline
 from ..trust.trust_report import TrustReportFormatter
@@ -12,7 +12,7 @@ from ..trust.trust_report import TrustReportFormatter
 logger = logging.getLogger(__name__)
 
 
-async def verify_forecast_horizon(horizon_text: str, horizon_name: str) -> Optional[Dict[str, Any]]:
+async def verify_forecast_horizon(horizon_text: str, horizon_name: str) -> dict[str, Any] | None:
     """
     Verify a single forecast horizon output
 
@@ -50,7 +50,7 @@ async def verify_forecast_horizon(horizon_text: str, horizon_name: str) -> Optio
         }
 
 
-async def verify_forecast_aggregate(executive_text: str) -> Optional[Dict[str, Any]]:
+async def verify_forecast_aggregate(executive_text: str) -> dict[str, Any] | None:
     """
     Verify aggregate executive forecast summary
 
@@ -88,8 +88,8 @@ async def verify_forecast_aggregate(executive_text: str) -> Optional[Dict[str, A
 
 
 def format_forecast_trust_section(
-    analysis: Optional[Dict[str, Any]],
-    horizon_name: Optional[str] = None
+    analysis: dict[str, Any] | None,
+    horizon_name: str | None = None
 ) -> str:
     """
     Format trust analysis for display in forecast output

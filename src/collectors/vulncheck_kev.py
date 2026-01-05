@@ -4,9 +4,9 @@ Collects Known Exploited Vulnerabilities from VulnCheck's free community API
 """
 
 import logging
-from datetime import datetime, timedelta
-from typing import List, Dict, Any, Optional
 import os
+from datetime import UTC, datetime
+from typing import Any
 
 from .base_collector import BaseCollector
 
@@ -25,7 +25,7 @@ class VulnCheckKEVCollector(BaseCollector):
 
     VULNCHECK_KEV_URL = "https://api.vulncheck.com/v3/backup/vulncheck-kev"
 
-    def __init__(self, api_token: Optional[str] = None):
+    def __init__(self, api_token: str | None = None):
         """
         Initialize VulnCheck KEV collector
 
@@ -41,7 +41,7 @@ class VulnCheckKEVCollector(BaseCollector):
             api_key=self.api_token
         )
 
-    def fetch_data(self) -> List[Dict[str, Any]]:
+    def fetch_data(self) -> list[dict[str, Any]]:
         """
         Fetch KEV data from VulnCheck API
 
@@ -78,7 +78,7 @@ class VulnCheckKEVCollector(BaseCollector):
             logger.error(f"Error fetching VulnCheck KEV data: {e}")
             return []
 
-    def parse_item(self, raw_item: Dict[str, Any]) -> Dict[str, Any]:
+    def parse_item(self, raw_item: dict[str, Any]) -> dict[str, Any]:
         """
         Parse raw KEV entry into standardized format
 
@@ -158,9 +158,9 @@ class VulnCheckKEVCollector(BaseCollector):
 
     def score_relevance(
         self,
-        item: Dict[str, Any],
-        decision_context: Optional[Dict] = None
-    ) -> tuple[float, List[str]]:
+        item: dict[str, Any],
+        decision_context: dict | None = None
+    ) -> tuple[float, list[str]]:
         """
         Score KEV relevance - cybersecurity vulnerabilities are always relevant
         but prioritize based on recency and exploit availability
@@ -181,8 +181,7 @@ class VulnCheckKEVCollector(BaseCollector):
             event_date = item['event_date']
             # Ensure both datetimes are timezone-aware or both are naive
             if event_date.tzinfo is not None:
-                from datetime import timezone
-                now = datetime.now(timezone.utc)
+                now = datetime.now(UTC)
             else:
                 now = datetime.utcnow()
 
