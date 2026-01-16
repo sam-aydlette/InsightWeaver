@@ -68,7 +68,7 @@ However, using InsightWeaver involves external data flows:
 - **Fact-checking sources**: Government and institutional sites log verification requests
 - **Email (optional)**: If configured, full reports pass through your email provider
 
-Your data is not sold, but it does leave your machine for analysis.
+This approach reduces data exhaust, although it doesn't completely prevent it.
 
 ---
 
