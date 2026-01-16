@@ -19,11 +19,11 @@ class EmailSender:
     """Handles email delivery for InsightWeaver newsletters"""
 
     def __init__(self):
-        self.smtp_server = os.getenv('SMTP_SERVER', 'smtp.gmail.com')
-        self.smtp_port = int(os.getenv('SMTP_PORT', '587'))
-        self.email_username = os.getenv('EMAIL_USERNAME')
-        self.email_password = os.getenv('EMAIL_PASSWORD')
-        self.from_email = os.getenv('FROM_EMAIL')
+        self.smtp_server = os.getenv("SMTP_SERVER", "smtp.gmail.com")
+        self.smtp_port = int(os.getenv("SMTP_PORT", "587"))
+        self.email_username = os.getenv("EMAIL_USERNAME")
+        self.email_password = os.getenv("EMAIL_PASSWORD")
+        self.from_email = os.getenv("FROM_EMAIL")
 
         if not all([self.email_username, self.email_password, self.from_email]):
             print("⚠️ Email credentials not configured. Newsletter will be saved locally only.")
@@ -40,13 +40,17 @@ class EmailSender:
             html_content = PersonalizedNarrativeTemplate.generate_html(content_data)
 
             # Simple text version (extract bottom line summary)
-            synthesis = content_data.get('synthesis_data', {})
-            bottom_line = synthesis.get('bottom_line', {})
-            text_content = bottom_line.get('summary', 'Please view the HTML version for full formatting.')
+            synthesis = content_data.get("synthesis_data", {})
+            bottom_line = synthesis.get("bottom_line", {})
+            text_content = bottom_line.get(
+                "summary", "Please view the HTML version for full formatting."
+            )
 
             # Format subject based on report type
-            if 'date' in content_data:
-                subject = f"InsightWeaver Daily Brief - {content_data['date'].strftime('%B %d, %Y')}"
+            if "date" in content_data:
+                subject = (
+                    f"InsightWeaver Daily Brief - {content_data['date'].strftime('%B %d, %Y')}"
+                )
             else:
                 date_range = f"{content_data['start_date'].strftime('%b %d')} - {content_data['end_date'].strftime('%b %d, %Y')}"
                 subject = f"InsightWeaver Intelligence Report - {date_range}"
@@ -56,7 +60,7 @@ class EmailSender:
                 recipient_email=recipient_email,
                 subject=subject,
                 html_content=html_content,
-                text_content=text_content
+                text_content=text_content,
             )
 
             if success:
@@ -69,7 +73,9 @@ class EmailSender:
 
         except Exception as e:
             print(f"❌ Failed to send daily brief: {e}")
-            self._save_newsletter_locally(content_data, "daily", PersonalizedNarrativeTemplate.generate_html(content_data))
+            self._save_newsletter_locally(
+                content_data, "daily", PersonalizedNarrativeTemplate.generate_html(content_data)
+            )
             return False
 
     async def send_weekly_trends(self, content_data: dict[str, Any], recipient_email: str) -> bool:
@@ -84,7 +90,7 @@ class EmailSender:
             subject = f"InsightWeaver Weekly Trends - {date_range}"
 
             # Simple text version
-            synthesis = content_data.get('synthesis_data', {})
+            synthesis = content_data.get("synthesis_data", {})
             text_content = f"Weekly trend analysis: {date_range}\n\n{synthesis.get('executive_summary', 'Please view the HTML version for full formatting.')}"
 
             # Send email
@@ -92,7 +98,7 @@ class EmailSender:
                 recipient_email=recipient_email,
                 subject=subject,
                 html_content=html_content,
-                text_content=text_content
+                text_content=text_content,
             )
 
             if success:
@@ -105,11 +111,14 @@ class EmailSender:
 
         except Exception as e:
             print(f"❌ Failed to send weekly trends: {e}")
-            self._save_newsletter_locally(content_data, "weekly", PersonalizedNarrativeTemplate.generate_html(content_data))
+            self._save_newsletter_locally(
+                content_data, "weekly", PersonalizedNarrativeTemplate.generate_html(content_data)
+            )
             return False
 
-    async def _send_email(self, recipient_email: str, subject: str,
-                         html_content: str, text_content: str) -> bool:
+    async def _send_email(
+        self, recipient_email: str, subject: str, html_content: str, text_content: str
+    ) -> bool:
         """Send email using SMTP"""
         if not self.email_enabled:
             print("📧 Email not configured, saving locally instead")
@@ -149,7 +158,9 @@ class EmailSender:
             print(f"❌ Email sending failed: {e}")
             return False
 
-    def _save_newsletter_locally(self, content_data: dict[str, Any], newsletter_type: str, html_content: str):
+    def _save_newsletter_locally(
+        self, content_data: dict[str, Any], newsletter_type: str, html_content: str
+    ):
         """Save newsletter to local file as fallback"""
         try:
             # Create newsletters directory
@@ -157,16 +168,16 @@ class EmailSender:
             newsletters_dir.mkdir(parents=True, exist_ok=True)
 
             if newsletter_type == "daily":
-                date_str = content_data['date'].strftime('%Y-%m-%d')
+                date_str = content_data["date"].strftime("%Y-%m-%d")
                 filename = f"daily_brief_{date_str}.html"
             else:
-                start_str = content_data['start_date'].strftime('%Y-%m-%d')
-                end_str = content_data['end_date'].strftime('%Y-%m-%d')
+                start_str = content_data["start_date"].strftime("%Y-%m-%d")
+                end_str = content_data["end_date"].strftime("%Y-%m-%d")
                 filename = f"weekly_trends_{start_str}_to_{end_str}.html"
 
             filepath = newsletters_dir / filename
 
-            with open(filepath, 'w', encoding='utf-8') as f:
+            with open(filepath, "w", encoding="utf-8") as f:
                 f.write(html_content)
 
             print(f"💾 Newsletter saved locally: {filepath}")
@@ -187,13 +198,13 @@ class EmailSender:
             <p>Email configuration is working correctly!</p>
             <hr>
             <small>Generated at {}</small>
-            """.format(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+            """.format(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
             success = await self._send_email(
                 recipient_email=recipient_email,
                 subject="InsightWeaver Email Test",
                 html_content=test_content,
-                text_content="InsightWeaver email test - configuration working!"
+                text_content="InsightWeaver email test - configuration working!",
             )
 
             if success:
@@ -213,10 +224,11 @@ class NewsletterScheduler:
 
     def __init__(self, email_sender: EmailSender | None = None):
         self.email_sender = email_sender or EmailSender()
-        self.default_recipient = os.getenv('RECIPIENT_EMAIL')
+        self.default_recipient = os.getenv("RECIPIENT_EMAIL")
 
-    async def send_daily_briefing(self, date: datetime | None = None,
-                                recipient: str | None = None) -> bool:
+    async def send_daily_briefing(
+        self, date: datetime | None = None, recipient: str | None = None
+    ) -> bool:
         """Send daily briefing for specified date"""
         from .content_engine import NewsletterContentEngine
 
@@ -243,8 +255,9 @@ class NewsletterScheduler:
             print(f"❌ Daily briefing failed: {e}")
             return False
 
-    async def send_weekly_analysis(self, end_date: datetime | None = None,
-                                 recipient: str | None = None) -> bool:
+    async def send_weekly_analysis(
+        self, end_date: datetime | None = None, recipient: str | None = None
+    ) -> bool:
         """Send weekly trend analysis"""
         from .content_engine import NewsletterContentEngine
 
@@ -288,5 +301,7 @@ class NewsletterScheduler:
             "smtp_port": self.email_sender.smtp_port,
             "from_email": self.email_sender.from_email,
             "default_recipient": self.default_recipient,
-            "credentials_configured": bool(self.email_sender.email_username and self.email_sender.email_password)
+            "credentials_configured": bool(
+                self.email_sender.email_username and self.email_sender.email_password
+            ),
         }

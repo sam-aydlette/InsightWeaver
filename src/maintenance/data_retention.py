@@ -42,7 +42,7 @@ class DataRetentionManager:
             "started_at": datetime.utcnow().isoformat(),
             "articles": {},
             "syntheses": {},
-            "total_freed_mb": 0
+            "total_freed_mb": 0,
         }
 
         with get_db() as session:
@@ -53,14 +53,10 @@ class DataRetentionManager:
             results["syntheses"] = self._cleanup_old_syntheses(session, dry_run)
 
             # Estimate space freed (rough approximation)
-            total_deleted = (
-                results["articles"].get("deleted", 0) +
-                results["syntheses"].get("deleted", 0)
-            )
             # Rough estimate: 10 KB per article, 50 KB per synthesis
             estimated_kb = (
-                results["articles"].get("deleted", 0) * 10 +
-                results["syntheses"].get("deleted", 0) * 50
+                results["articles"].get("deleted", 0) * 10
+                + results["syntheses"].get("deleted", 0) * 50
             )
             results["total_freed_mb"] = round(estimated_kb / 1024, 2)
 
@@ -101,9 +97,7 @@ class DataRetentionManager:
         cutoff_date = datetime.utcnow() - timedelta(days=self.retention_articles)
 
         # Find old articles
-        old_articles = session.query(Article).filter(
-            Article.fetched_at < cutoff_date
-        ).all()
+        old_articles = session.query(Article).filter(Article.fetched_at < cutoff_date).all()
 
         count = len(old_articles)
 
@@ -112,9 +106,12 @@ class DataRetentionManager:
             return {"deleted": 0, "oldest_kept": None}
 
         # Find oldest article we're keeping
-        oldest_kept = session.query(Article).filter(
-            Article.fetched_at >= cutoff_date
-        ).order_by(Article.fetched_at.asc()).first()
+        oldest_kept = (
+            session.query(Article)
+            .filter(Article.fetched_at >= cutoff_date)
+            .order_by(Article.fetched_at.asc())
+            .first()
+        )
 
         oldest_kept_date = oldest_kept.fetched_at if oldest_kept else None
 
@@ -125,25 +122,23 @@ class DataRetentionManager:
             return {
                 "deleted": count,
                 "cutoff_date": cutoff_date.isoformat(),
-                "oldest_kept": oldest_kept_date.isoformat() if oldest_kept_date else None
+                "oldest_kept": oldest_kept_date.isoformat() if oldest_kept_date else None,
             }
 
         # Actually delete
         try:
-            session.query(Article).filter(
-                Article.fetched_at < cutoff_date
-            ).delete(synchronize_session=False)
+            session.query(Article).filter(Article.fetched_at < cutoff_date).delete(
+                synchronize_session=False
+            )
 
             session.commit()
 
-            logger.info(
-                f"Deleted {count} articles older than {cutoff_date.strftime('%Y-%m-%d')}"
-            )
+            logger.info(f"Deleted {count} articles older than {cutoff_date.strftime('%Y-%m-%d')}")
 
             return {
                 "deleted": count,
                 "cutoff_date": cutoff_date.isoformat(),
-                "oldest_kept": oldest_kept_date.isoformat() if oldest_kept_date else None
+                "oldest_kept": oldest_kept_date.isoformat() if oldest_kept_date else None,
             }
 
         except Exception as e:
@@ -170,9 +165,11 @@ class DataRetentionManager:
         cutoff_date = datetime.utcnow() - timedelta(days=self.retention_syntheses)
 
         # Find old syntheses
-        old_syntheses = session.query(NarrativeSynthesis).filter(
-            NarrativeSynthesis.generated_at < cutoff_date
-        ).all()
+        old_syntheses = (
+            session.query(NarrativeSynthesis)
+            .filter(NarrativeSynthesis.generated_at < cutoff_date)
+            .all()
+        )
 
         count = len(old_syntheses)
 
@@ -181,9 +178,12 @@ class DataRetentionManager:
             return {"deleted": 0, "oldest_kept": None}
 
         # Find oldest synthesis we're keeping
-        oldest_kept = session.query(NarrativeSynthesis).filter(
-            NarrativeSynthesis.generated_at >= cutoff_date
-        ).order_by(NarrativeSynthesis.generated_at.asc()).first()
+        oldest_kept = (
+            session.query(NarrativeSynthesis)
+            .filter(NarrativeSynthesis.generated_at >= cutoff_date)
+            .order_by(NarrativeSynthesis.generated_at.asc())
+            .first()
+        )
 
         oldest_kept_date = oldest_kept.generated_at if oldest_kept else None
 
@@ -194,7 +194,7 @@ class DataRetentionManager:
             return {
                 "deleted": count,
                 "cutoff_date": cutoff_date.isoformat(),
-                "oldest_kept": oldest_kept_date.isoformat() if oldest_kept_date else None
+                "oldest_kept": oldest_kept_date.isoformat() if oldest_kept_date else None,
             }
 
         # Actually delete
@@ -205,14 +205,12 @@ class DataRetentionManager:
 
             session.commit()
 
-            logger.info(
-                f"Deleted {count} syntheses older than {cutoff_date.strftime('%Y-%m-%d')}"
-            )
+            logger.info(f"Deleted {count} syntheses older than {cutoff_date.strftime('%Y-%m-%d')}")
 
             return {
                 "deleted": count,
                 "cutoff_date": cutoff_date.isoformat(),
-                "oldest_kept": oldest_kept_date.isoformat() if oldest_kept_date else None
+                "oldest_kept": oldest_kept_date.isoformat() if oldest_kept_date else None,
             }
 
         except Exception as e:
@@ -230,12 +228,8 @@ class DataRetentionManager:
         with get_db() as session:
             # Count articles
             total_articles = session.query(Article).count()
-            oldest_article = session.query(Article).order_by(
-                Article.fetched_at.asc()
-            ).first()
-            newest_article = session.query(Article).order_by(
-                Article.fetched_at.desc()
-            ).first()
+            oldest_article = session.query(Article).order_by(Article.fetched_at.asc()).first()
+            newest_article = session.query(Article).order_by(Article.fetched_at.desc()).first()
 
             # Extract article timestamps while session is active
             oldest_article_date = oldest_article.fetched_at.isoformat() if oldest_article else None
@@ -243,28 +237,38 @@ class DataRetentionManager:
 
             # Count syntheses
             total_syntheses = session.query(NarrativeSynthesis).count()
-            oldest_synthesis = session.query(NarrativeSynthesis).order_by(
-                NarrativeSynthesis.generated_at.asc()
-            ).first()
-            newest_synthesis = session.query(NarrativeSynthesis).order_by(
-                NarrativeSynthesis.generated_at.desc()
-            ).first()
+            oldest_synthesis = (
+                session.query(NarrativeSynthesis)
+                .order_by(NarrativeSynthesis.generated_at.asc())
+                .first()
+            )
+            newest_synthesis = (
+                session.query(NarrativeSynthesis)
+                .order_by(NarrativeSynthesis.generated_at.desc())
+                .first()
+            )
 
             # Extract synthesis timestamps while session is active
-            oldest_synthesis_date = oldest_synthesis.generated_at.isoformat() if oldest_synthesis else None
-            newest_synthesis_date = newest_synthesis.generated_at.isoformat() if newest_synthesis else None
+            oldest_synthesis_date = (
+                oldest_synthesis.generated_at.isoformat() if oldest_synthesis else None
+            )
+            newest_synthesis_date = (
+                newest_synthesis.generated_at.isoformat() if newest_synthesis else None
+            )
 
             # Calculate what would be deleted
             article_cutoff = datetime.utcnow() - timedelta(days=self.retention_articles)
             synthesis_cutoff = datetime.utcnow() - timedelta(days=self.retention_syntheses)
 
-            articles_to_delete = session.query(Article).filter(
-                Article.fetched_at < article_cutoff
-            ).count()
+            articles_to_delete = (
+                session.query(Article).filter(Article.fetched_at < article_cutoff).count()
+            )
 
-            syntheses_to_delete = session.query(NarrativeSynthesis).filter(
-                NarrativeSynthesis.generated_at < synthesis_cutoff
-            ).count()
+            syntheses_to_delete = (
+                session.query(NarrativeSynthesis)
+                .filter(NarrativeSynthesis.generated_at < synthesis_cutoff)
+                .count()
+            )
 
         return {
             "retention_policies": {
@@ -276,15 +280,15 @@ class DataRetentionManager:
                     "total": total_articles,
                     "oldest": oldest_article_date,
                     "newest": newest_article_date,
-                    "pending_deletion": articles_to_delete
+                    "pending_deletion": articles_to_delete,
                 },
                 "syntheses": {
                     "total": total_syntheses,
                     "oldest": oldest_synthesis_date,
                     "newest": newest_synthesis_date,
-                    "pending_deletion": syntheses_to_delete
-                }
-            }
+                    "pending_deletion": syntheses_to_delete,
+                },
+            },
         }
 
 

@@ -29,11 +29,12 @@ enhanced_briefing_*.html
 cyber_*.html
 forecast_*.html
 
-# Reports directory (but keep directory structure)
-/reports/*.html
-/reports/*.json
-/reports/*.txt
-/reports/*.csv
+# Reports directory (but keep directory structure via .gitkeep)
+/reports/**/*.html
+/reports/**/*.json
+/reports/**/*.txt
+/reports/**/*.csv
+!/reports/**/.gitkeep
 
 # Logs
 src/logs/*.log

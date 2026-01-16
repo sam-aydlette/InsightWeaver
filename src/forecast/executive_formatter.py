@@ -29,9 +29,7 @@ class ExecutiveForecastFormatter:
         self.max_width = max_width
 
     def format_executive_briefing(
-        self,
-        forecasts: list[dict[str, Any]],
-        report_path: str = None
+        self, forecasts: list[dict[str, Any]], report_path: str = None
     ) -> str:
         """
         Create consolidated executive briefing across all horizons
@@ -49,19 +47,19 @@ class ExecutiveForecastFormatter:
         # Normalize forecast structure - extract forecast_data if nested
         normalized_forecasts = []
         for f in forecasts:
-            if 'forecast_data' in f:
+            if "forecast_data" in f:
                 # Merge metadata with forecast_data
-                forecast = f['forecast_data'].copy()
-                forecast['time_horizon'] = f.get('time_horizon')
-                forecast['horizon_months'] = f.get('horizon_months')
+                forecast = f["forecast_data"].copy()
+                forecast["time_horizon"] = f.get("time_horizon")
+                forecast["horizon_months"] = f.get("horizon_months")
                 normalized_forecasts.append(forecast)
             else:
                 # Already in expected format
                 normalized_forecasts.append(f)
 
         # Sort forecasts by horizon
-        sorted_forecasts = sorted(normalized_forecasts, key=lambda f: f.get('horizon_months', 0))
-        horizons = [f['time_horizon'] for f in sorted_forecasts]
+        sorted_forecasts = sorted(normalized_forecasts, key=lambda f: f.get("horizon_months", 0))
+        horizons = [f["time_horizon"] for f in sorted_forecasts]
 
         # Extract top trends
         top_trends = self._extract_top_trends(sorted_forecasts)
@@ -93,16 +91,14 @@ class ExecutiveForecastFormatter:
         lines.append("")
 
         for forecast in sorted_forecasts:
-            horizon = forecast['time_horizon']
+            horizon = forecast["time_horizon"]
             triggers = self._extract_action_triggers(forecast)
 
             if triggers:
                 lines.append(f"{horizon.upper()} Horizon:")
                 for trigger in triggers[:3]:  # Limit to top 3 per horizon
                     wrapped = textwrap.fill(
-                        f"  • {trigger}",
-                        width=self.max_width,
-                        subsequent_indent="    "
+                        f"  • {trigger}", width=self.max_width, subsequent_indent="    "
                     )
                     lines.append(wrapped)
                 lines.append("")
@@ -114,9 +110,7 @@ class ExecutiveForecastFormatter:
         critical_uncertainties = self._identify_critical_uncertainties(sorted_forecasts)
         for uncertainty in critical_uncertainties[:2]:  # Top 2 most critical
             wrapped = textwrap.fill(
-                f"• {uncertainty}",
-                width=self.max_width,
-                subsequent_indent="  "
+                f"• {uncertainty}", width=self.max_width, subsequent_indent="  "
             )
             lines.append(wrapped)
 
@@ -128,10 +122,7 @@ class ExecutiveForecastFormatter:
 
         return "\n".join(lines)
 
-    def _extract_top_trends(
-        self,
-        forecasts: list[dict[str, Any]]
-    ) -> list[str]:
+    def _extract_top_trends(self, forecasts: list[dict[str, Any]]) -> list[str]:
         """
         Extract top 2-3 trends appearing most frequently across horizons
 
@@ -145,9 +136,9 @@ class ExecutiveForecastFormatter:
         trend_counter = Counter()
 
         for forecast in forecasts:
-            trends = forecast.get('trend_extrapolations', [])
+            trends = forecast.get("trend_extrapolations", [])
             for trend in trends:
-                trend_name = trend.get('trend', '')
+                trend_name = trend.get("trend", "")
                 if trend_name:
                     # Normalize trend name for counting
                     normalized_name = self._normalize_trend_name(trend_name)
@@ -175,16 +166,14 @@ class ExecutiveForecastFormatter:
         # Extract key phrases if trend is long
         if len(trend_name) > 50:
             # Try to break at sentence boundary
-            sentences = trend_name.split('.')
+            sentences = trend_name.split(".")
             if sentences:
                 normalized = sentences[0].strip()
 
         return normalized
 
     def _build_trend_comparison_table(
-        self,
-        top_trends: list[str],
-        forecasts: list[dict[str, Any]]
+        self, top_trends: list[str], forecasts: list[dict[str, Any]]
     ) -> list[str]:
         """
         Build ASCII table showing trend evolution across horizons
@@ -199,7 +188,7 @@ class ExecutiveForecastFormatter:
         lines = []
 
         # Table header
-        horizons = [f['time_horizon'] for f in forecasts]
+        horizons = [f["time_horizon"] for f in forecasts]
         col_width = 16  # Width for each horizon column
         trend_col_width = 24  # Width for trend name column
 
@@ -215,13 +204,17 @@ class ExecutiveForecastFormatter:
             row_data = self._get_trend_outcomes_by_horizon(trend_name, forecasts)
 
             # Truncate trend name if too long
-            display_name = trend_name[:trend_col_width-1] if len(trend_name) > trend_col_width else trend_name
+            display_name = (
+                trend_name[: trend_col_width - 1]
+                if len(trend_name) > trend_col_width
+                else trend_name
+            )
             row = f"{display_name:<{trend_col_width}}"
 
             for horizon in horizons:
                 outcome = row_data.get(horizon, "-")
                 # Truncate outcome to fit column
-                outcome_display = outcome[:col_width-1] if len(outcome) > col_width else outcome
+                outcome_display = outcome[: col_width - 1] if len(outcome) > col_width else outcome
                 row += f"{outcome_display:<{col_width}}"
 
             lines.append(row)
@@ -235,9 +228,7 @@ class ExecutiveForecastFormatter:
         return lines
 
     def _get_trend_outcomes_by_horizon(
-        self,
-        trend_name: str,
-        forecasts: list[dict[str, Any]]
+        self, trend_name: str, forecasts: list[dict[str, Any]]
     ) -> dict[str, str]:
         """
         Get projected outcomes for a specific trend across all horizons
@@ -252,14 +243,14 @@ class ExecutiveForecastFormatter:
         outcomes = {}
 
         for forecast in forecasts:
-            horizon = forecast['time_horizon']
-            trends = forecast.get('trend_extrapolations', [])
+            horizon = forecast["time_horizon"]
+            trends = forecast.get("trend_extrapolations", [])
 
             # Find matching trend
             for trend in trends:
-                if self._trends_match(trend_name, trend.get('trend', '')):
+                if self._trends_match(trend_name, trend.get("trend", "")):
                     # Extract concise outcome
-                    outcome = trend.get('projected_outcome', '')
+                    outcome = trend.get("projected_outcome", "")
                     if outcome:
                         # Shorten to key phrase (first sentence)
                         outcome = self._extract_key_phrase(outcome)
@@ -297,20 +288,17 @@ class ExecutiveForecastFormatter:
             Shortened key phrase
         """
         # Take first sentence
-        sentences = text.split('.')
+        sentences = text.split(".")
         phrase = sentences[0].strip()
 
         # If still too long, take first N words
         if len(phrase) > max_length:
             words = phrase.split()
-            phrase = ' '.join(words[:3])
+            phrase = " ".join(words[:3])
 
         return phrase[:max_length]
 
-    def _extract_action_triggers(
-        self,
-        forecast: dict[str, Any]
-    ) -> list[str]:
+    def _extract_action_triggers(self, forecast: dict[str, Any]) -> list[str]:
         """
         Extract action triggers (early warning signals) from forecast
 
@@ -327,16 +315,16 @@ class ExecutiveForecastFormatter:
         triggers = []
 
         # Get triggers from scenarios
-        scenarios = forecast.get('scenarios', [])
+        scenarios = forecast.get("scenarios", [])
         for scenario in scenarios:
-            scenario_triggers = scenario.get('trigger_events', [])
+            scenario_triggers = scenario.get("trigger_events", [])
             triggers.extend(scenario_triggers)
 
         # Get triggers from known unknowns
-        event_risks = forecast.get('event_risks', {})
-        known_unknowns = event_risks.get('known_unknowns', [])
+        event_risks = forecast.get("event_risks", {})
+        known_unknowns = event_risks.get("known_unknowns", [])
         for unknown in known_unknowns:
-            uncertainty = unknown.get('uncertainty', '')
+            uncertainty = unknown.get("uncertainty", "")
             if uncertainty:
                 triggers.append(uncertainty)
 
@@ -345,10 +333,7 @@ class ExecutiveForecastFormatter:
 
         return unique_triggers
 
-    def _identify_critical_uncertainties(
-        self,
-        forecasts: list[dict[str, Any]]
-    ) -> list[str]:
+    def _identify_critical_uncertainties(self, forecasts: list[dict[str, Any]]) -> list[str]:
         """
         Identify most critical uncertainties across all forecasts
 
@@ -363,13 +348,13 @@ class ExecutiveForecastFormatter:
 
         for forecast in forecasts:
             # Get forecast-level uncertainties
-            key_uncertainties = forecast.get('key_uncertainties', [])
+            key_uncertainties = forecast.get("key_uncertainties", [])
             all_uncertainties.extend(key_uncertainties)
 
             # Get trend-level uncertainties
-            trends = forecast.get('trend_extrapolations', [])
+            trends = forecast.get("trend_extrapolations", [])
             for trend in trends:
-                trend_uncertainties = trend.get('uncertainties', [])
+                trend_uncertainties = trend.get("uncertainties", [])
                 all_uncertainties.extend(trend_uncertainties)
 
         # Count occurrences to find most common/critical

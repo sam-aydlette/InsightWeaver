@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Setup Complete - InsightWeaver</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+</head>
+<body>
+    <div class="setup-container">
+        <div class="setup-progress">
+            <div class="setup-step completed">Welcome</div>
+            <div class="setup-step completed">API Key</div>
+            <div class="setup-step completed">Location</div>
+            <div class="setup-step completed">Profession</div>
+            <div class="setup-step completed">Interests</div>
+        </div>
+
+        <div class="card text-center">
+            <h1 class="page-title mb-2">Setup Complete</h1>
+            <p class="page-subtitle mb-3">
+                Your InsightWeaver profile has been created.
+            </p>
+
+            <div class="setup-summary">
+                <h3 class="mb-2">Your Profile</h3>
+                <div class="summary-item">
+                    <span class="summary-label">Location:</span>
+                    <span class="summary-value">{{ profile.city }}, {{ profile.state }}</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Industry:</span>
+                    <span class="summary-value">{{ profile.industry }}</span>
+                </div>
+                {% if profile.role %}
+                <div class="summary-item">
+                    <span class="summary-label">Role:</span>
+                    <span class="summary-value">{{ profile.role }}</span>
+                </div>
+                {% endif %}
+                <div class="summary-item">
+                    <span class="summary-label">Interests:</span>
+                    <span class="summary-value">{{ profile.interests | join(', ') }}</span>
+                </div>
+            </div>
+
+            <div style="margin-top: 30px;">
+                <h3 class="mb-2">What's Next?</h3>
+                <ul style="text-align: left; list-style: disc; margin-left: 20px; line-height: 2;">
+                    <li><strong>Daily Brief</strong> - Get your first personalized news summary</li>
+                    <li><strong>Forecast</strong> - See evidence-based predictions</li>
+                    <li><strong>Ask AI</strong> - Get trust-verified answers to your questions</li>
+                </ul>
+            </div>
+
+            <form method="POST" style="margin-top: 30px;">
+                <button type="submit" class="btn btn-primary btn-lg">
+                    Go to Dashboard
+                </button>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

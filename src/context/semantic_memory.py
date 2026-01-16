@@ -31,9 +31,7 @@ class SemanticMemory:
         self.client = ClaudeClient()
 
     async def extract_facts_from_synthesis(
-        self,
-        synthesis_data: dict[str, Any],
-        source_synthesis_id: int
+        self, synthesis_data: dict[str, Any], source_synthesis_id: int
     ) -> list[MemoryFact]:
         """
         Extract structured facts from synthesis output
@@ -59,7 +57,7 @@ class SemanticMemory:
                 system_prompt="You are a fact extraction system. Extract structured facts from intelligence briefs.",
                 user_message=extraction_prompt,
                 temperature=0.3,  # Lower temperature for consistent extraction
-                max_tokens=2000
+                max_tokens=2000,
             )
 
             # Parse extracted facts
@@ -68,18 +66,18 @@ class SemanticMemory:
             # Convert to MemoryFact objects
             facts = []
             for fact_dict in facts_data:
-                fact_type = fact_dict.get('type', 'metric')
+                fact_type = fact_dict.get("type", "metric")
 
                 fact = MemoryFact(
                     fact_type=fact_type,
-                    subject=fact_dict.get('subject', ''),
-                    predicate=fact_dict.get('predicate', ''),
-                    object=fact_dict.get('object', ''),
-                    temporal_context=fact_dict.get('temporal_context'),
-                    confidence=float(fact_dict.get('confidence', 0.7)),
+                    subject=fact_dict.get("subject", ""),
+                    predicate=fact_dict.get("predicate", ""),
+                    object=fact_dict.get("object", ""),
+                    temporal_context=fact_dict.get("temporal_context"),
+                    confidence=float(fact_dict.get("confidence", 0.7)),
                     source_synthesis_id=source_synthesis_id,
                     expires_at=self._calculate_expiration(fact_type),
-                    fact_metadata={'extraction_date': datetime.utcnow().isoformat()}
+                    fact_metadata={"extraction_date": datetime.utcnow().isoformat()},
                 )
                 facts.append(fact)
 
@@ -117,9 +115,7 @@ class SemanticMemory:
             return 0
 
     def retrieve_relevant_facts(
-        self,
-        articles: list[Article],
-        max_facts: int = 20
+        self, articles: list[Article], max_facts: int = 20
     ) -> list[MemoryFact]:
         """
         Retrieve facts relevant to current article set
@@ -146,14 +142,17 @@ class SemanticMemory:
         facts = []
 
         for keyword in keywords[:10]:  # Limit to top 10 keywords
-            matching_facts = self.session.query(MemoryFact).filter(
-                MemoryFact.subject.ilike(f'%{keyword}%'),
-                (MemoryFact.expires_at.is_(None) | (MemoryFact.expires_at > datetime.utcnow())),
-                MemoryFact.confidence >= getattr(settings, 'memory_relevance_threshold', 0.6)
-            ).order_by(
-                MemoryFact.confidence.desc(),
-                MemoryFact.created_at.desc()
-            ).limit(3).all()
+            matching_facts = (
+                self.session.query(MemoryFact)
+                .filter(
+                    MemoryFact.subject.ilike(f"%{keyword}%"),
+                    (MemoryFact.expires_at.is_(None) | (MemoryFact.expires_at > datetime.utcnow())),
+                    MemoryFact.confidence >= getattr(settings, "memory_relevance_threshold", 0.6),
+                )
+                .order_by(MemoryFact.confidence.desc(), MemoryFact.created_at.desc())
+                .limit(3)
+                .all()
+            )
 
             facts.extend(matching_facts)
 
@@ -186,12 +185,12 @@ class SemanticMemory:
 
         # Group facts by type
         grouped_facts = {
-            'metric': [],
-            'trend': [],
-            'relationship': [],
-            'decision': [],
-            'civic_event': [],
-            'policy_position': []
+            "metric": [],
+            "trend": [],
+            "relationship": [],
+            "decision": [],
+            "civic_event": [],
+            "policy_position": [],
         }
 
         for fact in facts:
@@ -199,15 +198,15 @@ class SemanticMemory:
             if fact_type in grouped_facts:
                 grouped_facts[fact_type].append(fact)
             else:
-                grouped_facts['metric'].append(fact)  # Default to metric
+                grouped_facts["metric"].append(fact)  # Default to metric
 
         # Build formatted context
         context_parts = ["## Historical Context (from past syntheses)\n"]
 
         # Civic Events (prioritized for actionability)
-        if grouped_facts['civic_event']:
+        if grouped_facts["civic_event"]:
             context_parts.append("### Upcoming Civic Events:")
-            for fact in grouped_facts['civic_event'][:5]:
+            for fact in grouped_facts["civic_event"][:5]:
                 context_parts.append(
                     f"- {fact.subject} {fact.predicate} {fact.object} "
                     f"({fact.temporal_context or 'date TBD'})"
@@ -215,9 +214,9 @@ class SemanticMemory:
             context_parts.append("")
 
         # Policy Positions
-        if grouped_facts['policy_position']:
+        if grouped_facts["policy_position"]:
             context_parts.append("### Policy Positions:")
-            for fact in grouped_facts['policy_position'][:5]:
+            for fact in grouped_facts["policy_position"][:5]:
                 context_parts.append(
                     f"- {fact.subject} {fact.predicate} {fact.object} "
                     f"({fact.temporal_context or 'recent'})"
@@ -225,9 +224,9 @@ class SemanticMemory:
             context_parts.append("")
 
         # Metrics
-        if grouped_facts['metric']:
+        if grouped_facts["metric"]:
             context_parts.append("### Key Metrics:")
-            for fact in grouped_facts['metric'][:5]:
+            for fact in grouped_facts["metric"][:5]:
                 context_parts.append(
                     f"- {fact.subject} {fact.predicate} {fact.object} "
                     f"({fact.temporal_context or 'recent'})"
@@ -235,9 +234,9 @@ class SemanticMemory:
             context_parts.append("")
 
         # Trends
-        if grouped_facts['trend']:
+        if grouped_facts["trend"]:
             context_parts.append("### Observed Trends:")
-            for fact in grouped_facts['trend'][:5]:
+            for fact in grouped_facts["trend"][:5]:
                 context_parts.append(
                     f"- {fact.subject}: {fact.predicate} {fact.object} "
                     f"({fact.temporal_context or 'ongoing'})"
@@ -245,18 +244,16 @@ class SemanticMemory:
             context_parts.append("")
 
         # Relationships
-        if grouped_facts['relationship']:
+        if grouped_facts["relationship"]:
             context_parts.append("### Known Relationships:")
-            for fact in grouped_facts['relationship'][:5]:
-                context_parts.append(
-                    f"- {fact.subject} {fact.predicate} {fact.object}"
-                )
+            for fact in grouped_facts["relationship"][:5]:
+                context_parts.append(f"- {fact.subject} {fact.predicate} {fact.object}")
             context_parts.append("")
 
         # Decisions
-        if grouped_facts['decision']:
+        if grouped_facts["decision"]:
             context_parts.append("### Past Decisions/Events:")
-            for fact in grouped_facts['decision'][:5]:
+            for fact in grouped_facts["decision"][:5]:
                 context_parts.append(
                     f"- {fact.subject} {fact.predicate} {fact.object} "
                     f"({fact.temporal_context or 'date unknown'})"
@@ -282,18 +279,18 @@ class SemanticMemory:
             now = datetime.utcnow()
 
             # Find all expired facts
-            expired_facts = self.session.query(MemoryFact).filter(
-                MemoryFact.expires_at.isnot(None),
-                MemoryFact.expires_at <= now
-            ).all()
+            expired_facts = (
+                self.session.query(MemoryFact)
+                .filter(MemoryFact.expires_at.isnot(None), MemoryFact.expires_at <= now)
+                .all()
+            )
 
             count = len(expired_facts)
 
             if count > 0:
                 # Delete expired facts
                 self.session.query(MemoryFact).filter(
-                    MemoryFact.expires_at.isnot(None),
-                    MemoryFact.expires_at <= now
+                    MemoryFact.expires_at.isnot(None), MemoryFact.expires_at <= now
                 ).delete(synchronize_session=False)
 
                 self.session.commit()
@@ -320,7 +317,7 @@ class SemanticMemory:
         # Trends
         if "trends_and_patterns" in synthesis_data:
             trends = synthesis_data["trends_and_patterns"]
-            for category, items in trends.items():
+            for _category, items in trends.items():
                 for item in items[:3]:  # Top 3 per category
                     if isinstance(item, dict):
                         subject = item.get("subject", "")
@@ -342,7 +339,7 @@ class SemanticMemory:
         # Predictions
         if "predictions_scenarios" in synthesis_data:
             predictions = synthesis_data["predictions_scenarios"]
-            for category, items in predictions.items():
+            for _category, items in predictions.items():
                 for pred in items[:2]:  # Top 2 per category
                     if isinstance(pred, dict):
                         prediction = pred.get("prediction", "")
@@ -448,13 +445,13 @@ Extract 5-15 most significant facts. Prioritize civic events with specific dates
         """
         now = datetime.utcnow()
 
-        if fact_type in ['decision', 'event']:
+        if fact_type in ["decision", "event"]:
             return now + timedelta(days=60)
-        elif fact_type == 'civic_event':
+        elif fact_type == "civic_event":
             return now + timedelta(days=90)
-        elif fact_type == 'policy_position' or fact_type == 'trend':
+        elif fact_type == "policy_position" or fact_type == "trend":
             return now + timedelta(days=180)
-        elif fact_type in ['metric', 'relationship']:
+        elif fact_type in ["metric", "relationship"]:
             return now + timedelta(days=365)
         else:
             # Default to metric retention for unknown types
@@ -469,16 +466,19 @@ Extract 5-15 most significant facts. Prioritize civic events with specific dates
             if article.title:
                 words = article.title.lower().split()
                 # Add significant words (>3 chars, not common)
-                keywords.update([
-                    w.strip('.,!?()[]{}":;')
-                    for w in words
-                    if len(w) > 3 and w.lower() not in {'this', 'that', 'with', 'from', 'have', 'will', 'been'}
-                ])
+                keywords.update(
+                    [
+                        w.strip('.,!?()[]{}":;')
+                        for w in words
+                        if len(w) > 3
+                        and w.lower()
+                        not in {"this", "that", "with", "from", "have", "will", "been"}
+                    ]
+                )
 
             # Extract from entities if available
-            if article.entities:
-                if isinstance(article.entities, list):
-                    keywords.update([e.lower() for e in article.entities[:5]])
+            if article.entities and isinstance(article.entities, list):
+                keywords.update([e.lower() for e in article.entities[:5]])
 
         # Return sorted by length (longer = more specific)
-        return sorted(list(keywords), key=len, reverse=True)
+        return sorted(keywords, key=len, reverse=True)

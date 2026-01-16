@@ -9,9 +9,11 @@ Provides:
 """
 
 import asyncio
+import builtins
 import functools
 import time
-from typing import Any, Callable, TypeVar, cast
+from collections.abc import Callable
+from typing import Any, TypeVar, cast
 
 from .logging import get_logger
 
@@ -45,10 +47,7 @@ class ClaudeAPIError(APIError):
     """Error when communicating with Claude API"""
 
     def __init__(
-        self,
-        message: str,
-        status_code: int | None = None,
-        context: dict[str, Any] | None = None
+        self, message: str, status_code: int | None = None, context: dict[str, Any] | None = None
     ):
         super().__init__(message, context)
         self.status_code = status_code
@@ -61,7 +60,7 @@ class RateLimitError(APIError):
         self,
         message: str = "Rate limit exceeded",
         retry_after: int | None = None,
-        context: dict[str, Any] | None = None
+        context: dict[str, Any] | None = None,
     ):
         super().__init__(message, context)
         self.retry_after = retry_after
@@ -327,7 +326,7 @@ def timeout(seconds: float) -> Callable[[F], F]:
         async def wrapper(*args: Any, **kwargs: Any) -> Any:
             try:
                 return await asyncio.wait_for(func(*args, **kwargs), timeout=seconds)
-            except asyncio.TimeoutError:
+            except builtins.TimeoutError:
                 logger.error(
                     f"{func.__name__} timed out after {seconds}s",
                     extra_fields={"function": func.__name__, "timeout_seconds": seconds},
@@ -338,7 +337,9 @@ def timeout(seconds: float) -> Callable[[F], F]:
                 )
 
         if not asyncio.iscoroutinefunction(func):
-            raise TypeError(f"@timeout can only be applied to async functions, {func.__name__} is sync")
+            raise TypeError(
+                f"@timeout can only be applied to async functions, {func.__name__} is sync"
+            )
 
         return cast(F, wrapper)
 
@@ -372,7 +373,9 @@ class ErrorContext:
         )
         return self
 
-    def __exit__(self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: Any) -> bool:
+    def __exit__(
+        self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: Any
+    ) -> bool:
         duration = time.time() - (self.start_time or time.time())
 
         if exc_type is None:

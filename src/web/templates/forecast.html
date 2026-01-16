@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+
+{% block title %}Forecast - InsightWeaver{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Forecast</h1>
+    <p class="page-subtitle">Evidence-based predictions organized by certainty</p>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Generate Forecast</h3>
+    </div>
+    <p class="text-muted mb-2">
+        Analyze current trends and generate forecasts categorized by confidence level:
+        known knowns (certain), known unknowns (likely), and unknown unknowns (possible).
+    </p>
+    <button id="generate-forecast" class="btn btn-primary">
+        Generate New Forecast
+    </button>
+</div>
+
+<div id="forecast-loading" class="card" style="display: none;">
+    <div style="display: flex; align-items: center; gap: 16px;">
+        <div class="spinner"></div>
+        <div>
+            <div class="card-title">Generating Forecast</div>
+            <p class="text-muted" id="forecast-status">Analyzing trends...</p>
+        </div>
+    </div>
+</div>
+
+<div id="forecast-result" class="card" style="display: none;">
+    <div class="card-header">
+        <h3 class="card-title">Forecast Generated</h3>
+        <span class="trust-badge verified">Complete</span>
+    </div>
+    <p class="text-muted mb-2">Your forecast has been generated with predictions organized by confidence level.</p>
+    <a id="forecast-html-link" href="#" class="btn btn-primary" target="_blank">View Full Report</a>
+</div>
+
+<div id="forecast-error" class="alert alert-error" style="display: none;">
+    <strong>Error:</strong> <span id="forecast-error-message"></span>
+</div>
+
+{% if recent_forecasts %}
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Recent Forecasts</h3>
+    </div>
+    <ul class="list">
+        {% for forecast in recent_forecasts %}
+        <li class="list-item">
+            <div>
+                <div class="list-item-title">{{ forecast.title }}</div>
+                <div class="list-item-meta">{{ forecast.date }}</div>
+            </div>
+            <a href="{{ forecast.url }}" class="btn btn-secondary" style="padding: 6px 12px; font-size: 13px;">View</a>
+        </li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('generate-forecast').addEventListener('click', async function() {
+    const btn = this;
+    const loading = document.getElementById('forecast-loading');
+    const result = document.getElementById('forecast-result');
+    const errorDiv = document.getElementById('forecast-error');
+
+    btn.disabled = true;
+    loading.style.display = 'block';
+    result.style.display = 'none';
+    errorDiv.style.display = 'none';
+
+    const statuses = [
+        'Analyzing trends...',
+        'Processing data...',
+        'Evaluating certainty...',
+        'Generating forecasts...',
+        'Finalizing report...'
+    ];
+
+    let statusIndex = 0;
+    const statusInterval = setInterval(() => {
+        statusIndex = (statusIndex + 1) % statuses.length;
+        document.getElementById('forecast-status').textContent = statuses[statusIndex];
+    }, 3000);
+
+    try {
+        const response = await fetch('{{ url_for("forecast.generate") }}', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'}
+        });
+
+        const data = await response.json();
+
+        clearInterval(statusInterval);
+        loading.style.display = 'none';
+
+        if (data.success) {
+            result.style.display = 'block';
+            if (data.html_path) {
+                document.getElementById('forecast-html-link').href = data.html_path;
+            }
+        } else {
+            errorDiv.style.display = 'block';
+            document.getElementById('forecast-error-message').textContent = data.error || 'Unknown error';
+        }
+    } catch (err) {
+        clearInterval(statusInterval);
+        loading.style.display = 'none';
+        errorDiv.style.display = 'block';
+        document.getElementById('forecast-error-message').textContent = err.message;
+    }
+
+    btn.disabled = false;
+});
+</script>
+{% endblock %}

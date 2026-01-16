@@ -2,6 +2,7 @@
 Trust Pipeline - Main Orchestrator
 Coordinates trust-enhanced queries and analysis
 """
+
 import asyncio
 import logging
 from typing import Any
@@ -40,11 +41,7 @@ class TrustPipeline:
         self.source_matcher = AuthoritativeSourceMatcher(claude_client=self.client)
         logger.info("Trust pipeline initialized")
 
-    async def query_with_trust_constraints(
-        self,
-        user_query: str,
-        temperature: float = 1.0
-    ) -> str:
+    async def query_with_trust_constraints(self, user_query: str, temperature: float = 1.0) -> str:
         """
         Query Claude with trust-building constraints
 
@@ -83,7 +80,7 @@ Please answer the user's query using the current verified information provided a
         response = await self.client.analyze(
             system_prompt=TRUST_ENHANCED_SYSTEM_PROMPT,
             user_message=enhanced_query,
-            temperature=temperature
+            temperature=temperature,
         )
 
         logger.info(f"Response received: {len(response)} characters")
@@ -95,7 +92,7 @@ Please answer the user's query using the current verified information provided a
         verify_facts: bool = True,
         check_bias: bool = True,
         check_intimacy: bool = True,
-        skip_temporal_validation: bool = False
+        skip_temporal_validation: bool = False,
     ) -> dict[str, Any]:
         """
         Analyze Claude response for trust issues
@@ -118,10 +115,7 @@ Please answer the user's query using the current verified information provided a
         """
         logger.info("Starting trust analysis (parallel execution)")
 
-        analysis = {
-            "analyzed": True,
-            "response_length": len(response)
-        }
+        analysis = {"analyzed": True, "response_length": len(response)}
 
         # Queue all verification tasks for parallel execution
         tasks = {}
@@ -129,28 +123,26 @@ Please answer the user's query using the current verified information provided a
 
         if verify_facts:
             logger.info("Queuing fact verification")
-            tasks['facts'] = self.fact_verifier.verify(
-                response,
-                skip_temporal_validation=skip_temporal_validation
+            tasks["facts"] = self.fact_verifier.verify(
+                response, skip_temporal_validation=skip_temporal_validation
             )
-            task_keys.append('facts')
+            task_keys.append("facts")
 
         if check_bias:
             logger.info("Queuing bias analysis")
-            tasks['bias'] = self.bias_analyzer.analyze(response)
-            task_keys.append('bias')
+            tasks["bias"] = self.bias_analyzer.analyze(response)
+            task_keys.append("bias")
 
         if check_intimacy:
             logger.info("Queuing intimacy detection")
-            tasks['intimacy'] = self.intimacy_detector.detect(response)
-            task_keys.append('intimacy')
+            tasks["intimacy"] = self.intimacy_detector.detect(response)
+            task_keys.append("intimacy")
 
         # Execute all tasks concurrently
         if tasks:
             logger.info(f"Executing {len(tasks)} verification tasks in parallel")
             results = await asyncio.gather(
-                *[tasks[key] for key in task_keys],
-                return_exceptions=True
+                *[tasks[key] for key in task_keys], return_exceptions=True
             )
 
             # Map results back and handle individual task failures gracefully
@@ -159,25 +151,26 @@ Please answer the user's query using the current verified information provided a
 
                 if isinstance(result, Exception):
                     logger.error(f"Task '{key}' failed with error: {result}")
-                    analysis[key] = {
-                        "analyzed": False,
-                        "error": str(result)
-                    }
-                elif key == 'facts':
+                    analysis[key] = {"analyzed": False, "error": str(result)}
+                elif key == "facts":
                     fact_results = result
                     analysis["facts"] = {
                         "verifications": [v.to_dict() for v in fact_results],
                         "total_claims": len(fact_results),
                         "verified_count": sum(1 for v in fact_results if v.verdict == "VERIFIED"),
-                        "uncertain_count": sum(1 for v in fact_results if v.verdict == "UNVERIFIABLE"),
-                        "contradicted_count": sum(1 for v in fact_results if v.verdict == "CONTRADICTED"),
-                        "error_count": sum(1 for v in fact_results if v.verdict == "ERROR")
+                        "uncertain_count": sum(
+                            1 for v in fact_results if v.verdict == "UNVERIFIABLE"
+                        ),
+                        "contradicted_count": sum(
+                            1 for v in fact_results if v.verdict == "CONTRADICTED"
+                        ),
+                        "error_count": sum(1 for v in fact_results if v.verdict == "ERROR"),
                     }
-                elif key == 'bias':
+                elif key == "bias":
                     bias_results = result
                     analysis["bias"] = bias_results.to_dict()
                     analysis["bias"]["analyzed"] = True
-                elif key == 'intimacy':
+                elif key == "intimacy":
                     intimacy_results = result
                     analysis["intimacy"] = intimacy_results.to_dict()
                     analysis["intimacy"]["analyzed"] = True
@@ -234,11 +227,12 @@ Respond with JSON:
             result = await self.client.analyze(
                 system_prompt="You are a query classifier. Determine if queries ask about current, time-sensitive information.",
                 user_message=analysis_prompt,
-                temperature=0.0
+                temperature=0.0,
             )
 
             # Parse JSON response
             import json
+
             result_clean = result.strip()
             if result_clean.startswith("```json"):
                 result_clean = result_clean[7:]
@@ -284,17 +278,16 @@ Respond with JSON:
         logger.info(f"Time-sensitive query detected: {analysis.get('reasoning')}")
 
         # Construct a search string from the facts needed
-        facts_needed = analysis.get('facts_needed', [])
-        if facts_needed:
-            search_string = ' '.join(facts_needed)
-        else:
-            search_string = query
+        facts_needed = analysis.get("facts_needed", [])
+        search_string = " ".join(facts_needed) if facts_needed else query
 
         # Find authoritative source for this query using intelligent Claude-based matching
         source = await self.source_matcher.find_source(search_string)
 
         if source is None:
-            logger.info(f"No authoritative source found for source_type: {analysis.get('source_type')}")
+            logger.info(
+                f"No authoritative source found for source_type: {analysis.get('source_type')}"
+            )
             logger.info("Continuing without fetch-first - will rely on post-verification")
             return None
 
@@ -304,19 +297,18 @@ Respond with JSON:
 
             # Use the specific facts needed for a more targeted query
             if facts_needed:
-                fetch_prompt = f"{source['query_prompt']} Specifically focus on: {', '.join(facts_needed)}"
+                fetch_prompt = (
+                    f"{source['query_prompt']} Specifically focus on: {', '.join(facts_needed)}"
+                )
             else:
-                fetch_prompt = source['query_prompt']
+                fetch_prompt = source["query_prompt"]
 
-            fetched_content = await web_fetch(
-                url=source['url'],
-                prompt=fetch_prompt
-            )
+            fetched_content = await web_fetch(url=source["url"], prompt=fetch_prompt)
 
             # Format as current facts
-            current_facts = f"""Source: {source['name']} ({source['url']})
+            current_facts = f"""Source: {source["name"]} ({source["url"]})
 Retrieved: Today
-Facts verified: {', '.join(facts_needed) if facts_needed else 'general current information'}
+Facts verified: {", ".join(facts_needed) if facts_needed else "general current information"}
 
 {fetched_content}"""
 
@@ -335,7 +327,7 @@ Facts verified: {', '.join(facts_needed) if facts_needed else 'general current i
         verify_facts: bool = True,
         check_bias: bool = True,
         check_intimacy: bool = True,
-        temperature: float = 1.0
+        temperature: float = 1.0,
     ) -> dict[str, Any]:
         """
         Run complete trust pipeline: enhanced query + analysis
@@ -362,15 +354,14 @@ Facts verified: {', '.join(facts_needed) if facts_needed else 'general current i
 
         # Phase 1: Get trust-enhanced response (with fetch-first if time-sensitive)
         response = await self.query_with_trust_constraints(
-            user_query=user_query,
-            temperature=temperature
+            user_query=user_query, temperature=temperature
         )
 
         result = {
             "original_query": user_query,
             "response": response,
             "trust_enhanced": True,
-            "used_fetch_first": used_fetch_first
+            "used_fetch_first": used_fetch_first,
         }
 
         # Phase 2: Analyze response (if requested)
@@ -381,10 +372,11 @@ Facts verified: {', '.join(facts_needed) if facts_needed else 'general current i
             # Still run bias and intimacy checks.
             analysis = await self.analyze_response(
                 response=response,
-                verify_facts=verify_facts and not used_fetch_first,  # Skip fact verification if fetch-first was used
+                verify_facts=verify_facts
+                and not used_fetch_first,  # Skip fact verification if fetch-first was used
                 check_bias=check_bias,
                 check_intimacy=check_intimacy,
-                skip_temporal_validation=used_fetch_first
+                skip_temporal_validation=used_fetch_first,
             )
             result["analysis"] = analysis
 

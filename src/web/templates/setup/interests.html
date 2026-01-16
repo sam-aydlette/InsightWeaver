@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interests - InsightWeaver Setup</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+</head>
+<body>
+    <div class="setup-container">
+        <div class="setup-progress">
+            <div class="setup-step completed">Welcome</div>
+            <div class="setup-step completed">API Key</div>
+            <div class="setup-step completed">Location</div>
+            <div class="setup-step completed">Profession</div>
+            <div class="setup-step active">Interests</div>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="card">
+            <h2 class="page-title mb-2">Your Interests</h2>
+            <p class="page-subtitle mb-3">
+                Select topics you want to stay informed about. Choose at least 3.
+            </p>
+
+            <form method="POST">
+                <div class="interests-grid">
+                    {% for interest in interests %}
+                    <label class="interest-checkbox">
+                        <input type="checkbox" name="interests" value="{{ interest }}">
+                        <span class="interest-label">{{ interest }}</span>
+                    </label>
+                    {% endfor %}
+                </div>
+
+                <p class="form-hint mt-2">
+                    These help us curate relevant news and forecasts for you.
+                </p>
+
+                <div style="display: flex; gap: 12px; justify-content: space-between; margin-top: 24px;">
+                    <a href="{{ url_for('setup.profession') }}" class="btn btn-secondary">Back</a>
+                    <button type="submit" class="btn btn-primary">Continue</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

@@ -11,6 +11,7 @@ from pathlib import Path
 
 class ProfileValidationError(Exception):
     """Raised when user profile is missing required fields"""
+
     pass
 
 
@@ -19,18 +20,18 @@ class UserProfile:
 
     # Required top-level sections
     REQUIRED_SECTIONS = {
-        'geographic_context',
-        'professional_context',
-        'civic_interests',
-        'personal_priorities',
-        'content_preferences'
+        "geographic_context",
+        "professional_context",
+        "civic_interests",
+        "personal_priorities",
+        "content_preferences",
     }
 
     # Required fields within each section
     REQUIRED_FIELDS = {
-        'geographic_context': {'primary_location'},
-        'professional_context': {'professional_domains'},
-        'content_preferences': {'excluded_topics'}
+        "geographic_context": {"primary_location"},
+        "professional_context": {"professional_domains"},
+        "content_preferences": {"excluded_topics"},
     }
 
     def __init__(self, profile_path: str | None = None):
@@ -93,7 +94,7 @@ class UserProfile:
                 f"See config/user_profile.example.json"
             )
 
-        with open(self.profile_path, encoding='utf-8') as f:
+        with open(self.profile_path, encoding="utf-8") as f:
             self._profile_data = json.load(f)
 
         # Validate profile structure
@@ -110,39 +111,39 @@ class UserProfile:
 
     def get_geographic_context(self) -> dict:
         """Extract geographic context from profile"""
-        return self.profile.get('geographic_context', {})
+        return self.profile.get("geographic_context", {})
 
     def get_professional_context(self) -> dict:
         """Extract professional context from profile"""
-        return self.profile.get('professional_context', {})
+        return self.profile.get("professional_context", {})
 
     def get_civic_interests(self) -> dict:
         """Extract civic interests from profile"""
-        return self.profile.get('civic_interests', {})
+        return self.profile.get("civic_interests", {})
 
     def get_personal_priorities(self) -> dict:
         """Extract personal priorities from profile"""
-        return self.profile.get('personal_priorities', {})
+        return self.profile.get("personal_priorities", {})
 
     def get_content_preferences(self) -> dict:
         """Extract content preferences from profile"""
-        return self.profile.get('content_preferences', {})
+        return self.profile.get("content_preferences", {})
 
     def get_excluded_topics(self) -> list[str]:
         """Get list of topics to exclude from analysis"""
-        return self.get_content_preferences().get('excluded_topics', [])
+        return self.get_content_preferences().get("excluded_topics", [])
 
     def get_professional_domains(self) -> list[str]:
         """Get list of professional domains for relevance scoring"""
-        return self.get_professional_context().get('professional_domains', [])
+        return self.get_professional_context().get("professional_domains", [])
 
     def get_primary_location(self) -> dict:
         """Get primary location (city, state, region)"""
-        return self.get_geographic_context().get('primary_location', {})
+        return self.get_geographic_context().get("primary_location", {})
 
     def get_complexity_level(self) -> str:
         """Get preferred content complexity level"""
-        return self.get_content_preferences().get('complexity_level', 'balanced')
+        return self.get_content_preferences().get("complexity_level", "balanced")
 
     def format_for_agent_context(self) -> str:
         """
@@ -151,25 +152,29 @@ class UserProfile:
         Returns:
             Formatted string suitable for inclusion in agent prompts
         """
-        profile = self.profile
-
         # Extract key context elements
         location = self.get_primary_location()
-        location_str = f"{location.get('city', '')}, {location.get('state', '')}"
+        # Handle both string and dict formats for primary_location
+        if isinstance(location, str):
+            location_str = location
+        elif isinstance(location, dict):
+            location_str = f"{location.get('city', '')}, {location.get('state', '')}"
+        else:
+            location_str = "Unknown"
 
         prof_context = self.get_professional_context()
-        role = prof_context.get('job_role', '')
-        industry = prof_context.get('industry', '')
-        domains = ', '.join(self.get_professional_domains())
+        role = prof_context.get("job_role", "")
+        industry = prof_context.get("industry", "")
+        domains = ", ".join(self.get_professional_domains())
 
         civic = self.get_civic_interests()
-        engagement = civic.get('political_engagement_level', 'moderate')
-        policy_areas = ', '.join(civic.get('policy_areas', [])[:3])
+        engagement = civic.get("political_engagement_level", "moderate")
+        policy_areas = ", ".join(civic.get("policy_areas", [])[:3])
 
         priorities = self.get_personal_priorities()
-        priority_topics = ', '.join(priorities.get('priority_topics', [])[:5])
+        priority_topics = ", ".join(priorities.get("priority_topics", [])[:5])
 
-        excluded = ', '.join(self.get_excluded_topics())
+        excluded = ", ".join(self.get_excluded_topics())
 
         context_str = f"""USER CONTEXT PROFILE:
 
@@ -187,8 +192,15 @@ Use this context to filter, prioritize, and frame all analysis through the user'
 
     def __repr__(self) -> str:
         location = self.get_primary_location()
-        role = self.get_professional_context().get('job_role', 'Unknown')
-        return f"<UserProfile: {role} in {location.get('city', 'Unknown')}>"
+        role = self.get_professional_context().get("job_role", "Unknown")
+        # Handle both string and dict formats for primary_location
+        if isinstance(location, str):
+            location_str = location
+        elif isinstance(location, dict):
+            location_str = location.get("city", "Unknown")
+        else:
+            location_str = "Unknown"
+        return f"<UserProfile: {role} in {location_str}>"
 
 
 # Singleton instance for easy access throughout the application

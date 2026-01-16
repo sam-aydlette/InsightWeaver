@@ -28,10 +28,7 @@ class CoverageAnomalyDetector:
         self.baseline_days = baseline_days
 
     def detect_anomalies(
-        self,
-        session: Session,
-        current_articles: list[Article],
-        current_hours: int = 48
+        self, session: Session, current_articles: list[Article], current_hours: int = 48
     ) -> dict[str, Any]:
         """
         Detect coverage anomalies by comparing current period to baseline
@@ -48,16 +45,20 @@ class CoverageAnomalyDetector:
         baseline_end = datetime.utcnow() - timedelta(hours=current_hours)
         baseline_start = baseline_end - timedelta(days=self.baseline_days)
 
-        baseline_articles = session.query(Article).filter(
-            Article.fetched_at >= baseline_start,
-            Article.fetched_at < baseline_end,
-            Article.filtered == False
-        ).all()
+        baseline_articles = (
+            session.query(Article)
+            .filter(
+                Article.fetched_at >= baseline_start,
+                Article.fetched_at < baseline_end,
+                Article.filtered.is_(False),
+            )
+            .all()
+        )
 
         if not baseline_articles:
             return {
                 "has_baseline": False,
-                "message": "Insufficient historical data for anomaly detection"
+                "message": "Insufficient historical data for anomaly detection",
             }
 
         # Analyze current vs baseline
@@ -73,35 +74,38 @@ class CoverageAnomalyDetector:
 
         # Volume anomaly
         if current_count > baseline_period_count * 1.5:
-            anomalies.append({
-                "type": "volume_spike",
-                "severity": "medium",
-                "description": f"Article volume {int((current_count/baseline_period_count - 1) * 100)}% above baseline",
-                "current": current_count,
-                "baseline": int(baseline_period_count)
-            })
+            anomalies.append(
+                {
+                    "type": "volume_spike",
+                    "severity": "medium",
+                    "description": f"Article volume {int((current_count / baseline_period_count - 1) * 100)}% above baseline",
+                    "current": current_count,
+                    "baseline": int(baseline_period_count),
+                }
+            )
         elif current_count < baseline_period_count * 0.5:
-            anomalies.append({
-                "type": "volume_drop",
-                "severity": "low",
-                "description": f"Article volume {int((1 - current_count/baseline_period_count) * 100)}% below baseline",
-                "current": current_count,
-                "baseline": int(baseline_period_count)
-            })
+            anomalies.append(
+                {
+                    "type": "volume_drop",
+                    "severity": "low",
+                    "description": f"Article volume {int((1 - current_count / baseline_period_count) * 100)}% below baseline",
+                    "current": current_count,
+                    "baseline": int(baseline_period_count),
+                }
+            )
 
         # Topic anomalies (keywords in titles)
         topic_anomalies = self._detect_topic_anomalies(
-            current_stats['top_keywords'],
-            baseline_stats['top_keywords']
+            current_stats["top_keywords"], baseline_stats["top_keywords"]
         )
         anomalies.extend(topic_anomalies)
 
         # Source anomalies
         source_anomalies = self._detect_source_anomalies(
-            current_stats['source_distribution'],
-            baseline_stats['source_distribution'],
+            current_stats["source_distribution"],
+            baseline_stats["source_distribution"],
             current_hours,
-            self.baseline_days
+            self.baseline_days,
         )
         anomalies.extend(source_anomalies)
 
@@ -112,7 +116,7 @@ class CoverageAnomalyDetector:
             "current_article_count": current_count,
             "baseline_article_count": int(baseline_period_count),
             "anomalies": anomalies,
-            "summary": self._generate_summary(anomalies)
+            "summary": self._generate_summary(anomalies),
         }
 
     def _analyze_articles(self, articles: list[Article]) -> dict[str, Any]:
@@ -133,44 +137,42 @@ class CoverageAnomalyDetector:
 
         return {
             "top_keywords": keyword_counts.most_common(20),
-            "source_distribution": dict(source_counts)
+            "source_distribution": dict(source_counts),
         }
 
     def _detect_topic_anomalies(
-        self,
-        current_keywords: list[tuple],
-        baseline_keywords: list[tuple]
+        self, current_keywords: list[tuple], baseline_keywords: list[tuple]
     ) -> list[dict[str, Any]]:
         """Detect unusual topic coverage"""
         anomalies = []
 
-        # Convert to dicts for easier lookup
-        current_dict = dict(current_keywords)
-        baseline_dict = dict(baseline_keywords)
-
         # Find emerging topics (in current but not in baseline top 20)
-        baseline_words = set(w for w, _ in baseline_keywords)
+        baseline_words = {w for w, _ in baseline_keywords}
         for word, count in current_keywords[:10]:  # Check top 10 current
             if word not in baseline_words and count >= 3:
-                anomalies.append({
-                    "type": "emerging_topic",
-                    "severity": "medium",
-                    "description": f"Unusual coverage of '{word}' ({count} mentions)",
-                    "keyword": word,
-                    "mentions": count
-                })
+                anomalies.append(
+                    {
+                        "type": "emerging_topic",
+                        "severity": "medium",
+                        "description": f"Unusual coverage of '{word}' ({count} mentions)",
+                        "keyword": word,
+                        "mentions": count,
+                    }
+                )
 
         # Find missing topics (in baseline top 10 but absent from current)
-        current_words = set(w for w, _ in current_keywords)
+        current_words = {w for w, _ in current_keywords}
         for word, baseline_count in baseline_keywords[:10]:
             if word not in current_words:
-                anomalies.append({
-                    "type": "missing_topic",
-                    "severity": "low",
-                    "description": f"'{word}' absent (usually ~{baseline_count} mentions)",
-                    "keyword": word,
-                    "baseline_mentions": baseline_count
-                })
+                anomalies.append(
+                    {
+                        "type": "missing_topic",
+                        "severity": "low",
+                        "description": f"'{word}' absent (usually ~{baseline_count} mentions)",
+                        "keyword": word,
+                        "baseline_mentions": baseline_count,
+                    }
+                )
 
         return anomalies[:3]  # Limit to top 3 topic anomalies
 
@@ -179,7 +181,7 @@ class CoverageAnomalyDetector:
         current_sources: dict[str, int],
         baseline_sources: dict[str, int],
         current_hours: int,
-        baseline_days: int
+        baseline_days: int,
     ) -> list[dict[str, Any]]:
         """Detect unusual source patterns"""
         anomalies = []
@@ -194,22 +196,26 @@ class CoverageAnomalyDetector:
             if baseline_count > 0:
                 ratio = current_count / baseline_count
                 if ratio > 2.0:  # Source producing 2x normal volume
-                    anomalies.append({
-                        "type": "source_spike",
+                    anomalies.append(
+                        {
+                            "type": "source_spike",
+                            "severity": "low",
+                            "description": f"{source}: {int((ratio - 1) * 100)}% above normal volume",
+                            "source": source,
+                            "current": current_count,
+                            "baseline": int(baseline_count),
+                        }
+                    )
+            elif current_count >= 5:  # New source with significant volume
+                anomalies.append(
+                    {
+                        "type": "new_source_active",
                         "severity": "low",
-                        "description": f"{source}: {int((ratio - 1) * 100)}% above normal volume",
+                        "description": f"{source}: New or previously inactive source ({current_count} articles)",
                         "source": source,
                         "current": current_count,
-                        "baseline": int(baseline_count)
-                    })
-            elif current_count >= 5:  # New source with significant volume
-                anomalies.append({
-                    "type": "new_source_active",
-                    "severity": "low",
-                    "description": f"{source}: New or previously inactive source ({current_count} articles)",
-                    "source": source,
-                    "current": current_count
-                })
+                    }
+                )
 
         return anomalies[:2]  # Limit to top 2 source anomalies
 
@@ -218,8 +224,8 @@ class CoverageAnomalyDetector:
         if not anomalies:
             return "Coverage patterns normal compared to baseline"
 
-        high_severity = [a for a in anomalies if a.get('severity') == 'high']
-        medium_severity = [a for a in anomalies if a.get('severity') == 'medium']
+        high_severity = [a for a in anomalies if a.get("severity") == "high"]
+        medium_severity = [a for a in anomalies if a.get("severity") == "medium"]
 
         if high_severity:
             return f"Significant anomalies detected: {high_severity[0]['description']}"
@@ -230,26 +236,32 @@ class CoverageAnomalyDetector:
 
     def format_for_context(self, anomaly_report: dict[str, Any]) -> str:
         """Format anomaly report for inclusion in Claude context"""
-        if not anomaly_report.get('has_baseline'):
+        if not anomaly_report.get("has_baseline"):
             return ""
 
         parts = ["<coverage_analysis>"]
         parts.append("## Coverage Pattern Analysis")
-        parts.append(f"Comparing current {anomaly_report['current_period']} to {anomaly_report['baseline_period']} baseline:\n")
+        parts.append(
+            f"Comparing current {anomaly_report['current_period']} to {anomaly_report['baseline_period']} baseline:\n"
+        )
 
-        parts.append(f"**Article Volume:** {anomaly_report['current_article_count']} articles "
-                    f"(baseline: {anomaly_report['baseline_article_count']})\n")
+        parts.append(
+            f"**Article Volume:** {anomaly_report['current_article_count']} articles "
+            f"(baseline: {anomaly_report['baseline_article_count']})\n"
+        )
 
-        if anomaly_report['anomalies']:
+        if anomaly_report["anomalies"]:
             parts.append("**Detected Anomalies:**")
-            for anomaly in anomaly_report['anomalies']:
+            for anomaly in anomaly_report["anomalies"]:
                 parts.append(f"• {anomaly['description']}")
         else:
             parts.append("**Pattern:** Coverage patterns consistent with baseline")
 
-        parts.append("\n**Analysis Guidance:** Pay attention to topics with unusual coverage patterns. "
-                    "Emerging topics may signal important developments. Missing topics may indicate "
-                    "gaps in current period or shifts in news cycle.")
+        parts.append(
+            "\n**Analysis Guidance:** Pay attention to topics with unusual coverage patterns. "
+            "Emerging topics may signal important developments. Missing topics may indicate "
+            "gaps in current period or shifts in news cycle."
+        )
 
         parts.append("</coverage_analysis>")
 

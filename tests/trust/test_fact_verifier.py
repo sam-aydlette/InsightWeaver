@@ -2,8 +2,11 @@
 Unit tests for FactVerifier
 Tests claim extraction, verification, and temporal validation
 """
+
 import json
+
 import pytest
+
 from src.trust.fact_verifier import Claim, FactVerification, FactVerifier
 
 
@@ -11,7 +14,9 @@ class TestClaimExtraction:
     """Test claim extraction from responses"""
 
     @pytest.mark.asyncio
-    async def test_extract_claims_mixed_types(self, fact_verifier, mock_claude_client, json_claim_extraction_response):
+    async def test_extract_claims_mixed_types(
+        self, fact_verifier, mock_claude_client, json_claim_extraction_response
+    ):
         """Test extraction of different claim types"""
         mock_claude_client.analyze.return_value = json_claim_extraction_response
 
@@ -53,11 +58,13 @@ class TestClaimExtraction:
     @pytest.mark.asyncio
     async def test_extract_claims_with_markdown_wrapper(self, fact_verifier, mock_claude_client):
         """Test stripping of markdown code blocks"""
-        json_data = json.dumps({
-            "claims": [
-                {"text": "Test claim", "type": "FACT", "confidence": 0.9, "reasoning": "Test"}
-            ]
-        })
+        json_data = json.dumps(
+            {
+                "claims": [
+                    {"text": "Test claim", "type": "FACT", "confidence": 0.9, "reasoning": "Test"}
+                ]
+            }
+        )
         mock_claude_client.analyze.return_value = f"```json\n{json_data}\n```"
 
         response = "Test claim"
@@ -69,12 +76,24 @@ class TestClaimExtraction:
     @pytest.mark.asyncio
     async def test_extract_claims_confidence_levels(self, fact_verifier, mock_claude_client):
         """Test that confidence levels are properly extracted"""
-        mock_claude_client.analyze.return_value = json.dumps({
-            "claims": [
-                {"text": "High confidence", "type": "FACT", "confidence": 0.95, "reasoning": "Very sure"},
-                {"text": "Low confidence", "type": "INFERENCE", "confidence": 0.5, "reasoning": "Uncertain"}
-            ]
-        })
+        mock_claude_client.analyze.return_value = json.dumps(
+            {
+                "claims": [
+                    {
+                        "text": "High confidence",
+                        "type": "FACT",
+                        "confidence": 0.95,
+                        "reasoning": "Very sure",
+                    },
+                    {
+                        "text": "Low confidence",
+                        "type": "INFERENCE",
+                        "confidence": 0.5,
+                        "reasoning": "Uncertain",
+                    },
+                ]
+            }
+        )
 
         response = "High confidence. Low confidence."
         claims = await fact_verifier._extract_claims(response)
@@ -87,7 +106,9 @@ class TestClaimVerification:
     """Test individual claim verification"""
 
     @pytest.mark.asyncio
-    async def test_verify_fact_claim(self, fact_verifier, mock_claude_client, json_fact_verification_response):
+    async def test_verify_fact_claim(
+        self, fact_verifier, mock_claude_client, json_fact_verification_response
+    ):
         """Test verification of FACT type claim"""
         mock_claude_client.analyze.return_value = json_fact_verification_response
 
@@ -101,13 +122,15 @@ class TestClaimVerification:
     @pytest.mark.asyncio
     async def test_verify_inference_claim(self, fact_verifier, mock_claude_client):
         """Test verification of INFERENCE type claim"""
-        mock_claude_client.analyze.return_value = json.dumps({
-            "verdict": "VERIFIED",
-            "confidence": 0.8,
-            "reasoning": "Logical inference supported by evidence",
-            "caveats": [],
-            "contradictions": []
-        })
+        mock_claude_client.analyze.return_value = json.dumps(
+            {
+                "verdict": "VERIFIED",
+                "confidence": 0.8,
+                "reasoning": "Logical inference supported by evidence",
+                "caveats": [],
+                "contradictions": [],
+            }
+        )
 
         claim = Claim("This suggests growth", "INFERENCE", 0.7, "Logical conclusion")
         verification = await fact_verifier._verify_claim(claim, skip_temporal_validation=True)
@@ -142,13 +165,15 @@ class TestClaimVerification:
     @pytest.mark.asyncio
     async def test_verify_claim_contradicted(self, fact_verifier, mock_claude_client):
         """Test detection of contradicted claims"""
-        mock_claude_client.analyze.return_value = json.dumps({
-            "verdict": "CONTRADICTED",
-            "confidence": 0.9,
-            "reasoning": "This contradicts known facts",
-            "caveats": [],
-            "contradictions": ["The actual value is different"]
-        })
+        mock_claude_client.analyze.return_value = json.dumps(
+            {
+                "verdict": "CONTRADICTED",
+                "confidence": 0.9,
+                "reasoning": "This contradicts known facts",
+                "caveats": [],
+                "contradictions": ["The actual value is different"],
+            }
+        )
 
         claim = Claim("Wrong fact", "FACT", 0.8, "Incorrect claim")
         verification = await fact_verifier._verify_claim(claim, skip_temporal_validation=True)
@@ -159,13 +184,15 @@ class TestClaimVerification:
     @pytest.mark.asyncio
     async def test_verify_claim_unverifiable(self, fact_verifier, mock_claude_client):
         """Test handling of unverifiable facts"""
-        mock_claude_client.analyze.return_value = json.dumps({
-            "verdict": "UNVERIFIABLE",
-            "confidence": 0.0,
-            "reasoning": "Cannot verify with available sources",
-            "caveats": [],
-            "contradictions": []
-        })
+        mock_claude_client.analyze.return_value = json.dumps(
+            {
+                "verdict": "UNVERIFIABLE",
+                "confidence": 0.0,
+                "reasoning": "Cannot verify with available sources",
+                "caveats": [],
+                "contradictions": [],
+            }
+        )
 
         claim = Claim("Unknown fact", "FACT", 0.7, "Cannot verify")
         verification = await fact_verifier._verify_claim(claim, skip_temporal_validation=True)
@@ -176,13 +203,15 @@ class TestClaimVerification:
     @pytest.mark.asyncio
     async def test_verify_claim_with_caveats(self, fact_verifier, mock_claude_client):
         """Test extraction of caveats from verification"""
-        mock_claude_client.analyze.return_value = json.dumps({
-            "verdict": "VERIFIED",
-            "confidence": 0.85,
-            "reasoning": "Generally correct but with nuances",
-            "caveats": ["Caveat 1", "Caveat 2"],
-            "contradictions": []
-        })
+        mock_claude_client.analyze.return_value = json.dumps(
+            {
+                "verdict": "VERIFIED",
+                "confidence": 0.85,
+                "reasoning": "Generally correct but with nuances",
+                "caveats": ["Caveat 1", "Caveat 2"],
+                "contradictions": [],
+            }
+        )
 
         claim = Claim("Nuanced fact", "FACT", 0.8, "Needs context")
         verification = await fact_verifier._verify_claim(claim, skip_temporal_validation=True)
@@ -206,7 +235,9 @@ class TestTemporalValidation:
     """Test temporal validation of time-sensitive claims"""
 
     @pytest.mark.asyncio
-    async def test_temporal_check_time_sensitive_verified(self, fact_verifier, mock_claude_client, mock_web_fetch, mocker):
+    async def test_temporal_check_time_sensitive_verified(
+        self, fact_verifier, mock_claude_client, mock_web_fetch, mocker
+    ):
         """Test verification that claim is still current"""
         # Initial verification
         initial_verification = FactVerification(
@@ -215,39 +246,44 @@ class TestTemporalValidation:
             confidence=0.95,
             reasoning="Verified against knowledge base",
             caveats=[],
-            contradictions=[]
+            contradictions=[],
         )
 
         # Mock source matcher to return a source
-        mock_find_source = mocker.AsyncMock(return_value={
-            'name': 'White House',
-            'url': 'https://whitehouse.gov',
-            'query_prompt': 'Who is president?'
-        })
+        mock_find_source = mocker.AsyncMock(
+            return_value={
+                "name": "White House",
+                "url": "https://whitehouse.gov",
+                "query_prompt": "Who is president?",
+            }
+        )
         fact_verifier.source_matcher.find_source = mock_find_source
 
         # Mock web_fetch
         mock_web_fetch.return_value = "President: Joe Biden"
 
         # Mock Claude verification
-        mock_claude_client.analyze.return_value = json.dumps({
-            "still_current": True,
-            "confidence": 0.95,
-            "reasoning": "Claim matches current information",
-            "source_quote": "President: Joe Biden"
-        })
+        mock_claude_client.analyze.return_value = json.dumps(
+            {
+                "still_current": True,
+                "confidence": 0.95,
+                "reasoning": "Claim matches current information",
+                "source_quote": "President: Joe Biden",
+            }
+        )
 
         result = await fact_verifier._check_temporal_validity(
-            initial_verification.claim,
-            initial_verification
+            initial_verification.claim, initial_verification
         )
 
         assert result is not None
-        assert result['still_current'] is True
-        assert 'checked_date' in result
+        assert result["still_current"] is True
+        assert "checked_date" in result
 
     @pytest.mark.asyncio
-    async def test_temporal_check_time_sensitive_outdated(self, fact_verifier, mock_claude_client, mock_web_fetch, mocker):
+    async def test_temporal_check_time_sensitive_outdated(
+        self, fact_verifier, mock_claude_client, mock_web_fetch, mocker
+    ):
         """Test detection of outdated facts"""
         initial_verification = FactVerification(
             claim=Claim("The CEO is Jane Doe", "FACT", 0.9, "Corporate leadership"),
@@ -255,34 +291,37 @@ class TestTemporalValidation:
             confidence=0.9,
             reasoning="Verified",
             caveats=[],
-            contradictions=[]
+            contradictions=[],
         )
 
-        mock_find_source = mocker.AsyncMock(return_value={
-            'name': 'Company Site',
-            'url': 'https://company.com',
-            'query_prompt': 'Who is CEO?'
-        })
+        mock_find_source = mocker.AsyncMock(
+            return_value={
+                "name": "Company Site",
+                "url": "https://company.com",
+                "query_prompt": "Who is CEO?",
+            }
+        )
         fact_verifier.source_matcher.find_source = mock_find_source
 
         mock_web_fetch.return_value = "CEO: John Brown (as of 2024)"
 
-        mock_claude_client.analyze.return_value = json.dumps({
-            "still_current": False,
-            "confidence": 0.9,
-            "reasoning": "CEO changed in 2024",
-            "update_info": "Current CEO is John Brown",
-            "source_quote": "CEO: John Brown"
-        })
+        mock_claude_client.analyze.return_value = json.dumps(
+            {
+                "still_current": False,
+                "confidence": 0.9,
+                "reasoning": "CEO changed in 2024",
+                "update_info": "Current CEO is John Brown",
+                "source_quote": "CEO: John Brown",
+            }
+        )
 
         result = await fact_verifier._check_temporal_validity(
-            initial_verification.claim,
-            initial_verification
+            initial_verification.claim, initial_verification
         )
 
         assert result is not None
-        assert result['still_current'] is False
-        assert 'update_info' in result
+        assert result["still_current"] is False
+        assert "update_info" in result
 
     @pytest.mark.asyncio
     async def test_temporal_check_not_time_sensitive(self, fact_verifier):
@@ -293,13 +332,10 @@ class TestTemporalValidation:
             confidence=0.99,
             reasoning="Well-established",
             caveats=[],
-            contradictions=[]
+            contradictions=[],
         )
 
-        result = await fact_verifier._check_temporal_validity(
-            verification.claim,
-            verification
-        )
+        result = await fact_verifier._check_temporal_validity(verification.claim, verification)
 
         # Should return None for non-time-sensitive claims
         assert result is None
@@ -313,22 +349,22 @@ class TestTemporalValidation:
             confidence=0.85,
             reasoning="Verified",
             caveats=[],
-            contradictions=[]
+            contradictions=[],
         )
 
         # Mock source matcher to return None
         mock_find_source = mocker.AsyncMock(return_value=None)
         fact_verifier.source_matcher.find_source = mock_find_source
-        fact_verifier.source_matcher.get_fallback_config = lambda: {'reason': 'No source available'}
+        fact_verifier.source_matcher.get_fallback_config = lambda: {"reason": "No source available"}
 
-        result = await fact_verifier._check_temporal_validity(
-            verification.claim,
-            verification
-        )
+        result = await fact_verifier._check_temporal_validity(verification.claim, verification)
 
         assert result is not None
-        assert result['still_current'] is None
-        assert 'No source available' in result['reasoning'] or 'No authoritative source' in result['reasoning']
+        assert result["still_current"] is None
+        assert (
+            "No source available" in result["reasoning"]
+            or "No authoritative source" in result["reasoning"]
+        )
 
     @pytest.mark.asyncio
     async def test_temporal_check_web_fetch_error(self, fact_verifier, mock_web_fetch, mocker):
@@ -339,38 +375,35 @@ class TestTemporalValidation:
             confidence=0.9,
             reasoning="Verified",
             caveats=[],
-            contradictions=[]
+            contradictions=[],
         )
 
-        mock_find_source = mocker.AsyncMock(return_value={
-            'name': 'Test Source',
-            'url': 'https://test.com',
-            'query_prompt': 'Test'
-        })
+        mock_find_source = mocker.AsyncMock(
+            return_value={"name": "Test Source", "url": "https://test.com", "query_prompt": "Test"}
+        )
         fact_verifier.source_matcher.find_source = mock_find_source
 
         # Mock web_fetch to raise exception
         mock_web_fetch.side_effect = Exception("Network error")
 
-        result = await fact_verifier._check_temporal_validity(
-            verification.claim,
-            verification
-        )
+        result = await fact_verifier._check_temporal_validity(verification.claim, verification)
 
         assert result is not None
-        assert result['still_current'] is None
-        assert 'failed' in result['reasoning'].lower() or 'error' in result['reasoning'].lower()
+        assert result["still_current"] is None
+        assert "failed" in result["reasoning"].lower() or "error" in result["reasoning"].lower()
 
     @pytest.mark.asyncio
     async def test_temporal_check_skip_when_requested(self, fact_verifier, mock_claude_client):
         """Test that skip_temporal_validation flag is respected"""
-        mock_claude_client.analyze.return_value = json.dumps({
-            "verdict": "VERIFIED",
-            "confidence": 0.9,
-            "reasoning": "Verified",
-            "caveats": [],
-            "contradictions": []
-        })
+        mock_claude_client.analyze.return_value = json.dumps(
+            {
+                "verdict": "VERIFIED",
+                "confidence": 0.9,
+                "reasoning": "Verified",
+                "caveats": [],
+                "contradictions": [],
+            }
+        )
 
         claim = Claim("The president is current", "FACT", 0.9, "Time-sensitive")
         verification = await fact_verifier._verify_claim(claim, skip_temporal_validation=True)
@@ -380,7 +413,6 @@ class TestTemporalValidation:
 
     def test_is_time_sensitive_keywords(self):
         """Test keyword detection for time-sensitive claims"""
-        from src.trust.fact_verifier import FactVerifier
 
         # Create instance with None client (we don't need it for this test)
         verifier = FactVerifier(None)
@@ -389,12 +421,8 @@ class TestTemporalValidation:
         assert verifier._is_time_sensitive(
             Claim("The current president is...", "FACT", 0.9, "Test")
         )
-        assert verifier._is_time_sensitive(
-            Claim("Who is the CEO now?", "FACT", 0.9, "Test")
-        )
-        assert verifier._is_time_sensitive(
-            Claim("The director in 2025 is...", "FACT", 0.9, "Test")
-        )
+        assert verifier._is_time_sensitive(Claim("Who is the CEO now?", "FACT", 0.9, "Test"))
+        assert verifier._is_time_sensitive(Claim("The director in 2025 is...", "FACT", 0.9, "Test"))
 
         # Should not detect as time-sensitive (no time-sensitive keywords)
         assert not verifier._is_time_sensitive(
@@ -414,20 +442,29 @@ class TestMainPipeline:
         # Mock claim extraction
         mock_claude_client.analyze.side_effect = [
             # Extraction response
-            json.dumps({
-                "claims": [
-                    {"text": "Fact 1", "type": "FACT", "confidence": 0.9, "reasoning": "Test"},
-                    {"text": "Opinion 1", "type": "OPINION", "confidence": 0.5, "reasoning": "Test"}
-                ]
-            }),
+            json.dumps(
+                {
+                    "claims": [
+                        {"text": "Fact 1", "type": "FACT", "confidence": 0.9, "reasoning": "Test"},
+                        {
+                            "text": "Opinion 1",
+                            "type": "OPINION",
+                            "confidence": 0.5,
+                            "reasoning": "Test",
+                        },
+                    ]
+                }
+            ),
             # Verification response for Fact 1
-            json.dumps({
-                "verdict": "VERIFIED",
-                "confidence": 0.95,
-                "reasoning": "Confirmed",
-                "caveats": [],
-                "contradictions": []
-            })
+            json.dumps(
+                {
+                    "verdict": "VERIFIED",
+                    "confidence": 0.95,
+                    "reasoning": "Confirmed",
+                    "caveats": [],
+                    "contradictions": [],
+                }
+            ),
         ]
 
         response = "Fact 1. Opinion 1."
@@ -440,27 +477,31 @@ class TestMainPipeline:
     @pytest.mark.asyncio
     async def test_verify_parallel_execution(self, fact_verifier, mock_claude_client, mocker):
         """Test that claims are verified in parallel"""
-        verification_response = json.dumps({
-            "verdict": "VERIFIED",
-            "confidence": 0.9,
-            "reasoning": "Test",
-            "caveats": [],
-            "contradictions": []
-        })
+        verification_response = json.dumps(
+            {
+                "verdict": "VERIFIED",
+                "confidence": 0.9,
+                "reasoning": "Test",
+                "caveats": [],
+                "contradictions": [],
+            }
+        )
 
         mock_claude_client.analyze.side_effect = [
             # Extraction
-            json.dumps({
-                "claims": [
-                    {"text": "Fact 1", "type": "FACT", "confidence": 0.9, "reasoning": "Test"},
-                    {"text": "Fact 2", "type": "FACT", "confidence": 0.9, "reasoning": "Test"},
-                    {"text": "Fact 3", "type": "FACT", "confidence": 0.9, "reasoning": "Test"}
-                ]
-            }),
+            json.dumps(
+                {
+                    "claims": [
+                        {"text": "Fact 1", "type": "FACT", "confidence": 0.9, "reasoning": "Test"},
+                        {"text": "Fact 2", "type": "FACT", "confidence": 0.9, "reasoning": "Test"},
+                        {"text": "Fact 3", "type": "FACT", "confidence": 0.9, "reasoning": "Test"},
+                    ]
+                }
+            ),
             # Verifications (3 facts)
             verification_response,
             verification_response,
-            verification_response
+            verification_response,
         ]
 
         response = "Fact 1. Fact 2. Fact 3."
@@ -474,18 +515,27 @@ class TestMainPipeline:
     async def test_verify_with_temporal_skip(self, fact_verifier, mock_claude_client):
         """Test verification with temporal validation skipped"""
         mock_claude_client.analyze.side_effect = [
-            json.dumps({
-                "claims": [
-                    {"text": "Current fact", "type": "FACT", "confidence": 0.9, "reasoning": "Test"}
-                ]
-            }),
-            json.dumps({
-                "verdict": "VERIFIED",
-                "confidence": 0.9,
-                "reasoning": "Test",
-                "caveats": [],
-                "contradictions": []
-            })
+            json.dumps(
+                {
+                    "claims": [
+                        {
+                            "text": "Current fact",
+                            "type": "FACT",
+                            "confidence": 0.9,
+                            "reasoning": "Test",
+                        }
+                    ]
+                }
+            ),
+            json.dumps(
+                {
+                    "verdict": "VERIFIED",
+                    "confidence": 0.9,
+                    "reasoning": "Test",
+                    "caveats": [],
+                    "contradictions": [],
+                }
+            ),
         ]
 
         response = "Current fact"
@@ -498,15 +548,48 @@ class TestMainPipeline:
     async def test_verify_mixed_verdicts(self, fact_verifier, mock_claude_client):
         """Test handling of multiple verdict types"""
         mock_claude_client.analyze.side_effect = [
-            json.dumps({
-                "claims": [
-                    {"text": "Good fact", "type": "FACT", "confidence": 0.9, "reasoning": "Test"},
-                    {"text": "Bad fact", "type": "FACT", "confidence": 0.8, "reasoning": "Test"},
-                    {"text": "Opinion", "type": "OPINION", "confidence": 0.5, "reasoning": "Test"}
-                ]
-            }),
-            json.dumps({"verdict": "VERIFIED", "confidence": 0.95, "reasoning": "Good", "caveats": [], "contradictions": []}),
-            json.dumps({"verdict": "CONTRADICTED", "confidence": 0.9, "reasoning": "Bad", "caveats": [], "contradictions": ["Wrong"]})
+            json.dumps(
+                {
+                    "claims": [
+                        {
+                            "text": "Good fact",
+                            "type": "FACT",
+                            "confidence": 0.9,
+                            "reasoning": "Test",
+                        },
+                        {
+                            "text": "Bad fact",
+                            "type": "FACT",
+                            "confidence": 0.8,
+                            "reasoning": "Test",
+                        },
+                        {
+                            "text": "Opinion",
+                            "type": "OPINION",
+                            "confidence": 0.5,
+                            "reasoning": "Test",
+                        },
+                    ]
+                }
+            ),
+            json.dumps(
+                {
+                    "verdict": "VERIFIED",
+                    "confidence": 0.95,
+                    "reasoning": "Good",
+                    "caveats": [],
+                    "contradictions": [],
+                }
+            ),
+            json.dumps(
+                {
+                    "verdict": "CONTRADICTED",
+                    "confidence": 0.9,
+                    "reasoning": "Bad",
+                    "caveats": [],
+                    "contradictions": ["Wrong"],
+                }
+            ),
         ]
 
         response = "Good fact. Bad fact. Opinion."
@@ -531,14 +614,24 @@ class TestMainPipeline:
     async def test_verify_partial_failures(self, fact_verifier, mock_claude_client):
         """Test that some verifications can fail without blocking others"""
         mock_claude_client.analyze.side_effect = [
-            json.dumps({
-                "claims": [
-                    {"text": "Fact 1", "type": "FACT", "confidence": 0.9, "reasoning": "Test"},
-                    {"text": "Fact 2", "type": "FACT", "confidence": 0.9, "reasoning": "Test"}
-                ]
-            }),
-            json.dumps({"verdict": "VERIFIED", "confidence": 0.9, "reasoning": "Good", "caveats": [], "contradictions": []}),
-            Exception("API Error")  # Second verification fails
+            json.dumps(
+                {
+                    "claims": [
+                        {"text": "Fact 1", "type": "FACT", "confidence": 0.9, "reasoning": "Test"},
+                        {"text": "Fact 2", "type": "FACT", "confidence": 0.9, "reasoning": "Test"},
+                    ]
+                }
+            ),
+            json.dumps(
+                {
+                    "verdict": "VERIFIED",
+                    "confidence": 0.9,
+                    "reasoning": "Good",
+                    "caveats": [],
+                    "contradictions": [],
+                }
+            ),
+            Exception("API Error"),  # Second verification fails
         ]
 
         response = "Fact 1. Fact 2."
@@ -552,12 +645,14 @@ class TestMainPipeline:
     async def test_verify_all_failures(self, fact_verifier, mock_claude_client):
         """Test handling when all verifications fail"""
         mock_claude_client.analyze.side_effect = [
-            json.dumps({
-                "claims": [
-                    {"text": "Fact 1", "type": "FACT", "confidence": 0.9, "reasoning": "Test"}
-                ]
-            }),
-            Exception("Total failure")
+            json.dumps(
+                {
+                    "claims": [
+                        {"text": "Fact 1", "type": "FACT", "confidence": 0.9, "reasoning": "Test"}
+                    ]
+                }
+            ),
+            Exception("Total failure"),
         ]
 
         response = "Fact 1"

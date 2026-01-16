@@ -40,9 +40,9 @@ async def web_fetch(url: str, prompt: str, timeout: int = 30) -> str:
             response = await client.get(
                 url,
                 headers={
-                    'User-Agent': 'InsightWeaver/1.0 (Fact Verification Bot)',
-                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
-                }
+                    "User-Agent": "InsightWeaver/1.0 (Fact Verification Bot)",
+                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                },
             )
             response.raise_for_status()
             html_content = response.text
@@ -50,7 +50,7 @@ async def web_fetch(url: str, prompt: str, timeout: int = 30) -> str:
         logger.info(f"Successfully fetched {len(html_content)} bytes from {url}")
 
         # Parse HTML and extract text
-        soup = BeautifulSoup(html_content, 'html.parser')
+        soup = BeautifulSoup(html_content, "html.parser")
 
         # Remove script and style elements
         for script in soup(["script", "style", "nav", "footer", "header"]):
@@ -60,13 +60,13 @@ async def web_fetch(url: str, prompt: str, timeout: int = 30) -> str:
         # This helps maintain headings, lists, etc.
         try:
             markdown_content = md(str(soup), heading_style="ATX")
-        except:
+        except Exception:
             # Fallback to plain text if markdown conversion fails
-            markdown_content = soup.get_text(separator='\n', strip=True)
+            markdown_content = soup.get_text(separator="\n", strip=True)
 
         # Clean up excessive whitespace
-        lines = [line.strip() for line in markdown_content.split('\n') if line.strip()]
-        clean_content = '\n'.join(lines)
+        lines = [line.strip() for line in markdown_content.split("\n") if line.strip()]
+        clean_content = "\n".join(lines)
 
         # Truncate if too long (keep first 50000 chars to stay within token limits)
         # 50k characters is ~12.5k tokens, well within Claude's 200k token context window
@@ -92,7 +92,7 @@ Provide a factual, precise answer based ONLY on the content above. If the conten
         result = await claude_client.analyze(
             system_prompt="You are a web content analyzer. Extract specific factual information from provided web content accurately.",
             user_message=analysis_prompt,
-            temperature=0.0
+            temperature=0.0,
         )
 
         logger.info(f"Successfully processed content from {url}")

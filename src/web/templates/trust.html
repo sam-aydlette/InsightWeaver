@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+
+{% block title %}Ask AI - InsightWeaver{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Ask AI</h1>
+    <p class="page-subtitle">Get trust-verified answers with fact-checking and bias analysis</p>
+</div>
+
+<div class="card chat-card">
+    <div class="chat-container">
+        <div class="chat-messages" id="chat-messages">
+            <div class="chat-welcome">
+                <h3>How can I help you today?</h3>
+                <p class="text-muted">
+                    Ask me anything. I'll provide a response with trust verification,
+                    including fact-checking and bias analysis.
+                </p>
+                <div class="suggested-queries">
+                    <button class="suggested-query" onclick="askQuestion('What are the latest developments in AI regulation?')">
+                        AI regulation updates
+                    </button>
+                    <button class="suggested-query" onclick="askQuestion('Explain the current economic outlook')">
+                        Economic outlook
+                    </button>
+                    <button class="suggested-query" onclick="askQuestion('What cybersecurity threats should I be aware of?')">
+                        Cybersecurity threats
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="chat-input-container">
+            <input type="text" id="chat-input" class="form-input chat-input" placeholder="Type your question..." onkeypress="handleKeyPress(event)">
+            <button id="send-btn" class="btn btn-primary" onclick="sendMessage()">Send</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const messagesContainer = document.getElementById('chat-messages');
+const chatInput = document.getElementById('chat-input');
+const sendBtn = document.getElementById('send-btn');
+
+function handleKeyPress(event) {
+    if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        sendMessage();
+    }
+}
+
+function askQuestion(question) {
+    chatInput.value = question;
+    sendMessage();
+}
+
+async function sendMessage() {
+    const query = chatInput.value.trim();
+    if (!query) return;
+
+    // Clear welcome message on first query
+    const welcome = messagesContainer.querySelector('.chat-welcome');
+    if (welcome) {
+        welcome.remove();
+    }
+
+    // Add user message
+    addMessage(query, 'user');
+    chatInput.value = '';
+    sendBtn.disabled = true;
+
+    // Add loading message
+    const loadingId = 'loading-' + Date.now();
+    addLoadingMessage(loadingId);
+
+    try {
+        const response = await fetch('{{ url_for("trust.query") }}', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({query: query})
+        });
+
+        const data = await response.json();
+
+        // Remove loading message
+        document.getElementById(loadingId)?.remove();
+
+        if (data.success) {
+            addAssistantMessage(data);
+        } else {
+            addMessage('Error: ' + (data.error || 'Unknown error'), 'assistant error');
+        }
+    } catch (err) {
+        document.getElementById(loadingId)?.remove();
+        addMessage('Error: ' + err.message, 'assistant error');
+    }
+
+    sendBtn.disabled = false;
+    chatInput.focus();
+}
+
+function addMessage(content, type) {
+    const div = document.createElement('div');
+    div.className = 'chat-message ' + type;
+    div.innerHTML = '<div class="chat-message-content">' + escapeHtml(content) + '</div>';
+    messagesContainer.appendChild(div);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+
+function addLoadingMessage(id) {
+    const div = document.createElement('div');
+    div.id = id;
+    div.className = 'chat-message assistant';
+    div.innerHTML = `
+        <div class="chat-message-content">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <div class="spinner"></div>
+                <span>Analyzing and verifying...</span>
+            </div>
+        </div>
+    `;
+    messagesContainer.appendChild(div);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+
+function addAssistantMessage(data) {
+    const div = document.createElement('div');
+    div.className = 'chat-message assistant';
+
+    let html = '<div class="chat-message-content">';
+
+    // Main response
+    if (data.response) {
+        html += '<div class="response-text">' + formatResponse(data.response) + '</div>';
+    }
+
+    // Trust verification badge
+    if (data.verified) {
+        html += '<div class="trust-badge-container"><span class="trust-badge verified">Trust Verified</span></div>';
+    }
+
+    html += '</div>';
+    div.innerHTML = html;
+    messagesContainer.appendChild(div);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+
+function formatResponse(text) {
+    // Convert markdown-style formatting to HTML
+    let html = escapeHtml(text);
+    // Convert **bold** to <strong>
+    html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    // Convert newlines to <br>
+    html = html.replace(/\n/g, '<br>');
+    return html;
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+</script>
+{% endblock %}

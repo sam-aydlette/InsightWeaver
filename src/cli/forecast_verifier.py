@@ -37,17 +37,13 @@ async def verify_forecast_horizon(horizon_text: str, horizon_name: str) -> dict[
             verify_facts=True,
             check_bias=True,
             check_intimacy=True,
-            skip_temporal_validation=True  # Forecast predictions are speculative, not factual claims
+            skip_temporal_validation=True,  # Forecast predictions are speculative, not factual claims
         )
         logger.info(f"Trust verification completed for {horizon_name}")
         return analysis
     except Exception as e:
         logger.error(f"Trust verification failed for {horizon_name}: {e}", exc_info=True)
-        return {
-            "analyzed": False,
-            "error": True,
-            "message": f"Verification unavailable: {str(e)}"
-        }
+        return {"analyzed": False, "error": True, "message": f"Verification unavailable: {str(e)}"}
 
 
 async def verify_forecast_aggregate(executive_text: str) -> dict[str, Any] | None:
@@ -74,22 +70,17 @@ async def verify_forecast_aggregate(executive_text: str) -> dict[str, Any] | Non
             verify_facts=True,
             check_bias=True,
             check_intimacy=True,
-            skip_temporal_validation=True  # Forecast predictions are speculative
+            skip_temporal_validation=True,  # Forecast predictions are speculative
         )
         logger.info("Trust verification completed for executive summary")
         return analysis
     except Exception as e:
         logger.error(f"Trust verification failed for executive summary: {e}", exc_info=True)
-        return {
-            "analyzed": False,
-            "error": True,
-            "message": f"Verification unavailable: {str(e)}"
-        }
+        return {"analyzed": False, "error": True, "message": f"Verification unavailable: {str(e)}"}
 
 
 def format_forecast_trust_section(
-    analysis: dict[str, Any] | None,
-    horizon_name: str | None = None
+    analysis: dict[str, Any] | None, horizon_name: str | None = None
 ) -> str:
     """
     Format trust analysis for display in forecast output

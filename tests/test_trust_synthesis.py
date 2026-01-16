@@ -1,9 +1,12 @@
 """
 Unit tests for trust-integrated synthesis with citations
 """
-import pytest
+
 import json
 from datetime import datetime
+
+import pytest
+
 from src.context.synthesizer import NarrativeSynthesizer
 
 
@@ -21,15 +24,15 @@ class TestCitationPromptGeneration:
                 "title": "Cybersecurity Spending Increases",
                 "source": "TechNews",
                 "url": "https://example.com/article1",
-                "published_date": "2025-01-15"
+                "published_date": "2025-01-15",
             },
             {
                 "id": 2,
                 "title": "Local Council Votes on Zoning",
                 "source": "LocalNews",
                 "url": "https://example.com/article2",
-                "published_date": "2025-01-16"
-            }
+                "published_date": "2025-01-16",
+            },
         ]
 
         # Generate citation prompt
@@ -59,7 +62,7 @@ class TestCitationPromptGeneration:
                 "title": 'Article with "quotes" and special chars',
                 "source": "News & Analysis",
                 "url": "https://example.com/article?id=1&test=true",
-                "published_date": "2025-01-15"
+                "published_date": "2025-01-15",
             }
         ]
 
@@ -76,8 +79,13 @@ class TestCitationPromptGeneration:
         synthesizer = NarrativeSynthesizer()
 
         articles = [
-            {"id": 1, "title": "Test Article", "source": "Test Source",
-             "url": "https://test.com", "published_date": "2025-01-15"}
+            {
+                "id": 1,
+                "title": "Test Article",
+                "source": "Test Source",
+                "url": "https://test.com",
+                "published_date": "2025-01-15",
+            }
         ]
 
         prompt = synthesizer._build_synthesis_task_with_citations(articles, len(articles))
@@ -112,7 +120,7 @@ class TestCitationPromptGeneration:
         # Articles with minimal fields
         articles = [
             {"id": 1},  # Missing title, source, url, published_date
-            {"id": 2, "title": "Test"}  # Missing other fields
+            {"id": 2, "title": "Test"},  # Missing other fields
         ]
 
         prompt = synthesizer._build_synthesis_task_with_citations(articles, len(articles))
@@ -131,45 +139,57 @@ class TestCitationParsing:
         synthesizer = NarrativeSynthesizer()
 
         # Sample response with citations
-        response = json.dumps({
-            "bottom_line": {
-                "summary": "Cybersecurity spending increased 15%^[1] due to new mandates^[2]",
-                "immediate_actions": ["Review security budget^[1]"],
-                "article_citations": [1, 2]
-            },
-            "trends_and_patterns": {
-                "local": [
-                    {
-                        "subject": "Tech hiring^[1]",
-                        "direction": "increasing",
-                        "quantifier": "23% year-over-year^[1]",
-                        "description": "Driven by AI startups^[1]",
-                        "confidence": 0.85,
-                        "article_citations": [1]
-                    }
-                ],
-                "state_regional": [],
-                "national": [],
-                "global": [],
-                "niche_field": []
-            },
-            "priority_events": [],
-            "predictions_scenarios": {
-                "local_governance": [],
-                "education": [],
-                "niche_field": [],
-                "economic_conditions": [],
-                "infrastructure": []
-            },
-            "metadata": {
-                "articles_analyzed": 2,
-                "generated_at": datetime.utcnow().isoformat(),
-                "citation_map": {
-                    "1": {"article_id": 1, "title": "Tech News", "source": "TechSource", "url": "https://test.com"},
-                    "2": {"article_id": 2, "title": "Security Update", "source": "SecSource", "url": "https://test2.com"}
-                }
+        response = json.dumps(
+            {
+                "bottom_line": {
+                    "summary": "Cybersecurity spending increased 15%^[1] due to new mandates^[2]",
+                    "immediate_actions": ["Review security budget^[1]"],
+                    "article_citations": [1, 2],
+                },
+                "trends_and_patterns": {
+                    "local": [
+                        {
+                            "subject": "Tech hiring^[1]",
+                            "direction": "increasing",
+                            "quantifier": "23% year-over-year^[1]",
+                            "description": "Driven by AI startups^[1]",
+                            "confidence": 0.85,
+                            "article_citations": [1],
+                        }
+                    ],
+                    "state_regional": [],
+                    "national": [],
+                    "global": [],
+                    "niche_field": [],
+                },
+                "priority_events": [],
+                "predictions_scenarios": {
+                    "local_governance": [],
+                    "education": [],
+                    "niche_field": [],
+                    "economic_conditions": [],
+                    "infrastructure": [],
+                },
+                "metadata": {
+                    "articles_analyzed": 2,
+                    "generated_at": datetime.utcnow().isoformat(),
+                    "citation_map": {
+                        "1": {
+                            "article_id": 1,
+                            "title": "Tech News",
+                            "source": "TechSource",
+                            "url": "https://test.com",
+                        },
+                        "2": {
+                            "article_id": 2,
+                            "title": "Security Update",
+                            "source": "SecSource",
+                            "url": "https://test2.com",
+                        },
+                    },
+                },
             }
-        })
+        )
 
         parsed = synthesizer._parse_synthesis_response(response)
 
@@ -185,31 +205,30 @@ class TestCitationParsing:
         synthesizer = NarrativeSynthesizer()
 
         # Old format without citation fields
-        response = json.dumps({
-            "bottom_line": {
-                "summary": "Cybersecurity spending increased 15%",
-                "immediate_actions": []
-            },
-            "trends_and_patterns": {
-                "local": [],
-                "state_regional": [],
-                "national": [],
-                "global": [],
-                "niche_field": []
-            },
-            "priority_events": [],
-            "predictions_scenarios": {
-                "local_governance": [],
-                "education": [],
-                "niche_field": [],
-                "economic_conditions": [],
-                "infrastructure": []
-            },
-            "metadata": {
-                "articles_analyzed": 2,
-                "generated_at": datetime.utcnow().isoformat()
+        response = json.dumps(
+            {
+                "bottom_line": {
+                    "summary": "Cybersecurity spending increased 15%",
+                    "immediate_actions": [],
+                },
+                "trends_and_patterns": {
+                    "local": [],
+                    "state_regional": [],
+                    "national": [],
+                    "global": [],
+                    "niche_field": [],
+                },
+                "priority_events": [],
+                "predictions_scenarios": {
+                    "local_governance": [],
+                    "education": [],
+                    "niche_field": [],
+                    "economic_conditions": [],
+                    "infrastructure": [],
+                },
+                "metadata": {"articles_analyzed": 2, "generated_at": datetime.utcnow().isoformat()},
             }
-        })
+        )
 
         parsed = synthesizer._parse_synthesis_response(response)
 

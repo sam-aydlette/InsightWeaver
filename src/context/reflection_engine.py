@@ -16,21 +16,19 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ShallowArea:
     """Represents an area needing deeper analysis"""
+
     topic: str
     issue: str
     deeper_question: str
 
     def to_dict(self) -> dict[str, str]:
-        return {
-            "topic": self.topic,
-            "issue": self.issue,
-            "deeper_question": self.deeper_question
-        }
+        return {"topic": self.topic, "issue": self.issue, "deeper_question": self.deeper_question}
 
 
 @dataclass
 class ReflectionResult:
     """Results of synthesis depth evaluation"""
+
     depth_score: float  # 0-10
     shallow_areas: list[ShallowArea]
     missing_connections: list[str]
@@ -43,7 +41,7 @@ class ReflectionResult:
             "shallow_areas": [area.to_dict() for area in self.shallow_areas],
             "missing_connections": self.missing_connections,
             "recommendations": self.recommendations,
-            "evaluation_metadata": self.evaluation_metadata
+            "evaluation_metadata": self.evaluation_metadata,
         }
 
 
@@ -55,9 +53,7 @@ class ReflectionEngine:
         self.client = ClaudeClient()
 
     async def evaluate_depth(
-        self,
-        synthesis_data: dict[str, Any],
-        context: dict[str, Any]
+        self, synthesis_data: dict[str, Any], context: dict[str, Any]
     ) -> ReflectionResult:
         """
         Evaluate synthesis for analytical depth
@@ -83,7 +79,7 @@ class ReflectionEngine:
                 system_prompt="You are an expert evaluator assessing intelligence brief quality and analytical depth.",
                 user_message=reflection_prompt,
                 temperature=0.3,  # Lower temperature for consistent evaluation
-                max_tokens=2000
+                max_tokens=2000,
             )
 
             # Parse reflection response
@@ -103,14 +99,11 @@ class ReflectionEngine:
                 shallow_areas=[],
                 missing_connections=[],
                 recommendations=[],
-                evaluation_metadata={"error": str(e), "fallback": True}
+                evaluation_metadata={"error": str(e), "fallback": True},
             )
 
     async def generate_refinement_prompt(
-        self,
-        synthesis_data: dict[str, Any],
-        reflection: ReflectionResult,
-        context: dict[str, Any]
+        self, synthesis_data: dict[str, Any], reflection: ReflectionResult, _context: dict[str, Any]
     ) -> str:
         """
         Generate prompt for synthesis refinement
@@ -132,10 +125,12 @@ class ReflectionEngine:
 
         # Add shallow areas guidance
         if reflection.shallow_areas:
-            areas_text = "\n".join([
-                f"- **{area.topic}**: {area.issue}\n  Deeper question: {area.deeper_question}"
-                for area in reflection.shallow_areas
-            ])
+            areas_text = "\n".join(
+                [
+                    f"- **{area.topic}**: {area.issue}\n  Deeper question: {area.deeper_question}"
+                    for area in reflection.shallow_areas
+                ]
+            )
             refinement_sections.append(f"### Areas Needing Depth\n{areas_text}")
 
         # Add missing connections
@@ -233,20 +228,24 @@ Focus on QUALITY over QUANTITY - every statement should provide insight, not jus
             for category, items in trends.items():
                 if items:
                     category_name = category.replace("_", " ").title()
-                    trend_text = "\n".join([
-                        f"- {t.get('subject', '')}: {t.get('direction', '')} {t.get('quantifier', '')}"
-                        for t in items
-                    ])
+                    trend_text = "\n".join(
+                        [
+                            f"- {t.get('subject', '')}: {t.get('direction', '')} {t.get('quantifier', '')}"
+                            for t in items
+                        ]
+                    )
                     sections.append(f"TRENDS ({category_name})\n{trend_text}")
 
         # Priority events
         if "priority_events" in synthesis_data:
             events = synthesis_data["priority_events"]
             if events:
-                event_text = "\n".join([
-                    f"- [{e.get('impact_level', '')}] {e.get('event', '')}: {e.get('why_matters', '')}"
-                    for e in events
-                ])
+                event_text = "\n".join(
+                    [
+                        f"- [{e.get('impact_level', '')}] {e.get('event', '')}: {e.get('why_matters', '')}"
+                        for e in events
+                    ]
+                )
                 sections.append(f"PRIORITY EVENTS\n{event_text}")
 
         # Predictions
@@ -255,19 +254,17 @@ Focus on QUALITY over QUANTITY - every statement should provide insight, not jus
             for category, items in predictions.items():
                 if items:
                     category_name = category.replace("_", " ").title()
-                    pred_text = "\n".join([
-                        f"- {p.get('prediction', '')} (confidence: {p.get('confidence', 'N/A')})"
-                        for p in items
-                    ])
+                    pred_text = "\n".join(
+                        [
+                            f"- {p.get('prediction', '')} (confidence: {p.get('confidence', 'N/A')})"
+                            for p in items
+                        ]
+                    )
                     sections.append(f"PREDICTIONS ({category_name})\n{pred_text}")
 
         return "\n\n".join(sections)
 
-    def _build_reflection_prompt(
-        self,
-        synthesis_text: str,
-        context: dict[str, Any]
-    ) -> str:
+    def _build_reflection_prompt(self, synthesis_text: str, context: dict[str, Any]) -> str:
         """Build prompt for depth evaluation"""
 
         article_count = len(context.get("articles", []))
@@ -377,12 +374,12 @@ Be critical but constructive. The goal is to identify genuine opportunities for 
                     "historical_awareness": 8,
                     "cross_article_synthesis": 8,
                     "prediction_specificity": 8,
-                    "implication_exploration": 8
+                    "implication_exploration": 8,
                 },
                 "shallow_areas": [],
                 "missing_connections": [],
                 "recommendations": [],
-                "parse_error": str(e)
+                "parse_error": str(e),
             }
 
     def _build_reflection_result(self, reflection_data: dict[str, Any]) -> ReflectionResult:
@@ -391,18 +388,20 @@ Be critical but constructive. The goal is to identify genuine opportunities for 
         # Extract shallow areas
         shallow_areas = []
         for area_data in reflection_data.get("shallow_areas", []):
-            shallow_areas.append(ShallowArea(
-                topic=area_data.get("topic", ""),
-                issue=area_data.get("issue", ""),
-                deeper_question=area_data.get("deeper_question", "")
-            ))
+            shallow_areas.append(
+                ShallowArea(
+                    topic=area_data.get("topic", ""),
+                    issue=area_data.get("issue", ""),
+                    deeper_question=area_data.get("deeper_question", ""),
+                )
+            )
 
         # Build metadata
         metadata = {
             "dimension_scores": reflection_data.get("dimension_scores", {}),
-            "timestamp": logging.Formatter().formatTime(logging.LogRecord(
-                "", 0, "", 0, "", (), None
-            ))
+            "timestamp": logging.Formatter().formatTime(
+                logging.LogRecord("", 0, "", 0, "", (), None)
+            ),
         }
 
         if "parse_error" in reflection_data:
@@ -413,5 +412,5 @@ Be critical but constructive. The goal is to identify genuine opportunities for 
             shallow_areas=shallow_areas,
             missing_connections=reflection_data.get("missing_connections", []),
             recommendations=reflection_data.get("recommendations", []),
-            evaluation_metadata=metadata
+            evaluation_metadata=metadata,
         )

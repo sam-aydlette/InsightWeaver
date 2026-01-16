@@ -3,6 +3,7 @@ Personalized Narrative Newsletter Templates for InsightWeaver
 Story-driven, temporal-layered intelligence briefings
 """
 
+import re
 from datetime import datetime
 from typing import Any
 
@@ -27,6 +28,88 @@ class PersonalizedNarrativeTemplate(NewsletterTemplate):
     """Personalized narrative-driven intelligence brief template"""
 
     @staticmethod
+    def _convert_citations_to_links(text: str, citation_map: dict[str, Any]) -> str:
+        """
+        Convert citation markers like ^[1,3] to clickable HTML links.
+
+        Args:
+            text: Text containing citation markers
+            citation_map: Map of citation numbers to article details
+
+        Returns:
+            Text with citations converted to HTML anchor links
+        """
+        if not text or not citation_map:
+            return text
+
+        def replace_citation(match: re.Match) -> str:
+            # Extract citation numbers from match (e.g., "1,3" from "^[1,3]")
+            citation_nums = match.group(1).split(",")
+            links = []
+            for num in citation_nums:
+                num = num.strip()
+                if num in citation_map:
+                    # Link to the sources section at the bottom of the page
+                    links.append(f'<a href="#citation-{num}" class="citation-link">[{num}]</a>')
+                else:
+                    links.append(f"[{num}]")
+            return '<sup class="citations">' + "".join(links) + "</sup>"
+
+        # Match ^[N] or ^[N,M,O] patterns
+        pattern = r"\^\[([0-9,\s]+)\]"
+        return re.sub(pattern, replace_citation, text)
+
+    @staticmethod
+    def _render_sources_section(citation_map: dict[str, Any]) -> str:
+        """
+        Render the Sources/References section at the bottom of the report.
+
+        Args:
+            citation_map: Map of citation numbers to article details
+
+        Returns:
+            HTML for the sources section
+        """
+        if not citation_map:
+            return ""
+
+        html = """
+        <div class="section sources-section">
+            <h2>Sources</h2>
+            <ol class="sources-list">
+        """
+
+        # Sort citations by number
+        sorted_nums = sorted(citation_map.keys(), key=lambda x: int(x))
+
+        for num in sorted_nums:
+            citation = citation_map[num]
+            title = citation.get("title", "Unknown Title")
+            source = citation.get("source", "Unknown Source")
+            url = citation.get("url", "")
+
+            if url:
+                html += f"""
+                <li id="citation-{num}" class="source-item">
+                    <a href="{url}" target="_blank" rel="noopener noreferrer">{title}</a>
+                    <span class="source-name">- {source}</span>
+                </li>
+                """
+            else:
+                html += f"""
+                <li id="citation-{num}" class="source-item">
+                    {title}
+                    <span class="source-name">- {source}</span>
+                </li>
+                """
+
+        html += """
+            </ol>
+        </div>
+        """
+        return html
+
+    @staticmethod
     def generate_html(data: dict[str, Any]) -> str:
         """
         Generate HTML version of intelligence brief
@@ -34,28 +117,44 @@ class PersonalizedNarrativeTemplate(NewsletterTemplate):
         Args:
             data: Must contain 'synthesis_data' from NarrativeSynthesizer
         """
-        synthesis = data.get('synthesis_data', {})
-        metadata = synthesis.get('metadata', {})
-        bottom_line = synthesis.get('bottom_line', {})
-        trends = synthesis.get('trends_and_patterns', {})
-        events = synthesis.get('priority_events', [])
-        predictions = synthesis.get('predictions_scenarios', {})
+        synthesis = data.get("synthesis_data", {})
+        metadata = synthesis.get("metadata", {})
+        bottom_line_raw = synthesis.get("bottom_line", {})
+        # Handle bottom_line being either a string or dict
+        if isinstance(bottom_line_raw, str):
+            bottom_line = {"summary": bottom_line_raw, "immediate_actions": []}
+        else:
+            bottom_line = bottom_line_raw if bottom_line_raw else {}
+        trends = synthesis.get("trends_and_patterns", {})
+        events = synthesis.get("priority_events", [])
+        predictions = synthesis.get("predictions_scenarios", {})
+
+        # Extract citation_map for source linking
+        citation_map = metadata.get("citation_map", {})
 
         # Get user context for personalization
-        user_context = data.get('user_context', {})
-        location = user_context.get('location', {})
-        location_str = f"{location.get('city', 'Your Area')}, {location.get('state', 'State')}"
-        niche_field = user_context.get('professional_domains', ['Technology'])[0] if user_context.get('professional_domains') else 'Professional Domain'
+        user_context = data.get("user_context", {})
+        location = user_context.get("location", {})
+        # Handle location being either a string or dict
+        if isinstance(location, str):
+            location_str = location if location else "Your Area"
+        else:
+            location_str = f"{location.get('city', 'Your Area')}, {location.get('state', 'State')}"
+        niche_field = (
+            user_context.get("professional_domains", ["Technology"])[0]
+            if user_context.get("professional_domains")
+            else "Professional Domain"
+        )
 
         # Determine report title and date range based on report type
-        report_type = data.get('report_type', 'daily')
-        duration_hours = data.get('duration_hours', 24)
+        report_type = data.get("report_type", "daily")
+        duration_hours = data.get("duration_hours", 24)
 
-        if report_type == 'daily':
+        if report_type == "daily":
             title = "Daily Intelligence Brief"
-        elif report_type == 'weekly':
+        elif report_type == "weekly":
             title = "Weekly Intelligence Analysis"
-        elif report_type == 'update':
+        elif report_type == "update":
             title = "Intelligence Update"
         else:
             # Custom duration
@@ -66,10 +165,12 @@ class PersonalizedNarrativeTemplate(NewsletterTemplate):
                 title = f"Intelligence Report ({days}d)"
 
         # Format date range
-        if 'start_date' in data and 'end_date' in data:
-            date_range = f"{data['start_date'].strftime('%b %d')} - {data['end_date'].strftime('%b %d, %Y')}"
+        if "start_date" in data and "end_date" in data:
+            date_range = (
+                f"{data['start_date'].strftime('%b %d')} - {data['end_date'].strftime('%b %d, %Y')}"
+            )
         else:
-            date_range = data.get('date', datetime.now()).strftime('%B %d, %Y')
+            date_range = data.get("date", datetime.now()).strftime("%B %d, %Y")
 
         html = f"""
 <!DOCTYPE html>
@@ -531,6 +632,56 @@ class PersonalizedNarrativeTemplate(NewsletterTemplate):
             font-size: 13px;
             font-style: italic;
         }}
+        .citations {{
+            font-size: 10px;
+            vertical-align: super;
+            line-height: 0;
+        }}
+        .citation-link {{
+            color: #3182ce;
+            text-decoration: none;
+            font-weight: 600;
+            padding: 0 1px;
+        }}
+        .citation-link:hover {{
+            text-decoration: underline;
+            color: #2c5282;
+        }}
+        .sources-section {{
+            background: #f7fafc;
+            border-radius: 6px;
+            padding: 24px;
+            margin-top: 36px;
+        }}
+        .sources-section h2 {{
+            margin: 0 0 16px 0;
+            color: #2d3748;
+            font-size: 20px;
+            font-weight: 700;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 8px;
+        }}
+        .sources-list {{
+            margin: 0;
+            padding-left: 24px;
+        }}
+        .source-item {{
+            margin: 8px 0;
+            font-size: 13px;
+            line-height: 1.5;
+            color: #2d3748;
+        }}
+        .source-item a {{
+            color: #3182ce;
+            text-decoration: none;
+        }}
+        .source-item a:hover {{
+            text-decoration: underline;
+        }}
+        .source-name {{
+            color: #718096;
+            font-style: italic;
+        }}
         .footer {{
             text-align: center;
             color: #a0aec0;
@@ -549,24 +700,26 @@ class PersonalizedNarrativeTemplate(NewsletterTemplate):
             <div class="meta">
                 {date_range} |
                 Personalized for {location_str} |
-                {data.get('articles_analyzed', metadata.get('articles_analyzed', 0))} sources analyzed
+                {data.get("articles_analyzed", metadata.get("articles_analyzed", 0))} sources analyzed
             </div>
         </div>
 
-        {PersonalizedNarrativeTemplate._render_bottom_line(bottom_line)}
+        {PersonalizedNarrativeTemplate._render_bottom_line(bottom_line, citation_map)}
 
-        {PersonalizedNarrativeTemplate._render_civic_engagement(events)}
+        {PersonalizedNarrativeTemplate._render_civic_engagement(events, citation_map)}
 
-        {PersonalizedNarrativeTemplate._render_trends_and_patterns(trends, niche_field)}
+        {PersonalizedNarrativeTemplate._render_trends_and_patterns(trends, niche_field, citation_map)}
 
-        {PersonalizedNarrativeTemplate._render_priority_events(events)}
+        {PersonalizedNarrativeTemplate._render_priority_events(events, citation_map)}
 
-        {PersonalizedNarrativeTemplate._render_predictions(predictions, niche_field)}
+        {PersonalizedNarrativeTemplate._render_predictions(predictions, niche_field, citation_map)}
+
+        {PersonalizedNarrativeTemplate._render_sources_section(citation_map)}
 
         <div class="footer">
             Generated by <a href="#">InsightWeaver</a> |
-            Synthesis ID: {metadata.get('synthesis_id', 'N/A')[:8]}... |
-            {metadata.get('generated_at', 'Unknown time')}
+            Synthesis ID: {metadata.get("synthesis_id", "N/A")[:8]}... |
+            {metadata.get("generated_at", "Unknown time")}
         </div>
     </div>
 </body>
@@ -575,17 +728,21 @@ class PersonalizedNarrativeTemplate(NewsletterTemplate):
         return html.strip()
 
     @staticmethod
-    def _render_bottom_line(bottom_line: dict[str, Any]) -> str:
+    def _render_bottom_line(bottom_line: dict[str, Any], citation_map: dict[str, Any]) -> str:
         """Render bottom line section"""
         if not bottom_line:
             return ""
 
-        summary = bottom_line.get('summary', 'No summary available')
-        actions = bottom_line.get('immediate_actions', [])
+        summary = bottom_line.get("summary", "No summary available")
+        actions = bottom_line.get("immediate_actions", [])
+
+        # Convert citations to links
+        convert = PersonalizedNarrativeTemplate._convert_citations_to_links
+        summary = convert(summary, citation_map)
 
         html = f"""
         <div class="bottom-line">
-            <h2>⚡ BOTTOM LINE</h2>
+            <h2>BOTTOM LINE</h2>
             <div class="summary">{summary}</div>
         """
 
@@ -596,6 +753,7 @@ class PersonalizedNarrativeTemplate(NewsletterTemplate):
                 <ul>
             """
             for action in actions:
+                action = convert(action, citation_map)
                 html += f"<li>{action}</li>\n"
             html += """
                 </ul>
@@ -606,23 +764,27 @@ class PersonalizedNarrativeTemplate(NewsletterTemplate):
         return html
 
     @staticmethod
-    def _render_trends_and_patterns(trends: dict[str, list[dict[str, Any]]], niche_field: str) -> str:
+    def _render_trends_and_patterns(
+        trends: dict[str, list[dict[str, Any]]], niche_field: str, citation_map: dict[str, Any]
+    ) -> str:
         """Render trends organized by geographic scope"""
         if not trends:
             return ""
 
+        convert = PersonalizedNarrativeTemplate._convert_citations_to_links
+
         html = """
         <div class="section">
-            <h2>📊 TRENDS & PATTERNS</h2>
+            <h2>TRENDS & PATTERNS</h2>
         """
 
         # Geographic scopes with labels
         scopes = [
-            ('local', '🏘️ Local'),
-            ('state_regional', '🗺️ State/Regional'),
-            ('national', '🏛️ National'),
-            ('global', '🌍 Global'),
-            ('niche_field', f'💼 {niche_field}')
+            ("local", "Local"),
+            ("state_regional", "State/Regional"),
+            ("national", "National"),
+            ("global", "Global"),
+            ("niche_field", f"{niche_field}"),
         ]
 
         for scope_key, scope_label in scopes:
@@ -637,10 +799,10 @@ class PersonalizedNarrativeTemplate(NewsletterTemplate):
             """
 
             for trend in scope_trends:
-                subject = trend.get('subject', '')
-                direction = trend.get('direction', 'stable')
-                quantifier = trend.get('quantifier', '')
-                description = trend.get('description', '')
+                subject = convert(trend.get("subject", ""), citation_map)
+                direction = trend.get("direction", "stable")
+                quantifier = convert(trend.get("quantifier", ""), citation_map)
+                description = convert(trend.get("description", ""), citation_map)
 
                 # Format trend
                 trend_text = f"{subject} {direction}"
@@ -650,7 +812,7 @@ class PersonalizedNarrativeTemplate(NewsletterTemplate):
                 html += f"""
                 <li class="trend-item">
                     <span class="trend-text">{trend_text}</span>
-                    {f'<div class="trend-desc">{description}</div>' if description else ''}
+                    {f'<div class="trend-desc">{description}</div>' if description else ""}
                 </li>
                 """
 
@@ -663,14 +825,16 @@ class PersonalizedNarrativeTemplate(NewsletterTemplate):
         return html
 
     @staticmethod
-    def _render_priority_events(events: list[dict[str, Any]]) -> str:
+    def _render_priority_events(events: list[dict[str, Any]], citation_map: dict[str, Any]) -> str:
         """Render priority events table"""
         if not events:
             return ""
 
+        convert = PersonalizedNarrativeTemplate._convert_citations_to_links
+
         html = """
         <div class="section">
-            <h2>📅 PRIORITY EVENTS (Next 2-4 Weeks)</h2>
+            <h2>PRIORITY EVENTS (Next 2-4 Weeks)</h2>
             <table class="events-table">
                 <thead>
                     <tr>
@@ -685,12 +849,11 @@ class PersonalizedNarrativeTemplate(NewsletterTemplate):
         """
 
         for event in events:
-            impact = event.get('impact_level', 'MEDIUM')
-            event_name = event.get('event', '')
-            when = event.get('when', '')
-            why_matters = event.get('why_matters', '')
-            action = event.get('recommended_action', '')
-            confidence = event.get('confidence', 0)
+            impact = event.get("impact_level", "MEDIUM")
+            event_name = convert(event.get("event", ""), citation_map)
+            when = convert(event.get("when", ""), citation_map)
+            why_matters = convert(event.get("why_matters", ""), citation_map)
+            action = convert(event.get("recommended_action", ""), citation_map)
 
             html += f"""
                 <tr class="event-row impact-{impact.lower()}">
@@ -710,22 +873,26 @@ class PersonalizedNarrativeTemplate(NewsletterTemplate):
         return html
 
     @staticmethod
-    def _render_predictions(predictions: dict[str, list[dict[str, Any]]], niche_field: str) -> str:
+    def _render_predictions(
+        predictions: dict[str, list[dict[str, Any]]], niche_field: str, citation_map: dict[str, Any]
+    ) -> str:
         """Render predictions with confidence indicators"""
         if not predictions:
             return ""
 
+        convert = PersonalizedNarrativeTemplate._convert_citations_to_links
+
         html = """
         <div class="section">
-            <h2>🔮 PREDICTIONS & SCENARIOS (2-4 Week Horizon)</h2>
+            <h2>PREDICTIONS & SCENARIOS (2-4 Week Horizon)</h2>
         """
 
         categories = [
-            ('local_governance', '🏛️ Local Governance/Services'),
-            ('education', '🎓 Education/Schools'),
-            ('niche_field', f'💼 {niche_field}'),
-            ('economic_conditions', '💰 Economic Conditions'),
-            ('infrastructure', '🚧 Infrastructure/Transportation')
+            ("local_governance", "Local Governance/Services"),
+            ("education", "Education/Schools"),
+            ("niche_field", f"{niche_field}"),
+            ("economic_conditions", "Economic Conditions"),
+            ("infrastructure", "Infrastructure/Transportation"),
         ]
 
         for cat_key, cat_label in categories:
@@ -740,21 +907,21 @@ class PersonalizedNarrativeTemplate(NewsletterTemplate):
             """
 
             for pred in cat_predictions:
-                prediction_text = pred.get('prediction', '')
+                prediction_text = convert(pred.get("prediction", ""), citation_map)
                 # Map confidence to high/medium/low for CSS styling
-                conf = pred.get('confidence', 0.5)
-                confidence_level = 'high' if conf >= 0.7 else ('medium' if conf >= 0.4 else 'low')
-                timeframe = pred.get('timeframe', '2-4 weeks')
-                rationale = pred.get('rationale', '')
+                conf = pred.get("confidence", 0.5)
+                confidence_level = "high" if conf >= 0.7 else ("medium" if conf >= 0.4 else "low")
+                timeframe = pred.get("timeframe", "2-4 weeks")
+                rationale = convert(pred.get("rationale", ""), citation_map)
 
                 html += f"""
                 <li class="prediction-item confidence-{confidence_level}">
                     <div class="prediction-text">{prediction_text}</div>
                     <div class="prediction-meta">
-                        <span class="confidence">{int(conf*100)}% confidence</span>
+                        <span class="confidence">{int(conf * 100)}% confidence</span>
                         <span class="timeframe">{timeframe}</span>
                     </div>
-                    {f'<div class="rationale">{rationale}</div>' if rationale else ''}
+                    {f'<div class="rationale">{rationale}</div>' if rationale else ""}
                 </li>
                 """
 
@@ -767,14 +934,29 @@ class PersonalizedNarrativeTemplate(NewsletterTemplate):
         return html
 
     @staticmethod
-    def _render_civic_engagement(events: list[dict[str, Any]]) -> str:
+    def _render_civic_engagement(events: list[dict[str, Any]], citation_map: dict[str, Any]) -> str:
         """Render civic engagement section with government meetings, public hearings, and civic deadlines"""
         if not events:
             return ""
 
+        convert = PersonalizedNarrativeTemplate._convert_citations_to_links
+
         # Filter for civic events (keywords: meeting, hearing, board, school board, election, zoning, council)
-        civic_keywords = ['meeting', 'hearing', 'board', 'school board', 'election', 'zoning', 'council',
-                         'public comment', 'supervisor', 'ordinance', 'ballot', 'vote', 'planning commission']
+        civic_keywords = [
+            "meeting",
+            "hearing",
+            "board",
+            "school board",
+            "election",
+            "zoning",
+            "council",
+            "public comment",
+            "supervisor",
+            "ordinance",
+            "ballot",
+            "vote",
+            "planning commission",
+        ]
 
         civic_events = []
         for event in events:
@@ -787,23 +969,22 @@ class PersonalizedNarrativeTemplate(NewsletterTemplate):
 
         html = """
         <div class="civic-section">
-            <h2>🏛️ CIVIC ENGAGEMENT OPPORTUNITIES</h2>
+            <h2>CIVIC ENGAGEMENT OPPORTUNITIES</h2>
             <p style="margin: 0 0 16px 0; color: #4a5568; font-size: 15px;">
                 Upcoming meetings, public hearings, and civic participation opportunities in your area.
             </p>
         """
 
         for event in civic_events:
-            event_name = event.get('event', '')
-            when = event.get('when', '')
-            why_matters = event.get('why_matters', '')
-            action = event.get('recommended_action', '')
-            impact = event.get('impact_level', 'MEDIUM')
+            event_name = convert(event.get("event", ""), citation_map)
+            when = convert(event.get("when", ""), citation_map)
+            why_matters = convert(event.get("why_matters", ""), citation_map)
+            action = convert(event.get("recommended_action", ""), citation_map)
 
             html += f"""
             <div class="civic-event">
                 <div class="civic-event-title">{event_name}</div>
-                <div class="civic-event-date">📅 {when}</div>
+                <div class="civic-event-date">{when}</div>
                 <div class="civic-event-details">{why_matters}</div>
         """
 

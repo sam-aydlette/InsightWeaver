@@ -3,6 +3,7 @@
 InsightWeaver - Main Application Entry Point
 Multi-command CLI for intelligent RSS feed analysis and trust verification
 """
+
 import sys
 from pathlib import Path
 

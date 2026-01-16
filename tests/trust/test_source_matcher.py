@@ -2,9 +2,11 @@
 Unit tests for AuthoritativeSourceMatcher
 Tests source loading, intelligent matching, dynamic URL construction, and keyword fallback
 """
+
 import json
+
 import pytest
-from pathlib import Path
+
 from src.trust.source_matcher import AuthoritativeSourceMatcher
 
 
@@ -61,20 +63,22 @@ class TestIntelligentMatching:
     """Test Claude-based intelligent source matching"""
 
     @pytest.mark.asyncio
-    async def test_find_source_successful_match(self, mocker, mock_claude_client, mock_yaml_sources):
+    async def test_find_source_successful_match(
+        self, mocker, mock_claude_client, mock_yaml_sources
+    ):
         """Test successful source matching via Claude"""
         mock_open = mocker.mock_open(read_data="sources:\n  - name: Test")
         mocker.patch("builtins.open", mock_open)
         mocker.patch("yaml.safe_load", return_value=mock_yaml_sources)
 
         # Mock Claude response
-        mock_claude_client.analyze.return_value = json.dumps({
-            "best_match_id": 0,
-            "confidence": 0.95,
-            "reasoning": "This is a current leaders query"
-        })
+        mock_claude_client.analyze.return_value = json.dumps(
+            {"best_match_id": 0, "confidence": 0.95, "reasoning": "This is a current leaders query"}
+        )
 
-        matcher = AuthoritativeSourceMatcher(config_path="/fake/path.yaml", claude_client=mock_claude_client)
+        matcher = AuthoritativeSourceMatcher(
+            config_path="/fake/path.yaml", claude_client=mock_claude_client
+        )
         claim = "Who is the Prime Minister of India?"
         result = await matcher.find_source(claim)
 
@@ -92,13 +96,17 @@ class TestIntelligentMatching:
         mocker.patch("yaml.safe_load", return_value=mock_yaml_sources)
 
         # Mock Claude response with no match
-        mock_claude_client.analyze.return_value = json.dumps({
-            "best_match_id": None,
-            "confidence": 0.0,
-            "reasoning": "No appropriate authoritative source available for this type of claim"
-        })
+        mock_claude_client.analyze.return_value = json.dumps(
+            {
+                "best_match_id": None,
+                "confidence": 0.0,
+                "reasoning": "No appropriate authoritative source available for this type of claim",
+            }
+        )
 
-        matcher = AuthoritativeSourceMatcher(config_path="/fake/path.yaml", claude_client=mock_claude_client)
+        matcher = AuthoritativeSourceMatcher(
+            config_path="/fake/path.yaml", claude_client=mock_claude_client
+        )
         claim = "I think cats are better than dogs"
         result = await matcher.find_source(claim)
 
@@ -122,7 +130,9 @@ class TestIntelligentMatching:
         """Test behavior when no sources are loaded"""
         mocker.patch("builtins.open", side_effect=FileNotFoundError)
 
-        matcher = AuthoritativeSourceMatcher(config_path="/fake/path.yaml", claude_client=mock_claude_client)
+        matcher = AuthoritativeSourceMatcher(
+            config_path="/fake/path.yaml", claude_client=mock_claude_client
+        )
         claim = "Who is the Prime Minister of India?"
         result = await matcher.find_source(claim)
 
@@ -130,27 +140,35 @@ class TestIntelligentMatching:
         mock_claude_client.analyze.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_find_source_invalid_match_id(self, mocker, mock_claude_client, mock_yaml_sources):
+    async def test_find_source_invalid_match_id(
+        self, mocker, mock_claude_client, mock_yaml_sources
+    ):
         """Test handling of invalid match ID from Claude"""
         mock_open = mocker.mock_open(read_data="sources:\n  - name: Test")
         mocker.patch("builtins.open", mock_open)
         mocker.patch("yaml.safe_load", return_value=mock_yaml_sources)
 
         # Mock Claude response with invalid ID
-        mock_claude_client.analyze.return_value = json.dumps({
-            "best_match_id": 999,  # Out of range
-            "confidence": 0.8,
-            "reasoning": "Test"
-        })
+        mock_claude_client.analyze.return_value = json.dumps(
+            {
+                "best_match_id": 999,  # Out of range
+                "confidence": 0.8,
+                "reasoning": "Test",
+            }
+        )
 
-        matcher = AuthoritativeSourceMatcher(config_path="/fake/path.yaml", claude_client=mock_claude_client)
+        matcher = AuthoritativeSourceMatcher(
+            config_path="/fake/path.yaml", claude_client=mock_claude_client
+        )
         claim = "Test claim"
         result = await matcher.find_source(claim)
 
         assert result is None
 
     @pytest.mark.asyncio
-    async def test_find_source_json_parse_error(self, mocker, mock_claude_client, mock_yaml_sources):
+    async def test_find_source_json_parse_error(
+        self, mocker, mock_claude_client, mock_yaml_sources
+    ):
         """Test handling of malformed JSON response from Claude"""
         mock_open = mocker.mock_open(read_data="sources:\n  - name: Test")
         mocker.patch("builtins.open", mock_open)
@@ -159,7 +177,9 @@ class TestIntelligentMatching:
         # Mock Claude response with invalid JSON
         mock_claude_client.analyze.return_value = "Invalid JSON {{"
 
-        matcher = AuthoritativeSourceMatcher(config_path="/fake/path.yaml", claude_client=mock_claude_client)
+        matcher = AuthoritativeSourceMatcher(
+            config_path="/fake/path.yaml", claude_client=mock_claude_client
+        )
         claim = "Test claim"
         result = await matcher.find_source(claim)
 
@@ -175,14 +195,18 @@ class TestIntelligentMatching:
         # Mock Claude API error
         mock_claude_client.analyze.side_effect = Exception("API Error")
 
-        matcher = AuthoritativeSourceMatcher(config_path="/fake/path.yaml", claude_client=mock_claude_client)
+        matcher = AuthoritativeSourceMatcher(
+            config_path="/fake/path.yaml", claude_client=mock_claude_client
+        )
         claim = "Test claim"
         result = await matcher.find_source(claim)
 
         assert result is None
 
     @pytest.mark.asyncio
-    async def test_find_source_with_markdown_wrapper(self, mocker, mock_claude_client, mock_yaml_sources):
+    async def test_find_source_with_markdown_wrapper(
+        self, mocker, mock_claude_client, mock_yaml_sources
+    ):
         """Test JSON extraction from markdown code blocks"""
         mock_open = mocker.mock_open(read_data="sources:\n  - name: Test")
         mocker.patch("builtins.open", mock_open)
@@ -192,7 +216,9 @@ class TestIntelligentMatching:
         json_content = {"best_match_id": 0, "confidence": 0.9, "reasoning": "Test"}
         mock_claude_client.analyze.return_value = f"```json\n{json.dumps(json_content)}\n```"
 
-        matcher = AuthoritativeSourceMatcher(config_path="/fake/path.yaml", claude_client=mock_claude_client)
+        matcher = AuthoritativeSourceMatcher(
+            config_path="/fake/path.yaml", claude_client=mock_claude_client
+        )
         claim = "Who is the Prime Minister of India?"
         result = await matcher.find_source(claim)
 
@@ -200,20 +226,26 @@ class TestIntelligentMatching:
         assert result["name"] == "Wikipedia - Current Leaders"
 
     @pytest.mark.asyncio
-    async def test_find_source_geographic_specificity(self, mocker, mock_claude_client, mock_yaml_sources):
+    async def test_find_source_geographic_specificity(
+        self, mocker, mock_claude_client, mock_yaml_sources
+    ):
         """Test that Claude correctly handles geographic specificity"""
         mock_open = mocker.mock_open(read_data="sources:\n  - name: Test")
         mocker.patch("builtins.open", mock_open)
         mocker.patch("yaml.safe_load", return_value=mock_yaml_sources)
 
         # Mock Claude selecting geographically appropriate source
-        mock_claude_client.analyze.return_value = json.dumps({
-            "best_match_id": 0,
-            "confidence": 0.95,
-            "reasoning": "India-specific query requires Wikipedia current leaders source"
-        })
+        mock_claude_client.analyze.return_value = json.dumps(
+            {
+                "best_match_id": 0,
+                "confidence": 0.95,
+                "reasoning": "India-specific query requires Wikipedia current leaders source",
+            }
+        )
 
-        matcher = AuthoritativeSourceMatcher(config_path="/fake/path.yaml", claude_client=mock_claude_client)
+        matcher = AuthoritativeSourceMatcher(
+            config_path="/fake/path.yaml", claude_client=mock_claude_client
+        )
         claim = "Who is the Prime Minister of India in 2025?"
         result = await matcher.find_source(claim)
 
@@ -227,7 +259,9 @@ class TestDynamicURLConstruction:
     """Test dynamic URL construction with country extraction"""
 
     @pytest.mark.asyncio
-    async def test_construct_dynamic_url_success(self, mocker, mock_claude_client, mock_yaml_sources):
+    async def test_construct_dynamic_url_success(
+        self, mocker, mock_claude_client, mock_yaml_sources
+    ):
         """Test successful dynamic URL construction"""
         mock_open = mocker.mock_open(read_data="sources:\n  - name: Test")
         mocker.patch("builtins.open", mock_open)
@@ -240,30 +274,30 @@ class TestDynamicURLConstruction:
                     "url_template": "https://www.cia.gov/the-world-factbook/countries/{country}/",
                     "requires_country_extraction": True,
                     "query_prompt": "Find current leader information for {country}",
-                    "keywords": ["president", "prime minister", "leader"]
+                    "keywords": ["president", "prime minister", "leader"],
                 }
             ],
-            "fallback": {"enabled": True}
+            "fallback": {"enabled": True},
         }
         mocker.patch("yaml.safe_load", return_value=sources_with_template)
 
         # Mock Claude responses
         mock_claude_client.analyze.side_effect = [
             # First call: source matching
-            json.dumps({
-                "best_match_id": 0,
-                "confidence": 0.95,
-                "reasoning": "CIA factbook is appropriate for country leaders"
-            }),
+            json.dumps(
+                {
+                    "best_match_id": 0,
+                    "confidence": 0.95,
+                    "reasoning": "CIA factbook is appropriate for country leaders",
+                }
+            ),
             # Second call: country extraction
-            json.dumps({
-                "country": "India",
-                "slug_hyphen": "india",
-                "slug_underscore": "India"
-            })
+            json.dumps({"country": "India", "slug_hyphen": "india", "slug_underscore": "India"}),
         ]
 
-        matcher = AuthoritativeSourceMatcher(config_path="/fake/path.yaml", claude_client=mock_claude_client)
+        matcher = AuthoritativeSourceMatcher(
+            config_path="/fake/path.yaml", claude_client=mock_claude_client
+        )
         claim = "Who is the Prime Minister of India?"
         result = await matcher.find_source(claim)
 
@@ -286,24 +320,30 @@ class TestDynamicURLConstruction:
                     "url_template": "https://en.wikipedia.org/wiki/Politics_of_{country}",
                     "requires_country_extraction": True,
                     "query_prompt": "Find political information",
-                    "keywords": ["politics", "government"]
+                    "keywords": ["politics", "government"],
                 }
             ],
-            "fallback": {"enabled": True}
+            "fallback": {"enabled": True},
         }
         mocker.patch("yaml.safe_load", return_value=sources_with_wikipedia)
 
         # Mock Claude responses
         mock_claude_client.analyze.side_effect = [
-            json.dumps({"best_match_id": 0, "confidence": 0.9, "reasoning": "Wikipedia appropriate"}),
-            json.dumps({
-                "country": "South Korea",
-                "slug_hyphen": "south-korea",
-                "slug_underscore": "South_Korea"
-            })
+            json.dumps(
+                {"best_match_id": 0, "confidence": 0.9, "reasoning": "Wikipedia appropriate"}
+            ),
+            json.dumps(
+                {
+                    "country": "South Korea",
+                    "slug_hyphen": "south-korea",
+                    "slug_underscore": "South_Korea",
+                }
+            ),
         ]
 
-        matcher = AuthoritativeSourceMatcher(config_path="/fake/path.yaml", claude_client=mock_claude_client)
+        matcher = AuthoritativeSourceMatcher(
+            config_path="/fake/path.yaml", claude_client=mock_claude_client
+        )
         claim = "Politics of South Korea"
         result = await matcher.find_source(claim)
 
@@ -324,20 +364,22 @@ class TestDynamicURLConstruction:
                     "name": "Test Source",
                     "url_template": "https://example.com/{country}/",
                     "requires_country_extraction": True,
-                    "keywords": ["test"]
+                    "keywords": ["test"],
                 }
             ],
-            "fallback": {"enabled": True}
+            "fallback": {"enabled": True},
         }
         mocker.patch("yaml.safe_load", return_value=sources_with_template)
 
         # Mock Claude responses - extraction returns invalid JSON
         mock_claude_client.analyze.side_effect = [
             json.dumps({"best_match_id": 0, "confidence": 0.9, "reasoning": "Test"}),
-            "Invalid JSON"
+            "Invalid JSON",
         ]
 
-        matcher = AuthoritativeSourceMatcher(config_path="/fake/path.yaml", claude_client=mock_claude_client)
+        matcher = AuthoritativeSourceMatcher(
+            config_path="/fake/path.yaml", claude_client=mock_claude_client
+        )
         claim = "Test claim"
         result = await matcher.find_source(claim)
 
@@ -356,20 +398,20 @@ class TestDynamicURLConstruction:
                     "requires_country_extraction": True,
                     # Missing both url_template and url - should fail
                     "keywords": ["test"],
-                    "query_prompt": "Test query"
+                    "query_prompt": "Test query",
                 }
             ],
-            "fallback": {"enabled": True}
+            "fallback": {"enabled": True},
         }
         mocker.patch("yaml.safe_load", return_value=sources_without_template)
 
-        mock_claude_client.analyze.return_value = json.dumps({
-            "best_match_id": 0,
-            "confidence": 0.9,
-            "reasoning": "Test"
-        })
+        mock_claude_client.analyze.return_value = json.dumps(
+            {"best_match_id": 0, "confidence": 0.9, "reasoning": "Test"}
+        )
 
-        matcher = AuthoritativeSourceMatcher(config_path="/fake/path.yaml", claude_client=mock_claude_client)
+        matcher = AuthoritativeSourceMatcher(
+            config_path="/fake/path.yaml", claude_client=mock_claude_client
+        )
         claim = "Test claim"
         result = await matcher.find_source(claim)
 
@@ -390,10 +432,10 @@ class TestDynamicURLConstruction:
                     "name": "Test Source",
                     "url_template": "https://example.com/{country}/",
                     "requires_country_extraction": True,
-                    "keywords": ["test"]
+                    "keywords": ["test"],
                 }
             ],
-            "fallback": {"enabled": True}
+            "fallback": {"enabled": True},
         }
         mocker.patch("yaml.safe_load", return_value=sources_with_template)
 
@@ -432,16 +474,16 @@ class TestKeywordMatchingFallback:
                     "name": "Source A",
                     "url": "https://example-a.com",
                     "query_prompt": "Query A",
-                    "keywords": ["economy", "gdp"]
+                    "keywords": ["economy", "gdp"],
                 },
                 {
                     "name": "Source B",
                     "url": "https://example-b.com",
                     "query_prompt": "Query B",
-                    "keywords": ["economy", "gdp", "inflation"]
-                }
+                    "keywords": ["economy", "gdp", "inflation"],
+                },
             ],
-            "fallback": {"enabled": True}
+            "fallback": {"enabled": True},
         }
         mocker.patch("yaml.safe_load", return_value=sources_with_keywords)
 
@@ -464,16 +506,16 @@ class TestKeywordMatchingFallback:
                     "name": "Partial Match",
                     "url": "https://partial.com",
                     "query_prompt": "Query",
-                    "keywords": ["president", "election", "vote", "campaign"]
+                    "keywords": ["president", "election", "vote", "campaign"],
                 },
                 {
                     "name": "Full Match",
                     "url": "https://full.com",
                     "query_prompt": "Query",
-                    "keywords": ["president", "election"]
-                }
+                    "keywords": ["president", "election"],
+                },
             ],
-            "fallback": {"enabled": True}
+            "fallback": {"enabled": True},
         }
         mocker.patch("yaml.safe_load", return_value=sources)
 

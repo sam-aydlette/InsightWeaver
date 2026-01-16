@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Key - InsightWeaver Setup</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+</head>
+<body>
+    <div class="setup-container">
+        <div class="setup-progress">
+            <div class="setup-step completed">Welcome</div>
+            <div class="setup-step active">API Key</div>
+            <div class="setup-step">Location</div>
+            <div class="setup-step">Profession</div>
+            <div class="setup-step">Interests</div>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="card">
+            <h2 class="page-title mb-2">Anthropic API Key</h2>
+            <p class="page-subtitle mb-3">
+                InsightWeaver uses Claude AI. You'll need an API key from Anthropic.
+            </p>
+
+            <form method="POST" autocomplete="off">
+                <div class="form-group">
+                    <label class="form-label" for="api_key">API Key</label>
+                    <input
+                        type="password"
+                        id="api_key"
+                        name="api_key"
+                        class="form-input"
+                        placeholder="sk-ant-api03-..."
+                        required
+                        autocomplete="new-password"
+                        data-lpignore="true"
+                        data-1p-ignore="true"
+                    >
+                    <p class="form-hint">
+                        Your key starts with "sk-ant-". Get one at
+                        <a href="https://console.anthropic.com/" target="_blank">console.anthropic.com</a>
+                    </p>
+                </div>
+
+                <div style="display: flex; gap: 12px; justify-content: space-between;">
+                    <a href="{{ url_for('setup.welcome') }}" class="btn btn-secondary">Back</a>
+                    <button type="submit" class="btn btn-primary">Continue</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

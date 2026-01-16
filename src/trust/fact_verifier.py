@@ -2,6 +2,7 @@
 Fact Verification Module
 Extract and verify factual claims using Claude
 """
+
 import asyncio
 import json
 import logging
@@ -16,23 +17,34 @@ logger = logging.getLogger(__name__)
 
 # Time-sensitive keywords that indicate a fact might be outdated
 TIME_SENSITIVE_KEYWORDS = [
-    'current', 'currently', 'now', 'today', 'this year',
-    'present', 'recent', 'latest', 'director', 'ceo', 'president',
-    'leader', 'head of', 'chairman', 'minister', 'secretary',
-    'serving', 'incumbent', 'reigning', '2024', '2025'
+    "current",
+    "currently",
+    "now",
+    "today",
+    "this year",
+    "present",
+    "recent",
+    "latest",
+    "director",
+    "ceo",
+    "president",
+    "leader",
+    "head of",
+    "chairman",
+    "minister",
+    "secretary",
+    "serving",
+    "incumbent",
+    "reigning",
+    "2024",
+    "2025",
 ]
 
 
 class Claim:
     """Represents a single claim extracted from response"""
 
-    def __init__(
-        self,
-        text: str,
-        claim_type: str,
-        confidence: float = 0.5,
-        reasoning: str = ""
-    ):
+    def __init__(self, text: str, claim_type: str, confidence: float = 0.5, reasoning: str = ""):
         """
         Initialize claim
 
@@ -53,7 +65,7 @@ class Claim:
             "text": self.text,
             "type": self.claim_type,
             "confidence": self.confidence,
-            "reasoning": self.reasoning
+            "reasoning": self.reasoning,
         }
 
 
@@ -68,7 +80,7 @@ class FactVerification:
         reasoning: str,
         caveats: list[str] = None,
         contradictions: list[str] = None,
-        temporal_check: dict[str, Any] | None = None
+        temporal_check: dict[str, Any] | None = None,
     ):
         """
         Initialize verification result
@@ -98,7 +110,7 @@ class FactVerification:
             "confidence": self.confidence,
             "reasoning": self.reasoning,
             "caveats": self.caveats,
-            "contradictions": self.contradictions
+            "contradictions": self.contradictions,
         }
         if self.temporal_check:
             result["temporal_check"] = self.temporal_check
@@ -125,7 +137,9 @@ class FactVerifier:
         self.client = client
         self.source_matcher = AuthoritativeSourceMatcher(claude_client=client)
 
-    async def verify(self, response: str, skip_temporal_validation: bool = False) -> list[FactVerification]:
+    async def verify(
+        self, response: str, skip_temporal_validation: bool = False
+    ) -> list[FactVerification]:
         """
         Complete fact verification pipeline
 
@@ -139,7 +153,9 @@ class FactVerifier:
         logger.info("Starting fact verification")
 
         if skip_temporal_validation:
-            logger.info("Temporal validation will be skipped (fetch-first already provided current data)")
+            logger.info(
+                "Temporal validation will be skipped (fetch-first already provided current data)"
+            )
 
         # Step 1: Extract and classify claims
         claims = await self._extract_claims(response)
@@ -157,15 +173,17 @@ class FactVerifier:
         verified_results = []
         for i, result in enumerate(verifications):
             if isinstance(result, Exception):
-                logger.error(f"Claim {i+1} verification failed: {result}")
+                logger.error(f"Claim {i + 1} verification failed: {result}")
                 # Create error verification result
-                verified_results.append(FactVerification(
-                    claim=claims[i],
-                    verdict="ERROR",
-                    confidence=0.0,
-                    reasoning=f"Verification failed: {str(result)}",
-                    sources_checked=[]
-                ))
+                verified_results.append(
+                    FactVerification(
+                        claim=claims[i],
+                        verdict="ERROR",
+                        confidence=0.0,
+                        reasoning=f"Verification failed: {str(result)}",
+                        sources_checked=[],
+                    )
+                )
             else:
                 verified_results.append(result)
 
@@ -188,7 +206,7 @@ class FactVerifier:
             result = await self.client.analyze(
                 system_prompt="You are a claim extraction specialist. Extract and categorize factual claims from text with precision.",
                 user_message=prompt,
-                temperature=0.0  # Deterministic extraction
+                temperature=0.0,  # Deterministic extraction
             )
 
             # Parse JSON response
@@ -201,7 +219,7 @@ class FactVerifier:
                     text=claim_data.get("text", ""),
                     claim_type=claim_data.get("type", "UNKNOWN"),
                     confidence=claim_data.get("confidence", 0.5),
-                    reasoning=claim_data.get("reasoning", "")
+                    reasoning=claim_data.get("reasoning", ""),
                 )
                 claims.append(claim)
 
@@ -215,7 +233,9 @@ class FactVerifier:
             logger.error(f"Claim extraction failed: {e}")
             return []
 
-    async def _verify_claim(self, claim: Claim, skip_temporal_validation: bool = False) -> FactVerification:
+    async def _verify_claim(
+        self, claim: Claim, skip_temporal_validation: bool = False
+    ) -> FactVerification:
         """
         Verify a single claim using Claude
 
@@ -235,19 +255,16 @@ class FactVerifier:
                 confidence=1.0,
                 reasoning=f"Claim is {claim.claim_type.lower()} and cannot be factually verified",
                 caveats=[],
-                contradictions=[]
+                contradictions=[],
             )
 
-        prompt = FACT_VERIFICATION_PROMPT.format(
-            claim=claim.text,
-            claim_type=claim.claim_type
-        )
+        prompt = FACT_VERIFICATION_PROMPT.format(claim=claim.text, claim_type=claim.claim_type)
 
         try:
             result = await self.client.analyze(
                 system_prompt="You are a fact verification specialist. Verify claims using your knowledge base with careful attention to accuracy.",
                 user_message=prompt,
-                temperature=0.0  # Deterministic verification
+                temperature=0.0,  # Deterministic verification
             )
 
             # Parse JSON
@@ -260,7 +277,7 @@ class FactVerifier:
                 confidence=data.get("confidence", 0.5),
                 reasoning=data.get("reasoning", ""),
                 caveats=data.get("caveats", []),
-                contradictions=data.get("contradictions", [])
+                contradictions=data.get("contradictions", []),
             )
 
             # Perform temporal verification for time-sensitive claims (unless already done via fetch-first)
@@ -287,7 +304,7 @@ class FactVerifier:
                 confidence=0.0,
                 reasoning="Verification failed: JSON parse error",
                 caveats=[],
-                contradictions=[]
+                contradictions=[],
             )
         except Exception as e:
             logger.error(f"Claim verification failed: {e}")
@@ -297,7 +314,7 @@ class FactVerifier:
                 confidence=0.0,
                 reasoning=f"Verification failed: {str(e)}",
                 caveats=[],
-                contradictions=[]
+                contradictions=[],
             )
 
     def _is_time_sensitive(self, claim: Claim) -> bool:
@@ -313,7 +330,9 @@ class FactVerifier:
         text_lower = claim.text.lower()
         return any(keyword in text_lower for keyword in TIME_SENSITIVE_KEYWORDS)
 
-    async def _check_temporal_validity(self, claim: Claim, verification: FactVerification) -> dict[str, Any] | None:
+    async def _check_temporal_validity(
+        self, claim: Claim, verification: FactVerification
+    ) -> dict[str, Any] | None:
         """
         Check if a verified fact is still current as of today using authoritative sources
 
@@ -348,10 +367,13 @@ class FactVerifier:
             return {
                 "still_current": None,
                 "confidence": 0.0,
-                "reasoning": fallback.get('reason', 'No authoritative source available for verification beyond model knowledge cutoff (January 2025)'),
+                "reasoning": fallback.get(
+                    "reason",
+                    "No authoritative source available for verification beyond model knowledge cutoff (January 2025)",
+                ),
                 "checked_date": current_date,
                 "source": None,
-                "method": "knowledge_cutoff_limitation"
+                "method": "knowledge_cutoff_limitation",
             }
 
         # Use WebFetch to get current information from authoritative source
@@ -361,10 +383,7 @@ class FactVerifier:
             # Import WebFetch here to avoid circular dependencies
             from ..utils.web_tools import web_fetch
 
-            fetched_content = await web_fetch(
-                url=source['url'],
-                prompt=source['query_prompt']
-            )
+            fetched_content = await web_fetch(url=source["url"], prompt=source["query_prompt"])
 
             # Now ask Claude to verify the claim against the fetched content
             verification_prompt = f"""You are verifying a time-sensitive factual claim against authoritative source information.
@@ -372,7 +391,7 @@ class FactVerifier:
 CLAIM TO VERIFY:
 "{claim.text}"
 
-CURRENT INFORMATION FROM AUTHORITATIVE SOURCE ({source['name']}):
+CURRENT INFORMATION FROM AUTHORITATIVE SOURCE ({source["name"]}):
 {fetched_content}
 
 TASK:
@@ -397,18 +416,20 @@ Notes:
             result = await self.client.analyze(
                 system_prompt=f"You are a fact verification specialist comparing claims to authoritative source data. Today is {current_date}.",
                 user_message=verification_prompt,
-                temperature=0.0
+                temperature=0.0,
             )
 
             result_clean = self._clean_json_response(result)
             data = json.loads(result_clean)
 
             data["checked_date"] = current_date
-            data["source"] = source['name']
-            data["source_url"] = source['url']
+            data["source"] = source["name"]
+            data["source_url"] = source["url"]
             data["method"] = "authoritative_source_webfetch"
 
-            logger.info(f"Temporal verification complete: still_current={data.get('still_current')}")
+            logger.info(
+                f"Temporal verification complete: still_current={data.get('still_current')}"
+            )
             return data
 
         except Exception as e:
@@ -418,8 +439,8 @@ Notes:
                 "confidence": 0.0,
                 "reasoning": f"Temporal verification failed: Could not fetch from authoritative source ({str(e)})",
                 "checked_date": current_date,
-                "source": source['name'] if source else None,
-                "method": "webfetch_error"
+                "source": source["name"] if source else None,
+                "method": "webfetch_error",
             }
 
     def _clean_json_response(self, response: str) -> str:

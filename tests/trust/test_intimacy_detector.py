@@ -2,11 +2,12 @@
 Unit tests for IntimacyDetector
 Tests tone analysis and anthropomorphization detection
 """
+
 import json
+
 import pytest
-from src.trust.intimacy_detector import (
-    IntimacyDetector, IntimacyAnalysis, IntimacyIssue
-)
+
+from src.trust.intimacy_detector import IntimacyAnalysis, IntimacyIssue
 
 
 class TestMainDetection:
@@ -15,11 +16,13 @@ class TestMainDetection:
     @pytest.mark.asyncio
     async def test_detect_professional_tone(self, intimacy_detector, mock_claude_client):
         """Test detection of professional tone with no issues"""
-        mock_claude_client.analyze.return_value = json.dumps({
-            "issues": [],
-            "overall_tone": "PROFESSIONAL",
-            "summary": "Response maintains professional tone throughout"
-        })
+        mock_claude_client.analyze.return_value = json.dumps(
+            {
+                "issues": [],
+                "overall_tone": "PROFESSIONAL",
+                "summary": "Response maintains professional tone throughout",
+            }
+        )
 
         response = "I can assist you with your query. Here is the information you requested."
         analysis = await intimacy_detector.detect(response)
@@ -32,19 +35,21 @@ class TestMainDetection:
     @pytest.mark.asyncio
     async def test_detect_emotion_claims(self, intimacy_detector, mock_claude_client):
         """Test detection of emotion claims like 'I'm excited'"""
-        mock_claude_client.analyze.return_value = json.dumps({
-            "issues": [
-                {
-                    "category": "EMOTION",
-                    "text": "I'm excited to help you",
-                    "explanation": "AI cannot experience emotions like excitement",
-                    "severity": "HIGH",
-                    "professional_alternative": "I'm ready to assist you"
-                }
-            ],
-            "overall_tone": "FAMILIAR",
-            "summary": "Contains emotion claims"
-        })
+        mock_claude_client.analyze.return_value = json.dumps(
+            {
+                "issues": [
+                    {
+                        "category": "EMOTION",
+                        "text": "I'm excited to help you",
+                        "explanation": "AI cannot experience emotions like excitement",
+                        "severity": "HIGH",
+                        "professional_alternative": "I'm ready to assist you",
+                    }
+                ],
+                "overall_tone": "FAMILIAR",
+                "summary": "Contains emotion claims",
+            }
+        )
 
         response = "I'm excited to help you with this!"
         analysis = await intimacy_detector.detect(response)
@@ -57,19 +62,21 @@ class TestMainDetection:
     @pytest.mark.asyncio
     async def test_detect_false_empathy(self, intimacy_detector, mock_claude_client):
         """Test detection of false empathy claims"""
-        mock_claude_client.analyze.return_value = json.dumps({
-            "issues": [
-                {
-                    "category": "FALSE_EMPATHY",
-                    "text": "I understand how you feel",
-                    "explanation": "AI cannot genuinely understand human emotions",
-                    "severity": "MEDIUM",
-                    "professional_alternative": "I recognize this may be challenging"
-                }
-            ],
-            "overall_tone": "FAMILIAR",
-            "summary": "Contains false empathy"
-        })
+        mock_claude_client.analyze.return_value = json.dumps(
+            {
+                "issues": [
+                    {
+                        "category": "FALSE_EMPATHY",
+                        "text": "I understand how you feel",
+                        "explanation": "AI cannot genuinely understand human emotions",
+                        "severity": "MEDIUM",
+                        "professional_alternative": "I recognize this may be challenging",
+                    }
+                ],
+                "overall_tone": "FAMILIAR",
+                "summary": "Contains false empathy",
+            }
+        )
 
         response = "I understand how you feel about this issue"
         analysis = await intimacy_detector.detect(response)
@@ -81,19 +88,21 @@ class TestMainDetection:
     @pytest.mark.asyncio
     async def test_detect_anthropomorphization(self, intimacy_detector, mock_claude_client):
         """Test detection of human-like claims"""
-        mock_claude_client.analyze.return_value = json.dumps({
-            "issues": [
-                {
-                    "category": "ANTHROPOMORPHIZATION",
-                    "text": "I learned from my experiences",
-                    "explanation": "AI doesn't learn from experiences in a human sense",
-                    "severity": "MEDIUM",
-                    "professional_alternative": "My training data includes information about"
-                }
-            ],
-            "overall_tone": "FAMILIAR",
-            "summary": "Contains anthropomorphization"
-        })
+        mock_claude_client.analyze.return_value = json.dumps(
+            {
+                "issues": [
+                    {
+                        "category": "ANTHROPOMORPHIZATION",
+                        "text": "I learned from my experiences",
+                        "explanation": "AI doesn't learn from experiences in a human sense",
+                        "severity": "MEDIUM",
+                        "professional_alternative": "My training data includes information about",
+                    }
+                ],
+                "overall_tone": "FAMILIAR",
+                "summary": "Contains anthropomorphization",
+            }
+        )
 
         response = "I learned from my experiences with similar questions"
         analysis = await intimacy_detector.detect(response)
@@ -104,19 +113,21 @@ class TestMainDetection:
     @pytest.mark.asyncio
     async def test_detect_familiarity_issues(self, intimacy_detector, mock_claude_client):
         """Test detection of inappropriate familiarity"""
-        mock_claude_client.analyze.return_value = json.dumps({
-            "issues": [
-                {
-                    "category": "FAMILIARITY",
-                    "text": "We're in this together",
-                    "explanation": "Creates false sense of partnership",
-                    "severity": "LOW",
-                    "professional_alternative": "I'm here to assist you"
-                }
-            ],
-            "overall_tone": "FAMILIAR",
-            "summary": "Overly familiar tone"
-        })
+        mock_claude_client.analyze.return_value = json.dumps(
+            {
+                "issues": [
+                    {
+                        "category": "FAMILIARITY",
+                        "text": "We're in this together",
+                        "explanation": "Creates false sense of partnership",
+                        "severity": "LOW",
+                        "professional_alternative": "I'm here to assist you",
+                    }
+                ],
+                "overall_tone": "FAMILIAR",
+                "summary": "Overly familiar tone",
+            }
+        )
 
         response = "We're in this together! Let's solve it!"
         analysis = await intimacy_detector.detect(response)
@@ -126,7 +137,9 @@ class TestMainDetection:
         assert analysis.issues[0].severity == "LOW"
 
     @pytest.mark.asyncio
-    async def test_detect_mixed_issues(self, intimacy_detector, mock_claude_client, json_intimacy_detection_response):
+    async def test_detect_mixed_issues(
+        self, intimacy_detector, mock_claude_client, json_intimacy_detection_response
+    ):
         """Test detection of multiple issue types"""
         mock_claude_client.analyze.return_value = json_intimacy_detection_response
 
@@ -139,33 +152,35 @@ class TestMainDetection:
     @pytest.mark.asyncio
     async def test_detect_severity_levels(self, intimacy_detector, mock_claude_client):
         """Test that severity levels are properly detected"""
-        mock_claude_client.analyze.return_value = json.dumps({
-            "issues": [
-                {
-                    "category": "EMOTION",
-                    "text": "I'm thrilled",
-                    "explanation": "High severity emotion",
-                    "severity": "HIGH",
-                    "professional_alternative": "I'm ready"
-                },
-                {
-                    "category": "ANTHROPOMORPHIZATION",
-                    "text": "I think",
-                    "explanation": "Medium severity",
-                    "severity": "MEDIUM",
-                    "professional_alternative": "Based on analysis"
-                },
-                {
-                    "category": "FAMILIARITY",
-                    "text": "Let's do this",
-                    "explanation": "Low severity",
-                    "severity": "LOW",
-                    "professional_alternative": "I can assist"
-                }
-            ],
-            "overall_tone": "INAPPROPRIATE",
-            "summary": "Multiple severity levels"
-        })
+        mock_claude_client.analyze.return_value = json.dumps(
+            {
+                "issues": [
+                    {
+                        "category": "EMOTION",
+                        "text": "I'm thrilled",
+                        "explanation": "High severity emotion",
+                        "severity": "HIGH",
+                        "professional_alternative": "I'm ready",
+                    },
+                    {
+                        "category": "ANTHROPOMORPHIZATION",
+                        "text": "I think",
+                        "explanation": "Medium severity",
+                        "severity": "MEDIUM",
+                        "professional_alternative": "Based on analysis",
+                    },
+                    {
+                        "category": "FAMILIARITY",
+                        "text": "Let's do this",
+                        "explanation": "Low severity",
+                        "severity": "LOW",
+                        "professional_alternative": "I can assist",
+                    },
+                ],
+                "overall_tone": "INAPPROPRIATE",
+                "summary": "Multiple severity levels",
+            }
+        )
 
         response = "I'm thrilled! I think we should do this."
         analysis = await intimacy_detector.detect(response)
@@ -202,11 +217,9 @@ class TestMainDetection:
     @pytest.mark.asyncio
     async def test_detect_empty_response(self, intimacy_detector, mock_claude_client):
         """Test handling of empty input"""
-        mock_claude_client.analyze.return_value = json.dumps({
-            "issues": [],
-            "overall_tone": "PROFESSIONAL",
-            "summary": "No issues"
-        })
+        mock_claude_client.analyze.return_value = json.dumps(
+            {"issues": [], "overall_tone": "PROFESSIONAL", "summary": "No issues"}
+        )
 
         response = ""
         analysis = await intimacy_detector.detect(response)
@@ -225,7 +238,7 @@ class TestDataStructureConversions:
             text="I'm happy to help",
             explanation="AI cannot feel happiness",
             severity="HIGH",
-            professional_alternative="I'm available to assist"
+            professional_alternative="I'm available to assist",
         )
 
         result = issue.to_dict()
@@ -240,10 +253,10 @@ class TestDataStructureConversions:
         analysis = IntimacyAnalysis(
             issues=[
                 IntimacyIssue("EMOTION", "text1", "exp1", "HIGH", "alt1"),
-                IntimacyIssue("FAMILIARITY", "text2", "exp2", "LOW", "alt2")
+                IntimacyIssue("FAMILIARITY", "text2", "exp2", "LOW", "alt2"),
             ],
             overall_tone="FAMILIAR",
-            summary="Test summary"
+            summary="Test summary",
         )
 
         result = analysis.to_dict()
@@ -269,10 +282,10 @@ class TestDataStructureConversions:
                 IntimacyIssue("EMOTION", "t1", "e1", "HIGH", "a1"),
                 IntimacyIssue("EMOTION", "t2", "e2", "HIGH", "a2"),
                 IntimacyIssue("ANTHROPOMORPHIZATION", "t3", "e3", "MEDIUM", "a3"),
-                IntimacyIssue("FAMILIARITY", "t4", "e4", "LOW", "a4")
+                IntimacyIssue("FAMILIARITY", "t4", "e4", "LOW", "a4"),
             ],
             overall_tone="INAPPROPRIATE",
-            summary="Multiple issues"
+            summary="Multiple issues",
         )
         result = mixed.to_dict()
         assert result["high_severity_count"] == 2
@@ -287,9 +300,7 @@ class TestToneAssessment:
     def test_overall_tone_professional(self):
         """Test PROFESSIONAL tone classification"""
         analysis = IntimacyAnalysis(
-            issues=[],
-            overall_tone="PROFESSIONAL",
-            summary="No issues detected"
+            issues=[], overall_tone="PROFESSIONAL", summary="No issues detected"
         )
 
         assert analysis.overall_tone == "PROFESSIONAL"
@@ -298,11 +309,9 @@ class TestToneAssessment:
     def test_overall_tone_familiar(self):
         """Test FAMILIAR tone classification"""
         analysis = IntimacyAnalysis(
-            issues=[
-                IntimacyIssue("FAMILIARITY", "text", "exp", "LOW", "alt")
-            ],
+            issues=[IntimacyIssue("FAMILIARITY", "text", "exp", "LOW", "alt")],
             overall_tone="FAMILIAR",
-            summary="Some familiarity"
+            summary="Some familiarity",
         )
 
         assert analysis.overall_tone == "FAMILIAR"
@@ -311,11 +320,9 @@ class TestToneAssessment:
     def test_overall_tone_inappropriate(self):
         """Test INAPPROPRIATE tone classification"""
         analysis = IntimacyAnalysis(
-            issues=[
-                IntimacyIssue("EMOTION", "text", "exp", "HIGH", "alt")
-            ],
+            issues=[IntimacyIssue("EMOTION", "text", "exp", "HIGH", "alt")],
             overall_tone="INAPPROPRIATE",
-            summary="Emotion claims present"
+            summary="Emotion claims present",
         )
 
         assert analysis.overall_tone == "INAPPROPRIATE"

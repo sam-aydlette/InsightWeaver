@@ -15,9 +15,11 @@ from src.rss.fetcher import RSSFetcher
 
 logger = logging.getLogger(__name__)
 
+
 @dataclass
 class FetchResult:
     """Result of fetching a single RSS feed"""
+
     feed_id: int
     feed_name: str
     success: bool
@@ -25,13 +27,13 @@ class FetchResult:
     error_message: str | None
     fetch_time: float
 
+
 class ParallelRSSFetcher:
     """Fetches multiple RSS feeds in parallel with rate limiting"""
 
-    def __init__(self,
-                 max_concurrent_feeds: int = 10,
-                 requests_per_second: float = 2.0,
-                 timeout: int = 30):
+    def __init__(
+        self, max_concurrent_feeds: int = 10, requests_per_second: float = 2.0, timeout: int = 30
+    ):
         self.max_concurrent_feeds = max_concurrent_feeds
         self.requests_per_second = requests_per_second
         self.timeout = timeout
@@ -64,7 +66,7 @@ class ParallelRSSFetcher:
                     success=success,
                     articles_count=articles_count,
                     error_message=error,
-                    fetch_time=fetch_time
+                    fetch_time=fetch_time,
                 )
 
             except Exception as e:
@@ -77,7 +79,7 @@ class ParallelRSSFetcher:
                     success=False,
                     articles_count=0,
                     error_message=f"Unexpected error: {str(e)}",
-                    fetch_time=fetch_time
+                    fetch_time=fetch_time,
                 )
 
     async def fetch_all_feeds(self, feeds: list[RSSFeed]) -> dict[str, any]:
@@ -97,10 +99,7 @@ class ParallelRSSFetcher:
 
         try:
             # Create tasks for all feeds
-            tasks = [
-                self._rate_limited_fetch(fetcher, feed)
-                for feed in feeds
-            ]
+            tasks = [self._rate_limited_fetch(fetcher, feed) for feed in feeds]
 
             # Execute all tasks concurrently
             results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -111,14 +110,16 @@ class ParallelRSSFetcher:
                 if isinstance(result, Exception):
                     logger.error(f"Task exception: {result}")
                     # Create a failed result for exceptions
-                    fetch_results.append(FetchResult(
-                        feed_id=0,
-                        feed_name="Unknown",
-                        success=False,
-                        articles_count=0,
-                        error_message=str(result),
-                        fetch_time=0.0
-                    ))
+                    fetch_results.append(
+                        FetchResult(
+                            feed_id=0,
+                            feed_name="Unknown",
+                            success=False,
+                            articles_count=0,
+                            error_message=str(result),
+                            fetch_time=0.0,
+                        )
+                    )
                 else:
                     fetch_results.append(result)
 
@@ -127,9 +128,11 @@ class ParallelRSSFetcher:
             # Generate summary
             summary = self._generate_summary(fetch_results, total_time)
 
-            logger.info(f"Parallel fetch completed in {total_time:.2f}s: "
-                       f"{summary['successful_feeds']}/{summary['total_feeds']} successful, "
-                       f"{summary['total_articles']} articles")
+            logger.info(
+                f"Parallel fetch completed in {total_time:.2f}s: "
+                f"{summary['successful_feeds']}/{summary['total_feeds']} successful, "
+                f"{summary['total_articles']} articles"
+            )
 
             return summary
 
@@ -151,53 +154,62 @@ class ParallelRSSFetcher:
         for result in results:
             if not result.success and result.error_message:
                 # Simplify error message for grouping
-                error_type = result.error_message.split(':')[0] if ':' in result.error_message else result.error_message
+                error_type = (
+                    result.error_message.split(":")[0]
+                    if ":" in result.error_message
+                    else result.error_message
+                )
                 error_summary[error_type] = error_summary.get(error_type, 0) + 1
 
         # Feeds that succeeded but got no articles
         empty_feeds = [r for r in results if r.success and r.articles_count == 0]
 
         return {
-            'total_feeds': len(results),
-            'successful_feeds': successful_feeds,
-            'failed_feeds': failed_feeds,
-            'total_articles': total_articles,
-            'total_time': total_time,
-            'avg_fetch_time': avg_fetch_time,
-            'articles_per_second': total_articles / total_time if total_time > 0 else 0,
-            'feeds_per_second': len(results) / total_time if total_time > 0 else 0,
-            'error_summary': error_summary,
-            'empty_feeds': [f.feed_name for f in empty_feeds],
-            'failed_feeds_list': [f.feed_name for f in results if not f.success],
-            'timestamp': datetime.utcnow().isoformat()
+            "total_feeds": len(results),
+            "successful_feeds": successful_feeds,
+            "failed_feeds": failed_feeds,
+            "total_articles": total_articles,
+            "total_time": total_time,
+            "avg_fetch_time": avg_fetch_time,
+            "articles_per_second": total_articles / total_time if total_time > 0 else 0,
+            "feeds_per_second": len(results) / total_time if total_time > 0 else 0,
+            "error_summary": error_summary,
+            "empty_feeds": [f.feed_name for f in empty_feeds],
+            "failed_feeds_list": [f.feed_name for f in results if not f.success],
+            "timestamp": datetime.utcnow().isoformat(),
         }
 
     def _empty_results(self) -> dict[str, any]:
         """Return empty results structure"""
         return {
-            'total_feeds': 0,
-            'successful_feeds': 0,
-            'failed_feeds': 0,
-            'total_articles': 0,
-            'total_time': 0.0,
-            'avg_fetch_time': 0.0,
-            'articles_per_second': 0.0,
-            'feeds_per_second': 0.0,
-            'error_summary': {},
-            'empty_feeds': [],
-            'failed_feeds_list': [],
-            'timestamp': datetime.utcnow().isoformat()
+            "total_feeds": 0,
+            "successful_feeds": 0,
+            "failed_feeds": 0,
+            "total_articles": 0,
+            "total_time": 0.0,
+            "avg_fetch_time": 0.0,
+            "articles_per_second": 0.0,
+            "feeds_per_second": 0.0,
+            "error_summary": {},
+            "empty_feeds": [],
+            "failed_feeds_list": [],
+            "timestamp": datetime.utcnow().isoformat(),
         }
 
-async def fetch_all_active_feeds(max_concurrent: int = 10, rate_limit: float = 2.0) -> dict[str, any]:
+
+async def fetch_all_active_feeds(
+    max_concurrent: int = 10, rate_limit: float = 2.0
+) -> dict[str, any]:
     """
     Convenience function to fetch all active feeds from database
     """
     # Get active feed IDs and basic info from database
     with get_db() as db:
-        active_feeds_data = db.query(RSSFeed.id, RSSFeed.name, RSSFeed.url, RSSFeed.category).filter(
-            RSSFeed.is_active == True
-        ).all()
+        active_feeds_data = (
+            db.query(RSSFeed.id, RSSFeed.name, RSSFeed.url, RSSFeed.category)
+            .filter(RSSFeed.is_active.is_(True))
+            .all()
+        )
 
     if not active_feeds_data:
         logger.warning("No active feeds found in database")
@@ -207,17 +219,13 @@ async def fetch_all_active_feeds(max_concurrent: int = 10, rate_limit: float = 2
     active_feeds = []
     for feed_data in active_feeds_data:
         feed_obj = RSSFeed(
-            id=feed_data.id,
-            name=feed_data.name,
-            url=feed_data.url,
-            category=feed_data.category
+            id=feed_data.id, name=feed_data.name, url=feed_data.url, category=feed_data.category
         )
         active_feeds.append(feed_obj)
 
     # Create parallel fetcher and process feeds
     parallel_fetcher = ParallelRSSFetcher(
-        max_concurrent_feeds=max_concurrent,
-        requests_per_second=rate_limit
+        max_concurrent_feeds=max_concurrent, requests_per_second=rate_limit
     )
 
     return await parallel_fetcher.fetch_all_feeds(active_feeds)

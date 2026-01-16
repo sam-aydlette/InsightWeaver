@@ -33,10 +33,7 @@ class ScenarioModeler:
         self.client = claude_client or ClaudeClient()
 
     async def generate_scenarios(
-        self,
-        baseline_forecast: dict[str, Any],
-        context: dict[str, Any],
-        scenario_count: int = 3
+        self, baseline_forecast: dict[str, Any], context: dict[str, Any], scenario_count: int = 3
     ) -> list[dict[str, Any]]:
         """
         Generate scenario branches from baseline forecast
@@ -59,7 +56,7 @@ class ScenarioModeler:
             response = await self.client.analyze_with_context(
                 context=context,
                 task=task,
-                temperature=1.2  # Higher temperature for creative scenarios
+                temperature=1.2,  # Higher temperature for creative scenarios
             )
 
             # Parse JSON response
@@ -72,11 +69,7 @@ class ScenarioModeler:
             logger.error(f"Error generating scenarios: {e}")
             raise
 
-    def _build_scenario_task(
-        self,
-        baseline_forecast: dict[str, Any],
-        scenario_count: int
-    ) -> str:
+    def _build_scenario_task(self, baseline_forecast: dict[str, Any], scenario_count: int) -> str:
         """
         Build scenario generation task prompt
 
@@ -88,7 +81,7 @@ class ScenarioModeler:
             Formatted task prompt
         """
         # Extract key uncertainties from baseline
-        key_uncertainties = baseline_forecast.get('key_uncertainties', [])
+        key_uncertainties = baseline_forecast.get("key_uncertainties", [])
         uncertainties_text = "\n".join(f"- {u}" for u in key_uncertainties)
 
         task = f"""Based on the baseline forecast provided, generate {scenario_count} distinct scenarios exploring how the future could unfold.
@@ -230,4 +223,3 @@ IMPORTANT:
             logger.error(f"Failed to parse scenarios JSON: {e}")
             logger.error(f"Response was: {response[:500]}...")
             raise ValueError(f"Invalid JSON response from Claude: {e}")
-

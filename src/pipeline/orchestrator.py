@@ -18,17 +18,20 @@ from src.utils.profiler import get_profiler, profile
 
 logger = logging.getLogger(__name__)
 
+
 class PipelineOrchestrator:
     """Orchestrates the complete data pipeline"""
 
-    def __init__(self,
-                 max_concurrent_feeds: int = 10,
-                 rate_limit: float = 2.0,
-                 dedup_hours: int = 24,
-                 prioritize_hours: int = 48,
-                 prioritize_limit: int | None = None,
-                 topic_filters: dict | None = None,
-                 verify_trust: bool = True):
+    def __init__(
+        self,
+        max_concurrent_feeds: int = 10,
+        rate_limit: float = 2.0,
+        dedup_hours: int = 24,
+        prioritize_hours: int = 48,
+        prioritize_limit: int | None = None,
+        topic_filters: dict | None = None,
+        verify_trust: bool = True,
+    ):
         """
         Initialize pipeline orchestrator
 
@@ -65,9 +68,9 @@ class PipelineOrchestrator:
 
         try:
             with get_db() as session:
-                most_recent = session.query(Article.fetched_at).order_by(
-                    Article.fetched_at.desc()
-                ).first()
+                most_recent = (
+                    session.query(Article.fetched_at).order_by(Article.fetched_at.desc()).first()
+                )
 
                 if not most_recent or not most_recent[0]:
                     logger.info("No articles found in database, will fetch RSS feeds")
@@ -84,9 +87,13 @@ class PipelineOrchestrator:
                 should_skip = age_minutes < max_age_minutes
 
                 if should_skip:
-                    logger.info(f"Most recent articles are {age_minutes:.1f} minutes old (<{max_age_minutes}m threshold), skipping RSS fetch")
+                    logger.info(
+                        f"Most recent articles are {age_minutes:.1f} minutes old (<{max_age_minutes}m threshold), skipping RSS fetch"
+                    )
                 else:
-                    logger.info(f"Most recent articles are {age_minutes:.1f} minutes old (>{max_age_minutes}m threshold), will fetch RSS feeds")
+                    logger.info(
+                        f"Most recent articles are {age_minutes:.1f} minutes old (>{max_age_minutes}m threshold), will fetch RSS feeds"
+                    )
 
                 return should_skip, most_recent_time
 
@@ -110,10 +117,7 @@ class PipelineOrchestrator:
         profiler = get_profiler()
         profiler.start_session()
 
-        results = {
-            "pipeline_started": datetime.now(UTC).isoformat(),
-            "stages": {}
-        }
+        results = {"pipeline_started": datetime.now(UTC).isoformat(), "stages": {}}
 
         try:
             # Stage 1: Smart RSS Feed Fetching
@@ -121,8 +125,8 @@ class PipelineOrchestrator:
                 logger.info("Starting Stage 1: RSS Feed Fetching")
 
                 # Check if smart RSS fetch is enabled
-                smart_fetch_enabled = getattr(settings, 'enable_smart_rss_fetch', True)
-                smart_fetch_threshold = getattr(settings, 'smart_rss_fetch_threshold_minutes', 60)
+                smart_fetch_enabled = getattr(settings, "enable_smart_rss_fetch", True)
+                smart_fetch_threshold = getattr(settings, "smart_rss_fetch_threshold_minutes", 60)
 
                 skip_fetch = False
                 most_recent = None
@@ -136,23 +140,32 @@ class PipelineOrchestrator:
                         "skipped": True,
                         "reason": f"Articles less than {smart_fetch_threshold} minutes old",
                         "most_recent_fetch": most_recent.isoformat() if most_recent else None,
-                        "time_saved_seconds": 60
+                        "time_saved_seconds": 60,
                     }
                 else:
                     fetch_results = await self._fetch_feeds()
                     results["stages"]["fetch"] = fetch_results
-                    logger.info(f"Stage 1 complete: {fetch_results['successful_feeds']}/{fetch_results['total_feeds']} feeds fetched")
+                    logger.info(
+                        f"Stage 1 complete: {fetch_results['successful_feeds']}/{fetch_results['total_feeds']} feeds fetched"
+                    )
 
             # Stage 2: Deduplication (only if we got new articles)
             with profile("STAGE_2_DEDUP"):
                 fetch_stage = results["stages"]["fetch"]
-                if not fetch_stage.get("skipped", False) and fetch_stage.get("total_articles", 0) > 0:
+                if (
+                    not fetch_stage.get("skipped", False)
+                    and fetch_stage.get("total_articles", 0) > 0
+                ):
                     logger.info("Starting Stage 2: Article Deduplication")
                     dedup_results = await self._deduplicate_articles()
                     results["stages"]["deduplication"] = dedup_results
-                    logger.info(f"Stage 2 complete: {dedup_results['total_duplicates']} duplicates found")
+                    logger.info(
+                        f"Stage 2 complete: {dedup_results['total_duplicates']} duplicates found"
+                    )
                 else:
-                    reason = "RSS fetch was skipped" if fetch_stage.get("skipped") else "No new articles"
+                    reason = (
+                        "RSS fetch was skipped" if fetch_stage.get("skipped") else "No new articles"
+                    )
                     logger.info(f"Skipping Stage 2: {reason}")
                     results["stages"]["deduplication"] = {"skipped": True, "reason": reason}
 
@@ -161,7 +174,9 @@ class PipelineOrchestrator:
                 logger.info("Starting Stage 3: Content Filtering")
                 filter_results = await self._filter_content()
                 results["stages"]["filtering"] = filter_results
-                logger.info(f"Stage 3 complete: {filter_results['filtered_count']} articles filtered")
+                logger.info(
+                    f"Stage 3 complete: {filter_results['filtered_count']} articles filtered"
+                )
 
             # Stage 4: Narrative Synthesis (only if API key configured)
             with profile("STAGE_4_SYNTHESIS"):
@@ -171,16 +186,23 @@ class PipelineOrchestrator:
                     results["stages"]["synthesis"] = synthesis_results
 
                     articles_synthesized = synthesis_results.get("articles_analyzed", 0)
-                    logger.info(f"Stage 4 complete: {articles_synthesized} articles synthesized into narrative")
+                    logger.info(
+                        f"Stage 4 complete: {articles_synthesized} articles synthesized into narrative"
+                    )
                 else:
                     logger.info("Skipping Stage 4: ANTHROPIC_API_KEY not configured")
-                    results["stages"]["synthesis"] = {"skipped": True, "reason": "API key not configured"}
+                    results["stages"]["synthesis"] = {
+                        "skipped": True,
+                        "reason": "API key not configured",
+                    }
 
             # Calculate pipeline summary
             results["pipeline_completed"] = datetime.now(UTC).isoformat()
             results["summary"] = self._generate_summary(results)
 
-            logger.info(f"Pipeline complete: {results['summary']['total_stages_run']} stages run successfully")
+            logger.info(
+                f"Pipeline complete: {results['summary']['total_stages_run']} stages run successfully"
+            )
 
         except Exception as e:
             logger.error(f"Pipeline failed: {e}")
@@ -193,17 +215,14 @@ class PipelineOrchestrator:
     async def _fetch_feeds(self) -> dict[str, Any]:
         """Run RSS feed fetching stage"""
         return await fetch_all_active_feeds(
-            max_concurrent=self.max_concurrent_feeds,
-            rate_limit=self.rate_limit
+            max_concurrent=self.max_concurrent_feeds, rate_limit=self.rate_limit
         )
 
     async def _deduplicate_articles(self) -> dict[str, Any]:
         """Run article deduplication stage"""
         # Deduplication is synchronous, wrap in executor
         return await asyncio.get_event_loop().run_in_executor(
-            None,
-            run_deduplication,
-            self.dedup_hours
+            None, run_deduplication, self.dedup_hours
         )
 
     async def _filter_content(self) -> dict[str, Any]:
@@ -220,21 +239,21 @@ class PipelineOrchestrator:
                 self.content_filter = ContentFilter(user_profile)
             except FileNotFoundError as e:
                 logger.error(f"User profile not found: {e}")
-                return {
-                    "skipped": True,
-                    "reason": "User profile not found",
-                    "error": str(e)
-                }
+                return {"skipped": True, "reason": "User profile not found", "error": str(e)}
 
         # Get recent unfiltered articles
         session = get_db_session()
         try:
             cutoff_time = datetime.now(UTC) - timedelta(hours=self.dedup_hours)
 
-            articles = session.query(Article).filter(
-                Article.created_at >= cutoff_time,
-                Article.filtered == False  # Only unfiltered articles
-            ).all()
+            articles = (
+                session.query(Article)
+                .filter(
+                    Article.created_at >= cutoff_time,
+                    Article.filtered.is_(False),  # Only unfiltered articles
+                )
+                .all()
+            )
 
             if not articles:
                 return {
@@ -242,7 +261,7 @@ class PipelineOrchestrator:
                     "filtered_count": 0,
                     "kept_count": 0,
                     "filter_rate": 0,
-                    "reasons": {}
+                    "reasons": {},
                 }
 
             # Filter articles
@@ -254,8 +273,10 @@ class PipelineOrchestrator:
             # Get statistics
             stats = self.content_filter.get_filter_stats(articles)
 
-            logger.info(f"Content filtering: {stats['filtered_count']}/{stats['total_articles']} filtered ({stats['filter_rate']:.1%})")
-            for reason, count in stats['reasons'].items():
+            logger.info(
+                f"Content filtering: {stats['filtered_count']}/{stats['total_articles']} filtered ({stats['filter_rate']:.1%})"
+            )
+            for reason, count in stats["reasons"].items():
                 logger.info(f"  - {reason}: {count} articles")
 
             return stats
@@ -274,21 +295,18 @@ class PipelineOrchestrator:
         synthesizer = NarrativeSynthesizer(topic_filters=self.topic_filters)
 
         # Check if trust verification is enabled (can be overridden by CLI flag or settings)
-        use_trust_verification = self.verify_trust and getattr(settings, 'enable_trust_verification', True)
+        use_trust_verification = self.verify_trust and getattr(
+            settings, "enable_trust_verification", True
+        )
 
         if use_trust_verification:
             logger.info("Using trust-verified synthesis with citations")
             return await synthesizer.synthesize_with_trust_verification(
-                hours=self.prioritize_hours,
-                max_articles=50,
-                max_retries=3
+                hours=self.prioritize_hours, max_articles=50, max_retries=3
             )
         else:
             logger.info("Using basic synthesis (trust verification disabled)")
-            return await synthesizer.synthesize(
-                hours=self.prioritize_hours,
-                max_articles=50
-            )
+            return await synthesizer.synthesize(hours=self.prioritize_hours, max_articles=50)
 
     def _generate_summary(self, results: dict[str, Any]) -> dict[str, Any]:
         """Generate pipeline execution summary"""
@@ -301,7 +319,6 @@ class PipelineOrchestrator:
         fetch_stage = stages.get("fetch", {})
         dedup_stage = stages.get("deduplication", {})
         filter_stage = stages.get("filtering", {})
-        priority_stage = stages.get("prioritization", {})
         synthesis_stage = stages.get("synthesis", {})
 
         summary = {
@@ -312,7 +329,7 @@ class PipelineOrchestrator:
             "articles_filtered": filter_stage.get("filtered_count", 0),
             "articles_kept": filter_stage.get("kept_count", 0),
             "articles_synthesized": synthesis_stage.get("articles_analyzed", 0),
-            "narrative_generated": synthesis_stage.get("synthesis_id") is not None
+            "narrative_generated": synthesis_stage.get("synthesis_id") is not None,
         }
 
         # Calculate duration
@@ -324,6 +341,7 @@ class PipelineOrchestrator:
 
         return summary
 
+
 async def run_pipeline(
     max_concurrent: int = 10,
     rate_limit: float = 2.0,
@@ -331,7 +349,7 @@ async def run_pipeline(
     prioritize_hours: int = 48,
     prioritize_limit: int | None = None,
     topic_filters: dict | None = None,
-    verify_trust: bool = True
+    verify_trust: bool = True,
 ) -> dict[str, Any]:
     """
     Convenience function to run the complete pipeline
@@ -355,7 +373,7 @@ async def run_pipeline(
         prioritize_hours=prioritize_hours,
         prioritize_limit=prioritize_limit,
         topic_filters=topic_filters,
-        verify_trust=verify_trust
+        verify_trust=verify_trust,
     )
 
     return await orchestrator.run_full_pipeline()

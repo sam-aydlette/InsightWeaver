@@ -2,10 +2,17 @@
 Unit tests for BiasAnalyzer
 Tests framing, assumptions, omissions, and loaded language detection
 """
+
 import json
+
 import pytest
+
 from src.trust.bias_analyzer import (
-    BiasAnalyzer, BiasAnalysis, FramingIssue, Assumption, Omission, LoadedTerm
+    Assumption,
+    BiasAnalysis,
+    FramingIssue,
+    LoadedTerm,
+    Omission,
 )
 
 
@@ -15,12 +22,9 @@ class TestMainAnalysis:
     @pytest.mark.asyncio
     async def test_analyze_no_bias(self, bias_analyzer, mock_claude_client):
         """Test clean response with no bias issues"""
-        mock_claude_client.analyze.return_value = json.dumps({
-            "framing": [],
-            "assumptions": [],
-            "omissions": [],
-            "loaded_language": []
-        })
+        mock_claude_client.analyze.return_value = json.dumps(
+            {"framing": [], "assumptions": [], "omissions": [], "loaded_language": []}
+        )
 
         response = "Python is a programming language. It was created in 1991."
         analysis = await bias_analyzer.analyze(response)
@@ -35,19 +39,21 @@ class TestMainAnalysis:
     @pytest.mark.asyncio
     async def test_analyze_framing_issues(self, bias_analyzer, mock_claude_client):
         """Test detection of framing bias"""
-        mock_claude_client.analyze.return_value = json.dumps({
-            "framing": [
-                {
-                    "frame_type": "crisis-urgency",
-                    "text": "The situation demands immediate action",
-                    "effect": "Creates artificial urgency without justification",
-                    "alternative": "The situation requires careful consideration"
-                }
-            ],
-            "assumptions": [],
-            "omissions": [],
-            "loaded_language": []
-        })
+        mock_claude_client.analyze.return_value = json.dumps(
+            {
+                "framing": [
+                    {
+                        "frame_type": "crisis-urgency",
+                        "text": "The situation demands immediate action",
+                        "effect": "Creates artificial urgency without justification",
+                        "alternative": "The situation requires careful consideration",
+                    }
+                ],
+                "assumptions": [],
+                "omissions": [],
+                "loaded_language": [],
+            }
+        )
 
         response = "The situation demands immediate action"
         analysis = await bias_analyzer.analyze(response)
@@ -59,18 +65,20 @@ class TestMainAnalysis:
     @pytest.mark.asyncio
     async def test_analyze_assumptions(self, bias_analyzer, mock_claude_client):
         """Test detection of hidden assumptions"""
-        mock_claude_client.analyze.return_value = json.dumps({
-            "framing": [],
-            "assumptions": [
-                {
-                    "assumption": "All users prioritize speed over accessibility",
-                    "basis": "Focus on performance without mentioning accessibility",
-                    "impact": "Excludes users with disabilities from consideration"
-                }
-            ],
-            "omissions": [],
-            "loaded_language": []
-        })
+        mock_claude_client.analyze.return_value = json.dumps(
+            {
+                "framing": [],
+                "assumptions": [
+                    {
+                        "assumption": "All users prioritize speed over accessibility",
+                        "basis": "Focus on performance without mentioning accessibility",
+                        "impact": "Excludes users with disabilities from consideration",
+                    }
+                ],
+                "omissions": [],
+                "loaded_language": [],
+            }
+        )
 
         response = "We optimized for maximum speed"
         analysis = await bias_analyzer.analyze(response)
@@ -82,18 +90,20 @@ class TestMainAnalysis:
     @pytest.mark.asyncio
     async def test_analyze_omissions(self, bias_analyzer, mock_claude_client):
         """Test detection of missing perspectives"""
-        mock_claude_client.analyze.return_value = json.dumps({
-            "framing": [],
-            "assumptions": [],
-            "omissions": [
-                {
-                    "missing_perspective": "Environmental impact of the solution",
-                    "relevance": "Critical for sustainability assessment",
-                    "suggestion": "Include carbon footprint analysis"
-                }
-            ],
-            "loaded_language": []
-        })
+        mock_claude_client.analyze.return_value = json.dumps(
+            {
+                "framing": [],
+                "assumptions": [],
+                "omissions": [
+                    {
+                        "missing_perspective": "Environmental impact of the solution",
+                        "relevance": "Critical for sustainability assessment",
+                        "suggestion": "Include carbon footprint analysis",
+                    }
+                ],
+                "loaded_language": [],
+            }
+        )
 
         response = "This is the best technical solution"
         analysis = await bias_analyzer.analyze(response)
@@ -104,18 +114,20 @@ class TestMainAnalysis:
     @pytest.mark.asyncio
     async def test_analyze_loaded_terms(self, bias_analyzer, mock_claude_client):
         """Test detection of loaded language"""
-        mock_claude_client.analyze.return_value = json.dumps({
-            "framing": [],
-            "assumptions": [],
-            "omissions": [],
-            "loaded_language": [
-                {
-                    "term": "radical changes",
-                    "connotation": "Extreme, potentially dangerous",
-                    "neutral_alternative": "significant changes"
-                }
-            ]
-        })
+        mock_claude_client.analyze.return_value = json.dumps(
+            {
+                "framing": [],
+                "assumptions": [],
+                "omissions": [],
+                "loaded_language": [
+                    {
+                        "term": "radical changes",
+                        "connotation": "Extreme, potentially dangerous",
+                        "neutral_alternative": "significant changes",
+                    }
+                ],
+            }
+        )
 
         response = "We propose radical changes to the system"
         analysis = await bias_analyzer.analyze(response)
@@ -125,7 +137,9 @@ class TestMainAnalysis:
         assert "significant" in analysis.loaded_terms[0].neutral_alternative.lower()
 
     @pytest.mark.asyncio
-    async def test_analyze_all_categories(self, bias_analyzer, mock_claude_client, json_bias_analysis_response):
+    async def test_analyze_all_categories(
+        self, bias_analyzer, mock_claude_client, json_bias_analysis_response
+    ):
         """Test response with all bias types present"""
         mock_claude_client.analyze.return_value = json_bias_analysis_response
 
@@ -166,12 +180,9 @@ class TestMainAnalysis:
     @pytest.mark.asyncio
     async def test_analyze_empty_response(self, bias_analyzer, mock_claude_client):
         """Test handling of empty input"""
-        mock_claude_client.analyze.return_value = json.dumps({
-            "framing": [],
-            "assumptions": [],
-            "omissions": [],
-            "loaded_language": []
-        })
+        mock_claude_client.analyze.return_value = json.dumps(
+            {"framing": [], "assumptions": [], "omissions": [], "loaded_language": []}
+        )
 
         response = ""
         analysis = await bias_analyzer.analyze(response)
@@ -183,10 +194,12 @@ class TestMainAnalysis:
     async def test_analyze_with_text_wrapped_json(self, bias_analyzer, mock_claude_client):
         """Test JSON extraction from explanatory text"""
         json_content = {
-            "framing": [{"frame_type": "test", "text": "test", "effect": "test", "alternative": "test"}],
+            "framing": [
+                {"frame_type": "test", "text": "test", "effect": "test", "alternative": "test"}
+            ],
             "assumptions": [],
             "omissions": [],
-            "loaded_language": []
+            "loaded_language": [],
         }
         wrapped = f"Here's the analysis:\n```json\n{json.dumps(json_content)}\n```\nEnd"
 
@@ -207,7 +220,7 @@ class TestDataStructureConversions:
             frame_type="crisis",
             text="Emergency situation",
             effect="Creates urgency",
-            alternative="Situation requiring attention"
+            alternative="Situation requiring attention",
         )
 
         result = issue.to_dict()
@@ -221,7 +234,7 @@ class TestDataStructureConversions:
         assumption = Assumption(
             assumption="Everyone wants speed",
             basis="Performance focus",
-            impact="Ignores accessibility"
+            impact="Ignores accessibility",
         )
 
         result = assumption.to_dict()
@@ -234,7 +247,7 @@ class TestDataStructureConversions:
         omission = Omission(
             missing_perspective="Environmental impact",
             relevance="Critical for sustainability",
-            suggestion="Include carbon analysis"
+            suggestion="Include carbon analysis",
         )
 
         result = omission.to_dict()
@@ -244,11 +257,7 @@ class TestDataStructureConversions:
 
     def test_loaded_term_to_dict(self):
         """Test LoadedTerm serialization"""
-        term = LoadedTerm(
-            term="radical",
-            connotation="Extreme",
-            neutral_alternative="significant"
-        )
+        term = LoadedTerm(term="radical", connotation="Extreme", neutral_alternative="significant")
 
         result = term.to_dict()
         assert result["term"] == "radical"
@@ -258,18 +267,10 @@ class TestDataStructureConversions:
     def test_bias_analysis_to_dict(self):
         """Test complete BiasAnalysis serialization"""
         analysis = BiasAnalysis(
-            framing_issues=[
-                FramingIssue("crisis", "text", "effect", "alt")
-            ],
-            assumptions=[
-                Assumption("assumption", "basis", "impact")
-            ],
-            omissions=[
-                Omission("missing", "relevance", "suggestion")
-            ],
-            loaded_terms=[
-                LoadedTerm("term", "connotation", "alternative")
-            ]
+            framing_issues=[FramingIssue("crisis", "text", "effect", "alt")],
+            assumptions=[Assumption("assumption", "basis", "impact")],
+            omissions=[Omission("missing", "relevance", "suggestion")],
+            loaded_terms=[LoadedTerm("term", "connotation", "alternative")],
         )
 
         result = analysis.to_dict()
@@ -290,7 +291,7 @@ class TestDataStructureConversions:
             framing_issues=[FramingIssue("f1", "t", "e", "a"), FramingIssue("f2", "t", "e", "a")],
             assumptions=[Assumption("a1", "b", "i")],
             omissions=[],
-            loaded_terms=[LoadedTerm("t1", "c", "n"), LoadedTerm("t2", "c", "n")]
+            loaded_terms=[LoadedTerm("t1", "c", "n"), LoadedTerm("t2", "c", "n")],
         )
         assert multiple.to_dict()["total_issues"] == 5
 
@@ -321,6 +322,7 @@ class TestHelperMethods:
 
         # Should extract the JSON portion
         import json as json_lib
+
         parsed = json_lib.loads(cleaned)
         assert "framing" in parsed
         assert "assumptions" in parsed

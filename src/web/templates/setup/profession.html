@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profession - InsightWeaver Setup</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+</head>
+<body>
+    <div class="setup-container">
+        <div class="setup-progress">
+            <div class="setup-step completed">Welcome</div>
+            <div class="setup-step completed">API Key</div>
+            <div class="setup-step completed">Location</div>
+            <div class="setup-step active">Profession</div>
+            <div class="setup-step">Interests</div>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="card">
+            <h2 class="page-title mb-2">Your Profession</h2>
+            <p class="page-subtitle mb-3">
+                This helps us tailor content to your professional interests.
+            </p>
+
+            <form method="POST">
+                <div class="form-group">
+                    <label class="form-label" for="industry">Industry</label>
+                    <select id="industry" name="industry" class="form-select" required>
+                        <option value="">Select your industry...</option>
+                        {% for industry in industries %}
+                        <option value="{{ industry }}">{{ industry }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="role">Job Title (optional)</label>
+                    <input type="text" id="role" name="role" class="form-input" placeholder="e.g., Software Engineer">
+                </div>
+
+                <div style="display: flex; gap: 12px; justify-content: space-between;">
+                    <a href="{{ url_for('setup.location') }}" class="btn btn-secondary">Back</a>
+                    <button type="submit" class="btn btn-primary">Continue</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

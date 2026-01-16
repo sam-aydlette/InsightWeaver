@@ -2,6 +2,7 @@
 Trust Report Formatting
 Format trust analysis results for terminal display and export
 """
+
 from typing import Any
 
 from .moderate_formatter import format_moderate_trust_summary
@@ -80,7 +81,7 @@ class TrustReportFormatter:
                     "CONTRADICTED": "✗",
                     "UNVERIFIABLE": "?",
                     "OUTDATED": "⏰",
-                    "ERROR": "⚠"
+                    "ERROR": "⚠",
                 }.get(verdict, "?")
 
                 lines.append(f"{i}. [{icon}] {claim.get('text', '')}")
@@ -131,7 +132,7 @@ class TrustReportFormatter:
                     lines.append("### Framing\n")
                     for i, issue in enumerate(framing_issues, 1):
                         lines.append(f"{i}. Frame: {issue.get('frame_type', 'Unknown')}")
-                        lines.append(f"   Text: \"{issue.get('text', '')}\"")
+                        lines.append(f'   Text: "{issue.get("text", "")}"')
                         lines.append(f"   Effect: {issue.get('effect', '')}")
                         lines.append(f"   Alternative: {issue.get('alternative', '')}")
                         lines.append("")
@@ -142,7 +143,7 @@ class TrustReportFormatter:
                     lines.append("### Hidden Assumptions\n")
                     for i, assumption in enumerate(assumptions, 1):
                         lines.append(f"{i}. {assumption.get('assumption', '')}")
-                        lines.append(f"   Basis: \"{assumption.get('basis', '')}\"")
+                        lines.append(f'   Basis: "{assumption.get("basis", "")}"')
                         lines.append(f"   Impact: {assumption.get('impact', '')}")
                         lines.append("")
 
@@ -161,9 +162,11 @@ class TrustReportFormatter:
                 if loaded_terms:
                     lines.append("### Loaded Language\n")
                     for i, term in enumerate(loaded_terms, 1):
-                        lines.append(f"{i}. \"{term.get('term', '')}\"")
+                        lines.append(f'{i}. "{term.get("term", "")}"')
                         lines.append(f"   Connotation: {term.get('connotation', '')}")
-                        lines.append(f"   Neutral alternative: \"{term.get('neutral_alternative', '')}\"")
+                        lines.append(
+                            f'   Neutral alternative: "{term.get("neutral_alternative", "")}"'
+                        )
                         lines.append("")
 
                 # Summary if no issues
@@ -182,11 +185,9 @@ class TrustReportFormatter:
 
                 # Overall tone
                 tone = intimacy.get("overall_tone", "PROFESSIONAL")
-                tone_icon = {
-                    "PROFESSIONAL": "✓",
-                    "FAMILIAR": "⚠",
-                    "INAPPROPRIATE": "✗"
-                }.get(tone, "?")
+                tone_icon = {"PROFESSIONAL": "✓", "FAMILIAR": "⚠", "INAPPROPRIATE": "✗"}.get(
+                    tone, "?"
+                )
 
                 lines.append(f"Overall Tone: [{tone_icon}] {tone}\n")
 
@@ -207,16 +208,14 @@ class TrustReportFormatter:
                         alternative = issue.get("professional_alternative", "")
 
                         # Severity icon
-                        severity_icon = {
-                            "HIGH": "⚠⚠⚠",
-                            "MEDIUM": "⚠⚠",
-                            "LOW": "⚠"
-                        }.get(severity, "⚠")
+                        severity_icon = {"HIGH": "⚠⚠⚠", "MEDIUM": "⚠⚠", "LOW": "⚠"}.get(
+                            severity, "⚠"
+                        )
 
                         lines.append(f"{i}. [{severity_icon}] {category}")
-                        lines.append(f"   Text: \"{text}\"")
+                        lines.append(f'   Text: "{text}"')
                         lines.append(f"   Explanation: {explanation}")
-                        lines.append(f"   Professional alternative: \"{alternative}\"")
+                        lines.append(f'   Professional alternative: "{alternative}"')
                         lines.append("")
                 else:
                     lines.append("✓ No intimacy issues detected\n")
@@ -362,7 +361,7 @@ class TrustReportFormatter:
                         claim_text = claim_text[:77] + "..."
 
                     # Extract brief reason (first sentence or up to 100 chars)
-                    brief_reason = reasoning.split('.')[0]
+                    brief_reason = reasoning.split(".")[0]
                     if len(brief_reason) > 100:
                         brief_reason = brief_reason[:97] + "..."
 
@@ -382,7 +381,7 @@ class TrustReportFormatter:
                         claim_text = claim_text[:77] + "..."
 
                     # Extract brief reason (first sentence or up to 100 chars)
-                    brief_reason = reasoning.split('.')[0]
+                    brief_reason = reasoning.split(".")[0]
                     if len(brief_reason) > 100:
                         brief_reason = brief_reason[:97] + "..."
 
@@ -402,7 +401,7 @@ class TrustReportFormatter:
                         claim_text = claim_text[:77] + "..."
 
                     # Extract brief reason (first sentence or up to 100 chars)
-                    brief_reason = reasoning.split('.')[0]
+                    brief_reason = reasoning.split(".")[0]
                     if len(brief_reason) > 100:
                         brief_reason = brief_reason[:97] + "..."
 
@@ -445,6 +444,7 @@ class TrustReportFormatter:
             JSON string
         """
         import json
+
         return json.dumps(result, indent=2, ensure_ascii=False)
 
     @staticmethod

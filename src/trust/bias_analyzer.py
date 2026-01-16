@@ -2,6 +2,7 @@
 Bias Analysis Module
 Detect framing, assumptions, omissions, and loaded language using Claude
 """
+
 import json
 import logging
 from typing import Any
@@ -15,13 +16,7 @@ logger = logging.getLogger(__name__)
 class FramingIssue:
     """Represents a framing choice in the response"""
 
-    def __init__(
-        self,
-        frame_type: str,
-        text: str,
-        effect: str,
-        alternative: str
-    ):
+    def __init__(self, frame_type: str, text: str, effect: str, alternative: str):
         """
         Initialize framing issue
 
@@ -42,19 +37,14 @@ class FramingIssue:
             "frame_type": self.frame_type,
             "text": self.text,
             "effect": self.effect,
-            "alternative": self.alternative
+            "alternative": self.alternative,
         }
 
 
 class Assumption:
     """Represents an implicit assumption in the response"""
 
-    def __init__(
-        self,
-        assumption: str,
-        basis: str,
-        impact: str
-    ):
+    def __init__(self, assumption: str, basis: str, impact: str):
         """
         Initialize assumption
 
@@ -69,22 +59,13 @@ class Assumption:
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary"""
-        return {
-            "assumption": self.assumption,
-            "basis": self.basis,
-            "impact": self.impact
-        }
+        return {"assumption": self.assumption, "basis": self.basis, "impact": self.impact}
 
 
 class Omission:
     """Represents a missing perspective or consideration"""
 
-    def __init__(
-        self,
-        missing_perspective: str,
-        relevance: str,
-        suggestion: str
-    ):
+    def __init__(self, missing_perspective: str, relevance: str, suggestion: str):
         """
         Initialize omission
 
@@ -102,19 +83,14 @@ class Omission:
         return {
             "missing_perspective": self.missing_perspective,
             "relevance": self.relevance,
-            "suggestion": self.suggestion
+            "suggestion": self.suggestion,
         }
 
 
 class LoadedTerm:
     """Represents emotionally or politically charged language"""
 
-    def __init__(
-        self,
-        term: str,
-        connotation: str,
-        neutral_alternative: str
-    ):
+    def __init__(self, term: str, connotation: str, neutral_alternative: str):
         """
         Initialize loaded term
 
@@ -132,7 +108,7 @@ class LoadedTerm:
         return {
             "term": self.term,
             "connotation": self.connotation,
-            "neutral_alternative": self.neutral_alternative
+            "neutral_alternative": self.neutral_alternative,
         }
 
 
@@ -144,7 +120,7 @@ class BiasAnalysis:
         framing_issues: list[FramingIssue],
         assumptions: list[Assumption],
         omissions: list[Omission],
-        loaded_terms: list[LoadedTerm]
+        loaded_terms: list[LoadedTerm],
     ):
         """
         Initialize bias analysis results
@@ -167,7 +143,10 @@ class BiasAnalysis:
             "assumptions": [a.to_dict() for a in self.assumptions],
             "omissions": [o.to_dict() for o in self.omissions],
             "loaded_terms": [t.to_dict() for t in self.loaded_terms],
-            "total_issues": len(self.framing_issues) + len(self.assumptions) + len(self.omissions) + len(self.loaded_terms)
+            "total_issues": len(self.framing_issues)
+            + len(self.assumptions)
+            + len(self.omissions)
+            + len(self.loaded_terms),
         }
 
 
@@ -207,7 +186,7 @@ class BiasAnalyzer:
             result = await self.client.analyze(
                 system_prompt="You are a rhetorical analysis specialist. Identify framing effects, hidden assumptions, omissions, and loaded language with precision.",
                 user_message=prompt,
-                temperature=0.0  # Deterministic analysis
+                temperature=0.0,  # Deterministic analysis
             )
 
             # Parse JSON response
@@ -217,48 +196,58 @@ class BiasAnalyzer:
             # Extract framing issues
             framing_issues = []
             for item in data.get("framing", []):
-                framing_issues.append(FramingIssue(
-                    frame_type=item.get("frame_type", ""),
-                    text=item.get("text", ""),
-                    effect=item.get("effect", ""),
-                    alternative=item.get("alternative", "")
-                ))
+                framing_issues.append(
+                    FramingIssue(
+                        frame_type=item.get("frame_type", ""),
+                        text=item.get("text", ""),
+                        effect=item.get("effect", ""),
+                        alternative=item.get("alternative", ""),
+                    )
+                )
 
             # Extract assumptions
             assumptions = []
             for item in data.get("assumptions", []):
-                assumptions.append(Assumption(
-                    assumption=item.get("assumption", ""),
-                    basis=item.get("basis", ""),
-                    impact=item.get("impact", "")
-                ))
+                assumptions.append(
+                    Assumption(
+                        assumption=item.get("assumption", ""),
+                        basis=item.get("basis", ""),
+                        impact=item.get("impact", ""),
+                    )
+                )
 
             # Extract omissions
             omissions = []
             for item in data.get("omissions", []):
-                omissions.append(Omission(
-                    missing_perspective=item.get("missing_perspective", ""),
-                    relevance=item.get("relevance", ""),
-                    suggestion=item.get("suggestion", "")
-                ))
+                omissions.append(
+                    Omission(
+                        missing_perspective=item.get("missing_perspective", ""),
+                        relevance=item.get("relevance", ""),
+                        suggestion=item.get("suggestion", ""),
+                    )
+                )
 
             # Extract loaded terms
             loaded_terms = []
             for item in data.get("loaded_language", []):
-                loaded_terms.append(LoadedTerm(
-                    term=item.get("term", ""),
-                    connotation=item.get("connotation", ""),
-                    neutral_alternative=item.get("neutral_alternative", "")
-                ))
+                loaded_terms.append(
+                    LoadedTerm(
+                        term=item.get("term", ""),
+                        connotation=item.get("connotation", ""),
+                        neutral_alternative=item.get("neutral_alternative", ""),
+                    )
+                )
 
             analysis = BiasAnalysis(
                 framing_issues=framing_issues,
                 assumptions=assumptions,
                 omissions=omissions,
-                loaded_terms=loaded_terms
+                loaded_terms=loaded_terms,
             )
 
-            logger.info(f"Bias analysis complete: {len(framing_issues)} framing, {len(assumptions)} assumptions, {len(omissions)} omissions, {len(loaded_terms)} loaded terms")
+            logger.info(
+                f"Bias analysis complete: {len(framing_issues)} framing, {len(assumptions)} assumptions, {len(omissions)} omissions, {len(loaded_terms)} loaded terms"
+            )
             return analysis
 
         except json.JSONDecodeError as e:
@@ -301,6 +290,6 @@ class BiasAnalyzer:
         last_brace = result.rfind("}")
 
         if first_brace != -1 and last_brace != -1 and last_brace > first_brace:
-            result = result[first_brace:last_brace + 1]
+            result = result[first_brace : last_brace + 1]
 
         return result.strip()

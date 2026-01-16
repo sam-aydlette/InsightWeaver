@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Location - InsightWeaver Setup</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+</head>
+<body>
+    <div class="setup-container">
+        <div class="setup-progress">
+            <div class="setup-step completed">Welcome</div>
+            <div class="setup-step completed">API Key</div>
+            <div class="setup-step active">Location</div>
+            <div class="setup-step">Profession</div>
+            <div class="setup-step">Interests</div>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="card">
+            <h2 class="page-title mb-2">Your Location</h2>
+            <p class="page-subtitle mb-3">
+                This helps us find relevant local news and information for you.
+            </p>
+
+            <form method="POST">
+                <div class="form-group">
+                    <label class="form-label" for="city">City</label>
+                    <input type="text" id="city" name="city" class="form-input" placeholder="e.g., Fairfax" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="state">State</label>
+                    <select id="state" name="state" class="form-select" required>
+                        <option value="">Select a state...</option>
+                        {% for code, name in states %}
+                        <option value="{{ code }}">{{ name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div style="display: flex; gap: 12px; justify-content: space-between;">
+                    <a href="{{ url_for('setup.api_key') }}" class="btn btn-secondary">Back</a>
+                    <button type="submit" class="btn btn-primary">Continue</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

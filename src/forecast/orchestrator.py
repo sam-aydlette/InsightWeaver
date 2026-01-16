@@ -1,46 +1,33 @@
 """
 Forecast Orchestrator
-Manages multi-horizon forecast execution and coordinates all forecast components
+Manages forecast execution using certainty-based categorization
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any
 
 from ..database.connection import get_db
 from ..database.models import ForecastRun, LongTermForecast
 from .context_curator import ForecastContextCurator
 from .engine import ForecastEngine
-from .scenario_modeler import ScenarioModeler
 
 logger = logging.getLogger(__name__)
 
 
 class ForecastOrchestrator:
     """
-    Orchestrates multi-horizon forecast generation
+    Orchestrates forecast generation using certainty-based categorization
 
-    Coordinates:
-    - Multiple time horizons (6mo, 1yr, 3yr, 5yr)
-    - Context curation for each horizon
-    - Forecast generation
-    - Optional scenario modeling
-    - Database storage
+    Generates forecasts organized by:
+    - Known Knowns (certain/near-certain)
+    - Known Unknowns (evidence-based projections)
+    - Unknown Unknowns (weak signal speculation)
+
+    Each forecast includes its own timeline.
     """
 
-    # Supported horizons
-    SUPPORTED_HORIZONS = {
-        '6mo': 6,
-        '1yr': 12,
-        '3yr': 36,
-        '5yr': 60
-    }
-
-    def __init__(
-        self,
-        user_profile=None,
-        topic_filters: dict | None = None
-    ):
+    def __init__(self, user_profile=None, topic_filters: dict | None = None):
         """
         Initialize forecast orchestrator
 
@@ -52,47 +39,27 @@ class ForecastOrchestrator:
         self.topic_filters = topic_filters
         self.engine = ForecastEngine()
         self.curator = ForecastContextCurator(
-            user_profile=user_profile,
-            topic_filters=topic_filters
+            user_profile=user_profile, topic_filters=topic_filters
         )
-        self.scenario_modeler = ScenarioModeler()
 
-    async def run_forecast(
-        self,
-        horizons: list[str] | None = None,
-        scenario_count: int = 0
-    ) -> dict[str, Any]:
+    async def run_forecast(self) -> dict[str, Any]:
         """
-        Run forecast for specified horizons
-
-        Args:
-            horizons: List of horizon strings (e.g., ['6mo', '1yr', '3yr'])
-                     If None, runs all default horizons
-            scenario_count: Number of scenarios to generate per horizon (0 = skip)
+        Run certainty-based forecast generation
 
         Returns:
-            Dictionary with run_id and list of forecasts
+            Dictionary with run_id and forecast data
         """
-        # Default to all horizons if not specified
-        if horizons is None:
-            horizons = list(self.SUPPORTED_HORIZONS.keys())
-
-        # Validate horizons
-        for horizon in horizons:
-            if horizon not in self.SUPPORTED_HORIZONS:
-                raise ValueError(f"Unsupported horizon: {horizon}. Supported: {list(self.SUPPORTED_HORIZONS.keys())}")
-
-        logger.info(f"Starting forecast run for horizons: {horizons}")
+        logger.info("Starting certainty-based forecast run")
 
         # Create forecast run record
         with get_db() as session:
             forecast_run = ForecastRun(
-                run_type='multi_horizon' if len(horizons) > 1 else 'single_horizon',
-                horizons_requested=horizons,
-                scenario_count=scenario_count,
+                run_type="certainty_based",
+                horizons_requested=["unified"],
+                scenario_count=0,
                 started_at=datetime.utcnow(),
-                status='running',
-                forecasts_generated=0
+                status="running",
+                forecasts_generated=0,
             )
             session.add(forecast_run)
             session.commit()
@@ -100,167 +67,83 @@ class ForecastOrchestrator:
 
         logger.info(f"Created forecast run {run_id}")
 
-        # Generate forecasts for each horizon
-        forecasts = []
-        for horizon in horizons:
-            try:
-                forecast = await self._generate_horizon_forecast(
-                    run_id=run_id,
-                    horizon=horizon,
-                    scenario_count=scenario_count
-                )
-                forecasts.append(forecast)
+        try:
+            # Generate the unified forecast
+            forecast = await self._generate_forecast(run_id=run_id)
 
-                # Update run progress
-                with get_db() as session:
-                    run = session.query(ForecastRun).get(run_id)
-                    run.forecasts_generated += 1
-                    session.commit()
+            # Mark run as completed
+            with get_db() as session:
+                run = session.query(ForecastRun).get(run_id)
+                run.status = "completed"
+                run.completed_at = datetime.utcnow()
+                run.forecasts_generated = 1
+                session.commit()
 
-            except Exception as e:
-                logger.error(f"Failed to generate {horizon} forecast: {e}")
-                # Continue with other horizons
-                continue
+            logger.info(f"Forecast run {run_id} completed successfully")
 
-        # Mark run as completed
-        with get_db() as session:
-            run = session.query(ForecastRun).get(run_id)
-            run.status = 'completed' if forecasts else 'failed'
-            run.completed_at = datetime.utcnow()
-            if not forecasts:
-                run.error_message = "All horizons failed"
-            session.commit()
+            return {
+                "run_id": run_id,
+                "forecast": forecast,
+                "status": "completed",
+            }
 
-        logger.info(f"Forecast run {run_id} completed: {len(forecasts)}/{len(horizons)} horizons")
+        except Exception as e:
+            logger.error(f"Forecast generation failed: {e}")
 
-        return {
-            'run_id': run_id,
-            'forecasts': forecasts,
-            'requested_horizons': horizons,
-            'successful_horizons': len(forecasts)
-        }
+            # Mark run as failed
+            with get_db() as session:
+                run = session.query(ForecastRun).get(run_id)
+                run.status = "failed"
+                run.completed_at = datetime.utcnow()
+                run.error_message = str(e)
+                session.commit()
 
-    async def _generate_horizon_forecast(
-        self,
-        run_id: int,
-        horizon: str,
-        scenario_count: int
-    ) -> dict[str, Any]:
+            raise
+
+    async def _generate_forecast(self, run_id: int) -> dict[str, Any]:
         """
-        Generate forecast for a single horizon
+        Generate certainty-based forecast
 
         Args:
             run_id: Forecast run ID
-            horizon: Horizon string (e.g., '1yr')
-            scenario_count: Number of scenarios to generate
 
         Returns:
             Forecast dictionary with metadata
         """
-        horizon_months = self.SUPPORTED_HORIZONS[horizon]
+        logger.info("Curating context for forecast...")
 
-        logger.info(f"Generating {horizon} forecast...")
-
-        # 1. Curate context
-        logger.info(f"Curating context for {horizon} horizon...")
+        # Curate context with broad historical range (12 months)
         context = await self.curator.curate_for_horizon(
-            horizon_months=horizon_months,
-            topic_filters=self.topic_filters
+            horizon_months=12, topic_filters=self.topic_filters
         )
 
-        # 2. Generate base forecast
-        logger.info(f"Generating base forecast for {horizon}...")
-        forecast_data = await self.engine.generate_forecast(
-            horizon=horizon,
-            context=context
-        )
+        # Generate forecast
+        logger.info("Generating certainty-based forecast...")
+        forecast_data = await self.engine.generate_forecast(context=context)
 
-        # 3. Optional: Generate scenarios
-        if scenario_count > 0:
-            logger.info(f"Generating {scenario_count} scenarios for {horizon}...")
-            try:
-                scenarios = await self.scenario_modeler.generate_scenarios(
-                    baseline_forecast=forecast_data,
-                    context=context,
-                    scenario_count=scenario_count
-                )
-                forecast_data['detailed_scenarios'] = scenarios
-            except Exception as e:
-                logger.error(f"Scenario generation failed for {horizon}: {e}")
-                # Continue without scenarios
-
-        # 4. Calculate dates
+        # Store in database
         base_date = datetime.utcnow()
-        target_date = base_date + timedelta(days=horizon_months * 30)
 
-        # 5. Store in database
         with get_db() as session:
             forecast = LongTermForecast(
                 forecast_run_id=run_id,
-                time_horizon=horizon,
-                horizon_months=horizon_months,
+                time_horizon="unified",
+                horizon_months=0,  # Not applicable for certainty-based
                 base_date=base_date,
-                target_date=target_date,
+                target_date=base_date,  # Individual forecasts have their own timelines
                 forecast_data=forecast_data,
-                articles_analyzed=context.get('article_count', 0),
-                context_tokens=len(str(context)) // 4
+                articles_analyzed=context.get("article_count", 0),
+                context_tokens=len(str(context)) // 4,
             )
             session.add(forecast)
             session.commit()
             forecast_id = forecast.id
 
-        logger.info(f"Stored {horizon} forecast as ID {forecast_id}")
+        logger.info(f"Stored forecast as ID {forecast_id}")
 
         return {
-            'id': forecast_id,
-            'time_horizon': horizon,
-            'horizon_months': horizon_months,
-            'target_date': target_date.strftime('%B %Y'),
-            'forecast_data': forecast_data,
-            'articles_analyzed': context.get('article_count', 0)
+            "id": forecast_id,
+            "generated_at": base_date.isoformat(),
+            "forecast_data": forecast_data,
+            "articles_analyzed": context.get("article_count", 0),
         }
-
-    def parse_custom_horizon(self, horizon_str: str) -> int:
-        """
-        Parse custom horizon string to months
-
-        Args:
-            horizon_str: String like "18 months", "2 years", "24mo"
-
-        Returns:
-            Number of months
-
-        Raises:
-            ValueError: If format is invalid
-        """
-        horizon_str = horizon_str.lower().strip()
-
-        # Check if it's a standard horizon
-        if horizon_str in self.SUPPORTED_HORIZONS:
-            return self.SUPPORTED_HORIZONS[horizon_str]
-
-        # Parse custom format
-        if 'mo' in horizon_str:
-            try:
-                return int(horizon_str.replace('mo', '').strip())
-            except ValueError:
-                raise ValueError(f"Invalid horizon format: {horizon_str}")
-
-        if 'year' in horizon_str or 'yr' in horizon_str:
-            try:
-                years = int(horizon_str.replace('years', '').replace('year', '').replace('yr', '').strip())
-                return years * 12
-            except ValueError:
-                raise ValueError(f"Invalid horizon format: {horizon_str}")
-
-        if 'month' in horizon_str:
-            try:
-                return int(horizon_str.replace('months', '').replace('month', '').strip())
-            except ValueError:
-                raise ValueError(f"Invalid horizon format: {horizon_str}")
-
-        # Try parsing as just a number (assume months)
-        try:
-            return int(horizon_str)
-        except ValueError:
-            raise ValueError(f"Invalid horizon format: {horizon_str}. Use format like '6mo', '1yr', '18 months'")

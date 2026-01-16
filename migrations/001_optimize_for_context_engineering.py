@@ -31,12 +31,14 @@ def migrate_up():
         print("  1. Adding context-optimized fields to articles table...")
 
         try:
-            session.execute(text("""
+            session.execute(
+                text("""
                 ALTER TABLE articles
                 ADD COLUMN embedding_summary TEXT,
                 ADD COLUMN relevance_score REAL,
                 ADD COLUMN last_included_in_synthesis DATETIME
-            """))
+            """)
+            )
             print("     ✓ Added: embedding_summary, relevance_score, last_included_in_synthesis")
         except Exception as e:
             print(f"     Note: Fields may already exist: {e}")
@@ -45,12 +47,16 @@ def migrate_up():
         print("  2. Adding indexes for context selection...")
 
         try:
-            session.execute(text("""
+            session.execute(
+                text("""
                 CREATE INDEX IF NOT EXISTS idx_relevance_score ON articles(relevance_score)
-            """))
-            session.execute(text("""
+            """)
+            )
+            session.execute(
+                text("""
                 CREATE INDEX IF NOT EXISTS idx_filtered ON articles(filtered)
-            """))
+            """)
+            )
             print("     ✓ Added indexes: idx_relevance_score, idx_filtered")
         except Exception as e:
             print(f"     Note: Indexes may already exist: {e}")
@@ -59,7 +65,8 @@ def migrate_up():
         print("  3. Creating context_snapshots table...")
 
         try:
-            session.execute(text("""
+            session.execute(
+                text("""
                 CREATE TABLE IF NOT EXISTS context_snapshots (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     synthesis_id INTEGER,
@@ -70,10 +77,13 @@ def migrate_up():
                     instructions TEXT,
                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
                 )
-            """))
-            session.execute(text("""
+            """)
+            )
+            session.execute(
+                text("""
                 CREATE INDEX IF NOT EXISTS idx_context_created_at ON context_snapshots(created_at)
-            """))
+            """)
+            )
             print("     ✓ Created: context_snapshots table")
         except Exception as e:
             print(f"     Note: Table may already exist: {e}")
@@ -82,14 +92,18 @@ def migrate_up():
         print("  4. Updating narrative_syntheses table...")
 
         try:
-            session.execute(text("""
+            session.execute(
+                text("""
                 ALTER TABLE narrative_syntheses
                 ADD COLUMN context_snapshot_id INTEGER REFERENCES context_snapshots(id)
-            """))
-            session.execute(text("""
+            """)
+            )
+            session.execute(
+                text("""
                 CREATE INDEX IF NOT EXISTS idx_narrative_profile_version
                 ON narrative_syntheses(user_profile_version)
-            """))
+            """)
+            )
             print("     ✓ Added: context_snapshot_id, index on user_profile_version")
         except Exception as e:
             print(f"     Note: Fields may already exist: {e}")
@@ -98,14 +112,18 @@ def migrate_up():
         print("  5. Updating analysis_runs table...")
 
         try:
-            session.execute(text("""
+            session.execute(
+                text("""
                 ALTER TABLE analysis_runs
                 ADD COLUMN context_token_count INTEGER,
                 ADD COLUMN claude_model VARCHAR(100)
-            """))
-            session.execute(text("""
+            """)
+            )
+            session.execute(
+                text("""
                 CREATE INDEX IF NOT EXISTS idx_run_started_at ON analysis_runs(started_at)
-            """))
+            """)
+            )
             print("     ✓ Added: context_token_count, claude_model")
         except Exception as e:
             print(f"     Note: Fields may already exist: {e}")
@@ -114,11 +132,13 @@ def migrate_up():
         print("  6. Initializing relevance_score for existing articles...")
 
         try:
-            session.execute(text("""
+            session.execute(
+                text("""
                 UPDATE articles
                 SET relevance_score = julianday('now') - julianday(fetched_at)
                 WHERE relevance_score IS NULL AND fetched_at IS NOT NULL
-            """))
+            """)
+            )
             print("     ✓ Initialized relevance_score based on recency")
         except Exception as e:
             print(f"     Warning: {e}")

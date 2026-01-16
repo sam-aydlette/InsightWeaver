@@ -2,6 +2,7 @@
 Intimacy Detection Module
 Detect emotional claims, false empathy, and anthropomorphization using Claude
 """
+
 import json
 import logging
 from typing import Any
@@ -21,7 +22,7 @@ class IntimacyIssue:
         text: str,
         explanation: str,
         severity: str,
-        professional_alternative: str
+        professional_alternative: str,
     ):
         """
         Initialize intimacy issue
@@ -46,19 +47,14 @@ class IntimacyIssue:
             "text": self.text,
             "explanation": self.explanation,
             "severity": self.severity,
-            "professional_alternative": self.professional_alternative
+            "professional_alternative": self.professional_alternative,
         }
 
 
 class IntimacyAnalysis:
     """Complete intimacy detection results"""
 
-    def __init__(
-        self,
-        issues: list[IntimacyIssue],
-        overall_tone: str,
-        summary: str
-    ):
+    def __init__(self, issues: list[IntimacyIssue], overall_tone: str, summary: str):
         """
         Initialize intimacy analysis results
 
@@ -80,7 +76,7 @@ class IntimacyAnalysis:
             "total_issues": len(self.issues),
             "high_severity_count": sum(1 for i in self.issues if i.severity == "HIGH"),
             "medium_severity_count": sum(1 for i in self.issues if i.severity == "MEDIUM"),
-            "low_severity_count": sum(1 for i in self.issues if i.severity == "LOW")
+            "low_severity_count": sum(1 for i in self.issues if i.severity == "LOW"),
         }
 
 
@@ -120,7 +116,7 @@ class IntimacyDetector:
             result = await self.client.analyze(
                 system_prompt="You are a tone analysis specialist. Identify inappropriate anthropomorphization and emotional language with precision. Return ONLY valid JSON with properly escaped quotes in all string values.",
                 user_message=prompt,
-                temperature=0.0  # Deterministic analysis
+                temperature=0.0,  # Deterministic analysis
             )
 
             # Parse JSON response
@@ -130,21 +126,25 @@ class IntimacyDetector:
             # Extract issues
             issues = []
             for item in data.get("issues", []):
-                issues.append(IntimacyIssue(
-                    category=item.get("category", ""),
-                    text=item.get("text", ""),
-                    explanation=item.get("explanation", ""),
-                    severity=item.get("severity", "LOW"),
-                    professional_alternative=item.get("professional_alternative", "")
-                ))
+                issues.append(
+                    IntimacyIssue(
+                        category=item.get("category", ""),
+                        text=item.get("text", ""),
+                        explanation=item.get("explanation", ""),
+                        severity=item.get("severity", "LOW"),
+                        professional_alternative=item.get("professional_alternative", ""),
+                    )
+                )
 
             analysis = IntimacyAnalysis(
                 issues=issues,
                 overall_tone=data.get("overall_tone", "PROFESSIONAL"),
-                summary=data.get("summary", "No issues detected")
+                summary=data.get("summary", "No issues detected"),
             )
 
-            logger.info(f"Intimacy detection complete: {len(issues)} issues ({analysis.overall_tone} tone)")
+            logger.info(
+                f"Intimacy detection complete: {len(issues)} issues ({analysis.overall_tone} tone)"
+            )
             return analysis
 
         except json.JSONDecodeError as e:
@@ -187,6 +187,6 @@ class IntimacyDetector:
         last_brace = result.rfind("}")
 
         if first_brace != -1 and last_brace != -1 and last_brace > first_brace:
-            result = result[first_brace:last_brace + 1]
+            result = result[first_brace : last_brace + 1]
 
         return result.strip()

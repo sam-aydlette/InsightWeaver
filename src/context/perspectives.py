@@ -12,6 +12,7 @@ class Perspective:
     A perspective defines how intelligence should be analyzed and presented.
     Framework uses placeholders for user-specific data injection at runtime.
     """
+
     id: str
     name: str
     description: str
@@ -91,7 +92,7 @@ Analyze developments across these layers, identifying specific, measurable trend
 - Identify connections between local/national/global events
 - Keep niche section focused on actionable intelligence
 """,
-    tone="analytical_professional"
+    tone="analytical_professional",
 )
 
 # Executive Summary - Quick briefing format
@@ -114,7 +115,7 @@ EXECUTIVE_SUMMARY = Perspective(
 
 **Tone**: {tone} - direct, actionable, assumes domain expertise
 """,
-    tone="analytical_concise"
+    tone="analytical_concise",
 )
 
 # Weekly Digest - Longer form analysis
@@ -139,7 +140,7 @@ WEEKLY_DIGEST = Perspective(
 
 **Geographic Scope**: {city} → {state} → {country} → Global
 """,
-    tone="analytical_comprehensive"
+    tone="analytical_comprehensive",
 )
 
 
@@ -165,7 +166,9 @@ def get_perspective(perspective_id: str) -> Perspective:
         KeyError: If perspective not found
     """
     if perspective_id not in PERSPECTIVES:
-        raise KeyError(f"Perspective '{perspective_id}' not found. Available: {list(PERSPECTIVES.keys())}")
+        raise KeyError(
+            f"Perspective '{perspective_id}' not found. Available: {list(PERSPECTIVES.keys())}"
+        )
 
     return PERSPECTIVES[perspective_id]
 

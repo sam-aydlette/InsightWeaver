@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 class CollectorError(Exception):
     """Base exception for collector errors"""
+
     pass
 
 
@@ -34,7 +35,7 @@ class BaseCollector(ABC):
         source_name: str,
         source_type: str,
         endpoint_url: str | None = None,
-        api_key: str | None = None
+        api_key: str | None = None,
     ):
         """
         Initialize collector
@@ -53,7 +54,7 @@ class BaseCollector(ABC):
 
     def __del__(self):
         """Cleanup HTTP client"""
-        if hasattr(self, 'http_client'):
+        if hasattr(self, "http_client"):
             self.http_client.close()
 
     @staticmethod
@@ -73,9 +74,7 @@ class BaseCollector(ABC):
 
     def _get_or_create_source(self, session: Session) -> APIDataSource:
         """Get or create the APIDataSource record for this collector"""
-        source = session.query(APIDataSource).filter(
-            APIDataSource.name == self.source_name
-        ).first()
+        source = session.query(APIDataSource).filter(APIDataSource.name == self.source_name).first()
 
         if not source:
             source = APIDataSource(
@@ -83,7 +82,7 @@ class BaseCollector(ABC):
                 source_type=self.source_type,
                 endpoint_url=self.endpoint_url,
                 api_key_required=self.api_key is not None,
-                is_active=True
+                is_active=True,
             )
             session.add(source)
             session.commit()
@@ -123,9 +122,7 @@ class BaseCollector(ABC):
         pass
 
     def score_relevance(
-        self,
-        item: dict[str, Any],
-        decision_context: dict | None = None
+        self, item: dict[str, Any], decision_context: dict | None = None
     ) -> tuple[float, list[str]]:
         """
         Score item relevance against user's active decisions
@@ -147,15 +144,12 @@ class BaseCollector(ABC):
         searchable_text = f"{item.get('title', '')} {item.get('description', '')}".lower()
 
         # Check against each active decision
-        for decision in decision_context.get('active_decisions', []):
-            decision_id = decision.get('decision_id')
-            relevant_signals = decision.get('relevant_signals', [])
+        for decision in decision_context.get("active_decisions", []):
+            decision_id = decision.get("decision_id")
+            relevant_signals = decision.get("relevant_signals", [])
 
             # Count keyword matches
-            matches = sum(
-                1 for signal in relevant_signals
-                if signal.lower() in searchable_text
-            )
+            matches = sum(1 for signal in relevant_signals if signal.lower() in searchable_text)
 
             if matches > 0:
                 matching_decisions.append(decision_id)
@@ -163,17 +157,12 @@ class BaseCollector(ABC):
                 relevance_score += min(matches * 0.3, 1.0)
 
         # Cap at 1.0 and ensure minimum of 0.1 if any matches
-        if relevance_score > 0:
-            relevance_score = min(relevance_score, 1.0)
-        else:
-            relevance_score = 0.1  # Base score for items that don't match
+        relevance_score = min(relevance_score, 1.0) if relevance_score > 0 else 0.1
 
         return relevance_score, matching_decisions
 
     def collect_and_store(
-        self,
-        decision_context: dict | None = None,
-        max_items: int = 100
+        self, decision_context: dict | None = None, max_items: int = 100
     ) -> dict[str, Any]:
         """
         Main collection method: fetch, parse, score, and store data
@@ -208,10 +197,14 @@ class BaseCollector(ABC):
                         )
 
                         # Check if item already exists
-                        existing = session.query(APIDataPoint).filter(
-                            APIDataPoint.source_id == source.id,
-                            APIDataPoint.external_id == parsed['external_id']
-                        ).first()
+                        existing = (
+                            session.query(APIDataPoint)
+                            .filter(
+                                APIDataPoint.source_id == source.id,
+                                APIDataPoint.external_id == parsed["external_id"],
+                            )
+                            .first()
+                        )
 
                         if existing:
                             # Update relevance score if changed
@@ -224,20 +217,20 @@ class BaseCollector(ABC):
                         else:
                             # Create new data point
                             # Serialize data_payload to ensure all datetime objects are converted
-                            serialized_payload = self._serialize_for_json(parsed['data_payload'])
+                            serialized_payload = self._serialize_for_json(parsed["data_payload"])
 
                             data_point = APIDataPoint(
                                 source_id=source.id,
-                                data_type=parsed['data_type'],
-                                external_id=parsed['external_id'],
-                                title=parsed.get('title'),
-                                description=parsed.get('description'),
+                                data_type=parsed["data_type"],
+                                external_id=parsed["external_id"],
+                                title=parsed.get("title"),
+                                description=parsed.get("description"),
                                 data_payload=serialized_payload,
-                                event_date=parsed.get('event_date'),
-                                published_date=parsed.get('published_date'),
-                                expires_date=parsed.get('expires_date'),
+                                event_date=parsed.get("event_date"),
+                                published_date=parsed.get("published_date"),
+                                expires_date=parsed.get("expires_date"),
                                 relevance_score=relevance_score,
-                                decision_ids=decision_ids
+                                decision_ids=decision_ids,
                             )
                             session.add(data_point)
                             new_items += 1
@@ -253,12 +246,12 @@ class BaseCollector(ABC):
                 session.commit()
 
                 stats = {
-                    'source': self.source_name,
-                    'total_fetched': len(raw_items),
-                    'new_items': new_items,
-                    'updated_items': updated_items,
-                    'skipped_items': skipped_items,
-                    'success': True
+                    "source": self.source_name,
+                    "total_fetched": len(raw_items),
+                    "new_items": new_items,
+                    "updated_items": updated_items,
+                    "skipped_items": skipped_items,
+                    "success": True,
                 }
 
                 logger.info(f"Collection complete: {stats}")

@@ -26,16 +26,16 @@ class FairfaxCalendarCollector(BaseCollector):
     """
 
     SOURCES = {
-        'board_of_supervisors': 'https://www.fairfaxcounty.gov/boardofsupervisors/meetings',
-        'fcps_school_board': 'https://www.fcps.edu/about-fcps/school-board/meetings',
-        'planning_commission': 'https://www.fairfaxcounty.gov/planning-development/planning-commission/meetings'
+        "board_of_supervisors": "https://www.fairfaxcounty.gov/boardofsupervisors/meetings",
+        "fcps_school_board": "https://www.fcps.edu/about-fcps/school-board/meetings",
+        "planning_commission": "https://www.fairfaxcounty.gov/planning-development/planning-commission/meetings",
     }
 
     def __init__(self):
         super().__init__(
             source_name="Fairfax County Calendar",
             source_type="calendar",
-            endpoint_url=self.SOURCES['board_of_supervisors']
+            endpoint_url=self.SOURCES["board_of_supervisors"],
         )
 
     def fetch_data(self) -> list[dict[str, Any]]:
@@ -68,41 +68,43 @@ class FairfaxCalendarCollector(BaseCollector):
     def _fetch_board_of_supervisors(self) -> list[dict[str, Any]]:
         """Fetch Fairfax County Board of Supervisors meetings"""
         events = []
-        url = self.SOURCES['board_of_supervisors']
+        url = self.SOURCES["board_of_supervisors"]
 
         try:
             response = self.http_client.get(url)
             response.raise_for_status()
 
-            soup = BeautifulSoup(response.content, 'html.parser')
+            soup = BeautifulSoup(response.content, "html.parser")
 
             # Look for meeting listings (structure may vary)
             # This is a simplified example - real implementation needs to match actual HTML
-            meeting_items = soup.find_all('div', class_='meeting-item')
+            meeting_items = soup.find_all("div", class_="meeting-item")
 
             for item in meeting_items:
                 # Extract meeting details
-                title_elem = item.find('h3') or item.find('h4')
-                date_elem = item.find('time') or item.find(class_='date')
-                desc_elem = item.find('p') or item.find(class_='description')
+                title_elem = item.find("h3") or item.find("h4")
+                date_elem = item.find("time") or item.find(class_="date")
+                desc_elem = item.find("p") or item.find(class_="description")
 
                 if title_elem and date_elem:
                     title = title_elem.get_text(strip=True)
-                    date_str = date_elem.get('datetime') or date_elem.get_text(strip=True)
+                    date_str = date_elem.get("datetime") or date_elem.get_text(strip=True)
                     description = desc_elem.get_text(strip=True) if desc_elem else ""
 
                     # Parse date
                     event_date = self._parse_date(date_str)
 
                     if event_date:
-                        events.append({
-                            'source': 'board_of_supervisors',
-                            'title': title,
-                            'description': description,
-                            'event_date': event_date,
-                            'url': url,
-                            'location': 'Fairfax County Government Center'
-                        })
+                        events.append(
+                            {
+                                "source": "board_of_supervisors",
+                                "title": title,
+                                "description": description,
+                                "event_date": event_date,
+                                "url": url,
+                                "location": "Fairfax County Government Center",
+                            }
+                        )
 
         except Exception as e:
             logger.warning(f"Error fetching Board of Supervisors calendar: {e}")
@@ -116,38 +118,40 @@ class FairfaxCalendarCollector(BaseCollector):
     def _fetch_fcps_meetings(self) -> list[dict[str, Any]]:
         """Fetch FCPS School Board meetings"""
         events = []
-        url = self.SOURCES['fcps_school_board']
+        url = self.SOURCES["fcps_school_board"]
 
         try:
             response = self.http_client.get(url)
             response.raise_for_status()
 
-            soup = BeautifulSoup(response.content, 'html.parser')
+            soup = BeautifulSoup(response.content, "html.parser")
 
             # Look for meeting listings
-            meeting_items = soup.find_all(['div', 'li'], class_=re.compile('meeting|event'))
+            meeting_items = soup.find_all(["div", "li"], class_=re.compile("meeting|event"))
 
             for item in meeting_items:
-                title_elem = item.find(['h3', 'h4', 'strong'])
-                date_elem = item.find('time') or item.find(class_='date')
-                desc_elem = item.find('p')
+                title_elem = item.find(["h3", "h4", "strong"])
+                date_elem = item.find("time") or item.find(class_="date")
+                desc_elem = item.find("p")
 
                 if title_elem and date_elem:
                     title = title_elem.get_text(strip=True)
-                    date_str = date_elem.get('datetime') or date_elem.get_text(strip=True)
+                    date_str = date_elem.get("datetime") or date_elem.get_text(strip=True)
                     description = desc_elem.get_text(strip=True) if desc_elem else ""
 
                     event_date = self._parse_date(date_str)
 
                     if event_date:
-                        events.append({
-                            'source': 'fcps_school_board',
-                            'title': title,
-                            'description': description,
-                            'event_date': event_date,
-                            'url': url,
-                            'location': 'FCPS Administration Building'
-                        })
+                        events.append(
+                            {
+                                "source": "fcps_school_board",
+                                "title": title,
+                                "description": description,
+                                "event_date": event_date,
+                                "url": url,
+                                "location": "FCPS Administration Building",
+                            }
+                        )
 
         except Exception as e:
             logger.warning(f"Error fetching FCPS calendar: {e}")
@@ -165,13 +169,13 @@ class FairfaxCalendarCollector(BaseCollector):
         Tries multiple common formats
         """
         date_formats = [
-            '%Y-%m-%d',
-            '%Y-%m-%dT%H:%M:%S',
-            '%Y-%m-%dT%H:%M:%S%z',
-            '%m/%d/%Y',
-            '%B %d, %Y',
-            '%b %d, %Y',
-            '%A, %B %d, %Y',
+            "%Y-%m-%d",
+            "%Y-%m-%dT%H:%M:%S",
+            "%Y-%m-%dT%H:%M:%S%z",
+            "%m/%d/%Y",
+            "%B %d, %Y",
+            "%b %d, %Y",
+            "%A, %B %d, %Y",
         ]
 
         # Clean up the string
@@ -206,14 +210,16 @@ class FairfaxCalendarCollector(BaseCollector):
 
             for meeting_date in [second_tuesday, fourth_tuesday]:
                 if meeting_date >= today:
-                    events.append({
-                        'source': 'board_of_supervisors',
-                        'title': 'Fairfax County Board of Supervisors Meeting',
-                        'description': 'Regular board meeting (generated from typical schedule)',
-                        'event_date': meeting_date,
-                        'url': self.SOURCES['board_of_supervisors'],
-                        'location': 'Fairfax County Government Center'
-                    })
+                    events.append(
+                        {
+                            "source": "board_of_supervisors",
+                            "title": "Fairfax County Board of Supervisors Meeting",
+                            "description": "Regular board meeting (generated from typical schedule)",
+                            "event_date": meeting_date,
+                            "url": self.SOURCES["board_of_supervisors"],
+                            "location": "Fairfax County Government Center",
+                        }
+                    )
 
         return events
 
@@ -236,14 +242,16 @@ class FairfaxCalendarCollector(BaseCollector):
 
             for meeting_date in [second_thursday, fourth_thursday]:
                 if meeting_date >= today:
-                    events.append({
-                        'source': 'fcps_school_board',
-                        'title': 'FCPS School Board Meeting',
-                        'description': 'Regular school board meeting (generated from typical schedule)',
-                        'event_date': meeting_date,
-                        'url': self.SOURCES['fcps_school_board'],
-                        'location': 'FCPS Administration Building'
-                    })
+                    events.append(
+                        {
+                            "source": "fcps_school_board",
+                            "title": "FCPS School Board Meeting",
+                            "description": "Regular school board meeting (generated from typical schedule)",
+                            "event_date": meeting_date,
+                            "url": self.SOURCES["fcps_school_board"],
+                            "location": "FCPS Administration Building",
+                        }
+                    )
 
         return events
 
@@ -267,7 +275,7 @@ class FairfaxCalendarCollector(BaseCollector):
         first_occurrence = month_start + timedelta(days=days_ahead)
 
         # Add weeks to get Nth occurrence
-        nth_occurrence = first_occurrence + timedelta(weeks=n-1)
+        nth_occurrence = first_occurrence + timedelta(weeks=n - 1)
 
         return nth_occurrence
 
@@ -285,12 +293,12 @@ class FairfaxCalendarCollector(BaseCollector):
         external_id = f"{raw_item['source']}_{raw_item['event_date'].strftime('%Y%m%d')}"
 
         return {
-            'data_type': 'calendar_event',
-            'external_id': external_id,
-            'title': raw_item['title'],
-            'description': raw_item['description'],
-            'data_payload': raw_item,
-            'event_date': raw_item['event_date'],
-            'published_date': datetime.now(),
-            'expires_date': raw_item['event_date'] + timedelta(days=1)  # Expire after event
+            "data_type": "calendar_event",
+            "external_id": external_id,
+            "title": raw_item["title"],
+            "description": raw_item["description"],
+            "data_payload": raw_item,
+            "event_date": raw_item["event_date"],
+            "published_date": datetime.now(),
+            "expires_date": raw_item["event_date"] + timedelta(days=1),  # Expire after event
         }

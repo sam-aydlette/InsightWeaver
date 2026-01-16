@@ -11,13 +11,13 @@ from .perspectives import Perspective, get_perspective, list_perspectives
 from .synthesizer import NarrativeSynthesizer
 
 __all__ = [
-    'ContextCurator',
-    'ClaudeClient',
-    'NarrativeSynthesizer',
-    'get_perspective',
-    'list_perspectives',
-    'Perspective',
-    'get_few_shot_examples',
-    'ContextModuleLoader',
-    'ContextModule'
+    "ContextCurator",
+    "ClaudeClient",
+    "NarrativeSynthesizer",
+    "get_perspective",
+    "list_perspectives",
+    "Perspective",
+    "get_few_shot_examples",
+    "ContextModuleLoader",
+    "ContextModule",
 ]

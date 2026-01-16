@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+
+{% block title %}Daily Brief - InsightWeaver{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Daily Brief</h1>
+    <p class="page-subtitle">Personalized news summary based on your interests</p>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Generate Brief</h3>
+    </div>
+    <p class="text-muted mb-2">
+        This will fetch the latest news from your configured feeds, analyze it, and generate
+        a personalized briefing tailored to your location and interests.
+    </p>
+    <button id="generate-brief" class="btn btn-primary">
+        Generate New Brief
+    </button>
+</div>
+
+<div id="brief-loading" class="card" style="display: none;">
+    <div style="display: flex; align-items: center; gap: 16px;">
+        <div class="spinner"></div>
+        <div>
+            <div class="card-title">Generating Brief</div>
+            <p class="text-muted" id="brief-status">Fetching news feeds...</p>
+        </div>
+    </div>
+</div>
+
+<div id="brief-result" class="card" style="display: none;">
+    <div class="card-header">
+        <h3 class="card-title">Your Brief</h3>
+        <span class="text-muted" id="brief-date"></span>
+    </div>
+    <div id="brief-content"></div>
+    <div class="mt-3">
+        <a id="brief-html-link" href="#" class="btn btn-secondary" target="_blank">View Full Report</a>
+    </div>
+</div>
+
+<div id="brief-error" class="alert alert-error" style="display: none;">
+    <strong>Error:</strong> <span id="brief-error-message"></span>
+</div>
+
+{% if recent_briefs %}
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Recent Briefs</h3>
+    </div>
+    <ul class="list">
+        {% for brief in recent_briefs %}
+        <li class="list-item">
+            <div>
+                <div class="list-item-title">{{ brief.title }}</div>
+                <div class="list-item-meta">{{ brief.date }}</div>
+            </div>
+            <a href="{{ brief.url }}" class="btn btn-secondary" style="padding: 6px 12px; font-size: 13px;">View</a>
+        </li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('generate-brief').addEventListener('click', async function() {
+    const btn = this;
+    const loading = document.getElementById('brief-loading');
+    const result = document.getElementById('brief-result');
+    const errorDiv = document.getElementById('brief-error');
+
+    btn.disabled = true;
+    loading.style.display = 'block';
+    result.style.display = 'none';
+    errorDiv.style.display = 'none';
+
+    const statuses = [
+        'Fetching news feeds...',
+        'Processing articles...',
+        'Analyzing content...',
+        'Generating synthesis...',
+        'Finalizing brief...'
+    ];
+
+    let statusIndex = 0;
+    const statusInterval = setInterval(() => {
+        statusIndex = (statusIndex + 1) % statuses.length;
+        document.getElementById('brief-status').textContent = statuses[statusIndex];
+    }, 3000);
+
+    try {
+        const response = await fetch('{{ url_for("brief.generate") }}', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'}
+        });
+
+        const data = await response.json();
+
+        clearInterval(statusInterval);
+        loading.style.display = 'none';
+
+        if (data.success) {
+            result.style.display = 'block';
+            document.getElementById('brief-date').textContent = new Date().toLocaleDateString();
+            document.getElementById('brief-content').innerHTML = formatBrief(data.brief);
+            if (data.html_path) {
+                document.getElementById('brief-html-link').href = data.html_path;
+            }
+        } else {
+            errorDiv.style.display = 'block';
+            document.getElementById('brief-error-message').textContent = data.error || 'Unknown error';
+        }
+    } catch (err) {
+        clearInterval(statusInterval);
+        loading.style.display = 'none';
+        errorDiv.style.display = 'block';
+        document.getElementById('brief-error-message').textContent = err.message;
+    }
+
+    btn.disabled = false;
+});
+
+function formatBrief(brief) {
+    let html = '';
+
+    if (brief.bottom_line) {
+        html += '<div class="brief-section"><h4>Bottom Line</h4><p>' + escapeHtml(brief.bottom_line) + '</p></div>';
+    }
+
+    if (brief.key_findings && brief.key_findings.length) {
+        html += '<div class="brief-section"><h4>Key Findings</h4><ul>';
+        brief.key_findings.forEach(finding => {
+            html += '<li>' + escapeHtml(finding) + '</li>';
+        });
+        html += '</ul></div>';
+    }
+
+    if (brief.local_relevance) {
+        html += '<div class="brief-section"><h4>Local Relevance</h4><p>' + escapeHtml(brief.local_relevance) + '</p></div>';
+    }
+
+    return html;
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+</script>
+{% endblock %}

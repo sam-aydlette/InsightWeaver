@@ -1,311 +1,214 @@
 """
 Forecast Formatter
-Formats forecast data for terminal display and HTML reports
+Formats certainty-based forecasts for terminal display and HTML/JSON reports
 """
 
+import json
 import textwrap
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from ..config.settings import settings
+
 
 class ForecastFormatter:
-    """Formats forecast data for human-readable output"""
+    """Formats certainty-based forecast data for human-readable output"""
+
+    def _normalize_item(self, item: Any) -> dict:
+        """Normalize a forecast item to a dict, handling strings"""
+        if isinstance(item, str):
+            return {"forecast": item, "timeline": "Unknown"}
+        if isinstance(item, dict):
+            return item
+        return {"forecast": str(item), "timeline": "Unknown"}
 
     def format_forecast(self, forecast: dict[str, Any], max_width: int = 80) -> str:
         """
         Format forecast for terminal display
 
         Args:
-            forecast: Forecast dictionary from database
+            forecast: Forecast dictionary from orchestrator
             max_width: Maximum line width for wrapping
 
         Returns:
             Formatted string for terminal output
         """
         lines = []
+        forecast_data = forecast.get("forecast_data", forecast)
 
         # Header
         lines.append("\n" + "=" * max_width)
-        lines.append(f"{forecast['time_horizon'].upper()} FORECAST")
-        lines.append(f"Target Date: {forecast['target_date']}")
+        lines.append("CERTAINTY-BASED FORECAST")
+        generated_at = forecast.get("generated_at", datetime.now().isoformat())
+        lines.append(f"Generated: {generated_at[:10]}")
         lines.append("=" * max_width)
         lines.append("")
 
-        forecast_data = forecast['forecast_data']
+        # Section 1: Known Knowns
+        self._format_known_knowns(lines, forecast_data, max_width)
 
-        # Section 1: Trend Extrapolations
-        self._format_trend_extrapolations(lines, forecast_data, max_width)
+        # Section 2: Known Unknowns
+        self._format_known_unknowns(lines, forecast_data, max_width)
 
-        # Section 2: Scenarios
-        self._format_scenarios(lines, forecast_data, max_width)
-
-        # Section 3: Historical Patterns
-        self._format_historical_patterns(lines, forecast_data, max_width)
-
-        # Section 4: Causal Chains
-        self._format_causal_chains(lines, forecast_data, max_width)
-
-        # Section 5: Event Risks
-        self._format_event_risks(lines, forecast_data, max_width)
+        # Section 3: Unknown Unknowns
+        self._format_unknown_unknowns(lines, forecast_data, max_width)
 
         # Footer
         lines.append("")
         lines.append("=" * max_width)
 
-        # Key Uncertainties
-        if forecast_data.get('key_uncertainties'):
+        # Data sources
+        data_sources = forecast_data.get("data_sources_summary", "")
+        if data_sources:
             lines.append("")
-            lines.append("KEY UNCERTAINTIES:")
-            for uncertainty in forecast_data['key_uncertainties']:
-                wrapped = textwrap.fill(f"  - {uncertainty}", width=max_width, subsequent_indent="    ")
-                lines.append(wrapped)
+            wrapped = textwrap.fill(
+                f"Data Sources: {data_sources}", width=max_width, subsequent_indent="  "
+            )
+            lines.append(wrapped)
 
         lines.append("")
 
         return "\n".join(lines)
 
-    def _format_trend_extrapolations(
-        self,
-        lines: list[str],
-        forecast_data: dict[str, Any],
-        max_width: int
+    def _format_known_knowns(
+        self, lines: list[str], forecast_data: dict[str, Any], max_width: int
     ) -> None:
-        """Format trend extrapolation section"""
+        """Format Known Knowns section (certain/near-certain forecasts)"""
         lines.append("-" * max_width)
-        lines.append("1. TREND EXTRAPOLATIONS")
+        lines.append("KNOWN KNOWNS (Certain or Near-Certain)")
         lines.append("-" * max_width)
         lines.append("")
 
-        trends = forecast_data.get('trend_extrapolations', [])
-        for i, trend in enumerate(trends, 1):
-            lines.append(f"Trend {i}: {trend.get('trend', 'N/A')}")
+        known_knowns = forecast_data.get("known_knowns", [])
+        if not known_knowns:
+            lines.append("  No certain forecasts identified.")
+            lines.append("")
+            return
 
-            current = trend.get('current_state', '')
-            if current:
-                wrapped = textwrap.fill(f"  Current: {current}", width=max_width, subsequent_indent="           ")
+        for i, raw_item in enumerate(known_knowns, 1):
+            item = self._normalize_item(raw_item)
+            forecast_text = item.get("forecast", "N/A")
+            timeline = item.get("timeline", "Unknown")
+            basis = item.get("basis", "")
+            impact = item.get("impact", "")
+
+            lines.append(f"{i}. {forecast_text}")
+            lines.append(f"   Timeline: {timeline}")
+
+            if basis:
+                wrapped = textwrap.fill(
+                    f"   Basis: {basis}", width=max_width, subsequent_indent="          "
+                )
                 lines.append(wrapped)
 
-            trajectory = trend.get('projected_trajectory', '')
-            if trajectory:
-                wrapped = textwrap.fill(f"  Trajectory: {trajectory}", width=max_width, subsequent_indent="              ")
+            if impact:
+                wrapped = textwrap.fill(
+                    f"   Impact: {impact}", width=max_width, subsequent_indent="          "
+                )
                 lines.append(wrapped)
-
-            outcome = trend.get('projected_outcome', '')
-            if outcome:
-                wrapped = textwrap.fill(f"  Outcome: {outcome}", width=max_width, subsequent_indent="           ")
-                lines.append(wrapped)
-
-            uncertainties = trend.get('uncertainties', [])
-            if uncertainties:
-                lines.append("  Uncertainties:")
-                for unc in uncertainties:
-                    wrapped = textwrap.fill(f"    - {unc}", width=max_width, subsequent_indent="      ")
-                    lines.append(wrapped)
 
             lines.append("")
 
-        lines.append("")
-
-    def _format_scenarios(
-        self,
-        lines: list[str],
-        forecast_data: dict[str, Any],
-        max_width: int
+    def _format_known_unknowns(
+        self, lines: list[str], forecast_data: dict[str, Any], max_width: int
     ) -> None:
-        """Format scenario modeling section"""
+        """Format Known Unknowns section (evidence-based projections)"""
         lines.append("-" * max_width)
-        lines.append("2. SCENARIO MODELING")
+        lines.append("KNOWN UNKNOWNS (Evidence-Based Projections)")
         lines.append("-" * max_width)
         lines.append("")
 
-        scenarios = forecast_data.get('scenarios', [])
-        for scenario in scenarios:
-            scenario_type = scenario.get('type', 'unknown').upper()
-            name = scenario.get('name', 'Unnamed Scenario')
+        known_unknowns = forecast_data.get("known_unknowns", [])
+        if not known_unknowns:
+            lines.append("  No evidence-based projections identified.")
+            lines.append("")
+            return
 
-            lines.append(f"[{scenario_type}] {name}")
+        for i, raw_item in enumerate(known_unknowns, 1):
+            item = self._normalize_item(raw_item)
+            forecast_text = item.get("forecast", "N/A")
+            timeline = item.get("timeline", "Unknown")
+            evidence = item.get("evidence", "")
+            possible_outcomes = item.get("possible_outcomes", [])
+            key_factors = item.get("key_factors", [])
 
-            plausibility = scenario.get('plausibility', '')
-            if plausibility:
-                wrapped = textwrap.fill(f"  Plausibility: {plausibility}", width=max_width, subsequent_indent="                ")
+            lines.append(f"{i}. {forecast_text}")
+            lines.append(f"   Timeline: {timeline}")
+
+            if evidence:
+                wrapped = textwrap.fill(
+                    f"   Evidence: {evidence}", width=max_width, subsequent_indent="             "
+                )
                 lines.append(wrapped)
 
-            predictions = scenario.get('predictions', [])
-            if predictions:
-                lines.append("  Predictions:")
-                for pred in predictions[:5]:  # Limit to top 5
-                    wrapped = textwrap.fill(f"    - {pred}", width=max_width, subsequent_indent="      ")
+            if possible_outcomes:
+                lines.append("   Possible Outcomes:")
+                for outcome in possible_outcomes[:3]:
+                    wrapped = textwrap.fill(
+                        f"     - {outcome}", width=max_width, subsequent_indent="       "
+                    )
                     lines.append(wrapped)
 
-            assumptions = scenario.get('key_assumptions', [])
-            if assumptions:
-                lines.append("  Key Assumptions:")
-                for assumption in assumptions[:3]:  # Limit to top 3
-                    wrapped = textwrap.fill(f"    - {assumption}", width=max_width, subsequent_indent="      ")
+            if key_factors:
+                lines.append("   Key Factors:")
+                for factor in key_factors[:3]:
+                    wrapped = textwrap.fill(
+                        f"     - {factor}", width=max_width, subsequent_indent="       "
+                    )
                     lines.append(wrapped)
 
             lines.append("")
 
-        lines.append("")
-
-    def _format_historical_patterns(
-        self,
-        lines: list[str],
-        forecast_data: dict[str, Any],
-        max_width: int
+    def _format_unknown_unknowns(
+        self, lines: list[str], forecast_data: dict[str, Any], max_width: int
     ) -> None:
-        """Format pattern recognition section"""
+        """Format Unknown Unknowns section (weak signal projections)"""
         lines.append("-" * max_width)
-        lines.append("3. HISTORICAL PATTERNS")
+        lines.append("UNKNOWN UNKNOWNS (Weak Signal Projections)")
         lines.append("-" * max_width)
         lines.append("")
 
-        patterns = forecast_data.get('historical_patterns', [])
-        for i, pattern in enumerate(patterns, 1):
-            pattern_type = pattern.get('pattern_type', 'unknown').capitalize()
-            pattern_desc = pattern.get('pattern', 'N/A')
+        unknown_unknowns = forecast_data.get("unknown_unknowns", [])
+        if not unknown_unknowns:
+            lines.append("  No weak signal projections identified.")
+            lines.append("")
+            return
 
-            lines.append(f"Pattern {i}: {pattern_type}")
-            wrapped = textwrap.fill(f"  {pattern_desc}", width=max_width, subsequent_indent="  ")
-            lines.append(wrapped)
+        for i, raw_item in enumerate(unknown_unknowns, 1):
+            item = self._normalize_item(raw_item)
+            forecast_text = item.get("forecast", "N/A")
+            timeline = item.get("timeline", "Unknown")
+            weak_signal = item.get("weak_signal", "")
+            potential_impact = item.get("potential_impact", "")
+            why_plausible = item.get("why_plausible", "")
 
-            historical_period = pattern.get('historical_period', '')
-            if historical_period:
-                lines.append(f"  Historical Period: {historical_period}")
+            lines.append(f"{i}. {forecast_text}")
+            lines.append(f"   Timeline: {timeline}")
 
-            implications = pattern.get('implications', '')
-            if implications:
-                wrapped = textwrap.fill(f"  Implications: {implications}", width=max_width, subsequent_indent="                ")
+            if weak_signal:
+                wrapped = textwrap.fill(
+                    f"   Weak Signal: {weak_signal}",
+                    width=max_width,
+                    subsequent_indent="                ",
+                )
                 lines.append(wrapped)
 
-            lines.append("")
-
-        lines.append("")
-
-    def _format_causal_chains(
-        self,
-        lines: list[str],
-        forecast_data: dict[str, Any],
-        max_width: int
-    ) -> None:
-        """Format causal chain analysis section"""
-        lines.append("-" * max_width)
-        lines.append("4. CAUSAL CHAIN ANALYSIS")
-        lines.append("-" * max_width)
-        lines.append("")
-
-        chains = forecast_data.get('causal_chains', [])
-        for i, chain in enumerate(chains, 1):
-            name = chain.get('chain_name', f'Chain {i}')
-            time_months = chain.get('time_to_unfold_months', 0)
-
-            lines.append(f"{name} ({time_months}mo to unfold)")
-
-            initial = chain.get('initial_cause', '')
-            if initial:
-                wrapped = textwrap.fill(f"  Initial: {initial}", width=max_width, subsequent_indent="           ")
+            if potential_impact:
+                wrapped = textwrap.fill(
+                    f"   If Occurs: {potential_impact}",
+                    width=max_width,
+                    subsequent_indent="              ",
+                )
                 lines.append(wrapped)
 
-            effects = chain.get('intermediate_effects', [])
-            if effects:
-                lines.append("  Effects:")
-                for j, effect in enumerate(effects, 1):
-                    wrapped = textwrap.fill(f"    {j}. {effect}", width=max_width, subsequent_indent="       ")
-                    lines.append(wrapped)
-
-            final = chain.get('final_outcome', '')
-            if final:
-                wrapped = textwrap.fill(f"  Final: {final}", width=max_width, subsequent_indent="         ")
+            if why_plausible:
+                wrapped = textwrap.fill(
+                    f"   Why Plausible: {why_plausible}",
+                    width=max_width,
+                    subsequent_indent="                  ",
+                )
                 lines.append(wrapped)
-
-            uncertainties = chain.get('key_uncertainties', [])
-            if uncertainties:
-                lines.append("  Uncertainties:")
-                for unc in uncertainties:
-                    wrapped = textwrap.fill(f"    - {unc}", width=max_width, subsequent_indent="      ")
-                    lines.append(wrapped)
-
-            lines.append("")
-
-        lines.append("")
-
-    def _format_event_risks(
-        self,
-        lines: list[str],
-        forecast_data: dict[str, Any],
-        max_width: int
-    ) -> None:
-        """Format event risk categorization section (Rumsfeld framework)"""
-        lines.append("-" * max_width)
-        lines.append("5. EVENT RISK CATEGORIZATION")
-        lines.append("-" * max_width)
-        lines.append("")
-
-        event_risks = forecast_data.get('event_risks', {})
-
-        # Known Knowns
-        known_knowns = event_risks.get('known_knowns', [])
-        if known_knowns:
-            lines.append("KNOWN KNOWNS (Scheduled/confirmed events):")
-            for event in known_knowns[:5]:  # Limit to top 5
-                event_name = event.get('event', 'Unknown event')
-                date = event.get('date', 'TBD')
-                lines.append(f"  - {event_name} ({date})")
-
-                certainty_basis = event.get('certainty_basis', '')
-                if certainty_basis:
-                    wrapped = textwrap.fill(f"    Basis: {certainty_basis}", width=max_width, subsequent_indent="           ")
-                    lines.append(wrapped)
-
-                impact = event.get('impact', '')
-                if impact:
-                    wrapped = textwrap.fill(f"    Impact: {impact}", width=max_width, subsequent_indent="            ")
-                    lines.append(wrapped)
-
-            lines.append("")
-
-        # Known Unknowns
-        known_unknowns = event_risks.get('known_unknowns', [])
-        if known_unknowns:
-            lines.append("KNOWN UNKNOWNS (Recognized but uncertain):")
-            for event in known_unknowns[:5]:  # Limit to top 5
-                uncertainty = event.get('uncertainty', 'Unknown uncertainty')
-                lines.append(f"  - {uncertainty}")
-
-                outcomes = event.get('possible_outcomes', [])
-                if outcomes:
-                    lines.append("    Possible outcomes:")
-                    for outcome in outcomes[:3]:
-                        wrapped = textwrap.fill(f"      • {outcome}", width=max_width, subsequent_indent="        ")
-                        lines.append(wrapped)
-
-                factors = event.get('factors_affecting_outcome', [])
-                if factors:
-                    lines.append("    Key factors:")
-                    for factor in factors[:3]:
-                        wrapped = textwrap.fill(f"      • {factor}", width=max_width, subsequent_indent="        ")
-                        lines.append(wrapped)
-
-            lines.append("")
-
-        # Unknown Unknowns
-        unknown_unknowns = event_risks.get('unknown_unknowns', [])
-        if unknown_unknowns:
-            lines.append("UNKNOWN UNKNOWNS (Speculative risks):")
-            for event in unknown_unknowns[:3]:  # Limit to top 3
-                signal = event.get('weak_signal', 'Speculative risk')
-                lines.append(f"  - {signal}")
-
-                plausibility = event.get('why_plausible', '')
-                if plausibility:
-                    wrapped = textwrap.fill(f"    Why plausible: {plausibility}", width=max_width, subsequent_indent="                   ")
-                    lines.append(wrapped)
-
-                impact = event.get('potential_impact', '')
-                if impact:
-                    wrapped = textwrap.fill(f"    If occurs: {impact}", width=max_width, subsequent_indent="               ")
-                    lines.append(wrapped)
 
             lines.append("")
 
@@ -314,12 +217,20 @@ class ForecastFormatter:
         Generate and save HTML report
 
         Args:
-            result: Forecast result dictionary with run_id and forecasts
+            result: Forecast result dictionary from orchestrator
 
         Returns:
             Path to saved HTML file
         """
-        # Simple HTML template for MVP
+        forecast = result.get("forecast", {})
+        # Handle case where forecast might be a string instead of dict
+        if isinstance(forecast, str):
+            forecast = {"forecast_data": {}, "generated_at": datetime.now().isoformat()}
+        forecast_data = forecast.get("forecast_data", {})
+        # Handle case where forecast_data might be a string
+        if isinstance(forecast_data, str):
+            forecast_data = {}
+
         html_parts = [
             "<!DOCTYPE html>",
             "<html>",
@@ -327,120 +238,205 @@ class ForecastFormatter:
             "<meta charset='utf-8'>",
             "<title>InsightWeaver Forecast Report</title>",
             "<style>",
-            "body { font-family: Arial, sans-serif; max-width: 1000px; margin: 0 auto; padding: 20px; }",
-            "h1 { color: #2c3e50; border-bottom: 3px solid #3498db; padding-bottom: 10px; }",
-            "h2 { color: #34495e; margin-top: 30px; border-bottom: 2px solid #bdc3c7; padding-bottom: 5px; }",
-            "h3 { color: #7f8c8d; }",
-            ".metadata { background: #ecf0f1; padding: 15px; border-radius: 5px; margin-bottom: 20px; }",
-            ".scenario { background: #e8f4f8; padding: 15px; margin: 15px 0; border-left: 4px solid #3498db; }",
-            ".trend { background: #e8f8e8; padding: 15px; margin: 15px 0; border-left: 4px solid #27ae60; }",
-            ".risk { background: #fff5e6; padding: 15px; margin: 15px 0; border-left: 4px solid #f39c12; }",
-            ".chain { background: #f4e8f8; padding: 15px; margin: 15px 0; border-left: 4px solid #9b59b6; }",
-            "ul { line-height: 1.6; }",
-            ".confidence { font-weight: bold; color: #2980b9; }",
+            "body { font-family: 'Segoe UI', Arial, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; background: #f5f5f5; }",
+            ".container { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }",
+            "h1 { color: #2c3e50; border-bottom: 3px solid #3498db; padding-bottom: 10px; margin-top: 0; }",
+            "h2 { color: #34495e; margin-top: 30px; border-bottom: 2px solid #bdc3c7; padding-bottom: 8px; }",
+            ".metadata { background: #ecf0f1; padding: 15px; border-radius: 5px; margin-bottom: 25px; }",
+            ".forecast-item { background: #fafafa; padding: 18px; margin: 12px 0; border-radius: 6px; border-left: 4px solid #3498db; }",
+            ".known-knowns .forecast-item { border-left-color: #27ae60; }",
+            ".known-unknowns .forecast-item { border-left-color: #f39c12; }",
+            ".unknown-unknowns .forecast-item { border-left-color: #9b59b6; }",
+            ".forecast-text { font-size: 16px; font-weight: 600; color: #2c3e50; margin-bottom: 8px; }",
+            ".timeline { display: inline-block; background: #3498db; color: white; padding: 3px 10px; border-radius: 12px; font-size: 13px; margin-bottom: 10px; }",
+            ".known-knowns .timeline { background: #27ae60; }",
+            ".known-unknowns .timeline { background: #f39c12; }",
+            ".unknown-unknowns .timeline { background: #9b59b6; }",
+            ".detail { color: #555; font-size: 14px; margin: 6px 0; line-height: 1.5; }",
+            ".detail strong { color: #34495e; }",
+            ".outcomes-list { margin: 8px 0 8px 20px; padding: 0; }",
+            ".outcomes-list li { margin: 4px 0; color: #555; }",
+            ".section-intro { color: #7f8c8d; font-style: italic; margin-bottom: 15px; }",
+            ".footer { text-align: center; color: #95a5a6; font-size: 12px; margin-top: 30px; padding-top: 20px; border-top: 1px solid #ecf0f1; }",
             "</style>",
             "</head>",
             "<body>",
-            "<h1>InsightWeaver Long-Term Forecast</h1>"
+            "<div class='container'>",
+            "<h1>InsightWeaver Forecast Report</h1>",
         ]
 
-        # Add forecasts
-        for forecast in result.get('forecasts', []):
-            forecast_data = forecast['forecast_data']
+        # Metadata
+        generated_at = forecast.get("generated_at", datetime.now().isoformat())
+        articles = forecast.get("articles_analyzed", 0)
+        html_parts.append("<div class='metadata'>")
+        html_parts.append(f"<strong>Generated:</strong> {generated_at[:19].replace('T', ' ')}<br>")
+        html_parts.append(f"<strong>Articles Analyzed:</strong> {articles}")
+        html_parts.append("</div>")
 
-            html_parts.append("<div class='metadata'>")
-            html_parts.append(f"<strong>Time Horizon:</strong> {forecast['time_horizon']}<br>")
-            html_parts.append(f"<strong>Target Date:</strong> {forecast['target_date']}")
-            html_parts.append("</div>")
+        # Known Knowns
+        html_parts.append("<div class='known-knowns'>")
+        html_parts.append("<h2>Known Knowns</h2>")
+        html_parts.append(
+            "<p class='section-intro'>Certain or near-certain forecasts based on scheduled events, announced plans, or legal requirements.</p>"
+        )
 
-            # Trends
-            html_parts.append("<h2>Trend Extrapolations</h2>")
-            for trend in forecast_data.get('trend_extrapolations', []):
-                html_parts.append("<div class='trend'>")
-                html_parts.append(f"<h3>{trend.get('trend', 'N/A')}</h3>")
-                html_parts.append(f"<p><strong>Current State:</strong> {trend.get('current_state', '')}</p>")
-                html_parts.append(f"<p><strong>Projected Outcome:</strong> {trend.get('projected_outcome', '')}</p>")
-
-                uncertainties = trend.get('uncertainties', [])
-                if uncertainties:
-                    html_parts.append("<p><strong>Uncertainties:</strong></p><ul>")
-                    for unc in uncertainties:
-                        html_parts.append(f"<li>{unc}</li>")
-                    html_parts.append("</ul>")
-
+        known_knowns = forecast_data.get("known_knowns", [])
+        if known_knowns:
+            for raw_item in known_knowns:
+                item = self._normalize_item(raw_item)
+                html_parts.append("<div class='forecast-item'>")
+                html_parts.append(f"<div class='forecast-text'>{item.get('forecast', 'N/A')}</div>")
+                html_parts.append(
+                    f"<span class='timeline'>{item.get('timeline', 'Unknown')}</span>"
+                )
+                if item.get("basis"):
+                    html_parts.append(
+                        f"<div class='detail'><strong>Basis:</strong> {item['basis']}</div>"
+                    )
+                if item.get("impact"):
+                    html_parts.append(
+                        f"<div class='detail'><strong>Impact:</strong> {item['impact']}</div>"
+                    )
                 html_parts.append("</div>")
+        else:
+            html_parts.append("<p>No certain forecasts identified.</p>")
+        html_parts.append("</div>")
 
-            # Scenarios
-            html_parts.append("<h2>Scenario Modeling</h2>")
-            for scenario in forecast_data.get('scenarios', []):
-                html_parts.append("<div class='scenario'>")
-                html_parts.append(f"<h3>[{scenario.get('type', '').upper()}] {scenario.get('name', 'Unnamed')}</h3>")
+        # Known Unknowns
+        html_parts.append("<div class='known-unknowns'>")
+        html_parts.append("<h2>Known Unknowns</h2>")
+        html_parts.append(
+            "<p class='section-intro'>Evidence-based projections with significant supporting data but uncertain outcomes.</p>"
+        )
 
-                plausibility = scenario.get('plausibility', '')
-                if plausibility:
-                    html_parts.append(f"<p><strong>Plausibility:</strong> {plausibility}</p>")
-
-                html_parts.append("<p><strong>Predictions:</strong></p><ul>")
-                for pred in scenario.get('predictions', [])[:5]:
-                    html_parts.append(f"<li>{pred}</li>")
-                html_parts.append("</ul>")
-                html_parts.append("</div>")
-
-            # Causal Chains
-            html_parts.append("<h2>Causal Chain Analysis</h2>")
-            for chain in forecast_data.get('causal_chains', []):
-                html_parts.append("<div class='chain'>")
-                html_parts.append(f"<h3>{chain.get('chain_name', 'Chain')}</h3>")
-                html_parts.append(f"<p><strong>Initial Cause:</strong> {chain.get('initial_cause', '')}</p>")
-                html_parts.append("<p><strong>Effects:</strong></p><ol>")
-                for effect in chain.get('intermediate_effects', []):
-                    html_parts.append(f"<li>{effect}</li>")
-                html_parts.append("</ol>")
-                html_parts.append(f"<p><strong>Final Outcome:</strong> {chain.get('final_outcome', '')}</p>")
-                html_parts.append("</div>")
-
-            # Event Risks
-            html_parts.append("<h2>Event Risk Categorization</h2>")
-            event_risks = forecast_data.get('event_risks', {})
-
-            html_parts.append("<div class='risk'>")
-            html_parts.append("<h3>Known Knowns</h3><ul>")
-            for event in event_risks.get('known_knowns', [])[:5]:
-                html_parts.append(f"<li><strong>{event.get('event', 'N/A')}</strong> - {event.get('date', 'TBD')}")
-                if event.get('certainty_basis'):
-                    html_parts.append(f"<br><em>Basis: {event.get('certainty_basis')}</em>")
-                html_parts.append("</li>")
-            html_parts.append("</ul>")
-
-            html_parts.append("<h3>Known Unknowns</h3><ul>")
-            for event in event_risks.get('known_unknowns', [])[:5]:
-                html_parts.append(f"<li><strong>{event.get('uncertainty', 'N/A')}</strong>")
-                outcomes = event.get('possible_outcomes', [])
+        known_unknowns = forecast_data.get("known_unknowns", [])
+        if known_unknowns:
+            for raw_item in known_unknowns:
+                item = self._normalize_item(raw_item)
+                html_parts.append("<div class='forecast-item'>")
+                html_parts.append(f"<div class='forecast-text'>{item.get('forecast', 'N/A')}</div>")
+                html_parts.append(
+                    f"<span class='timeline'>{item.get('timeline', 'Unknown')}</span>"
+                )
+                if item.get("evidence"):
+                    html_parts.append(
+                        f"<div class='detail'><strong>Evidence:</strong> {item['evidence']}</div>"
+                    )
+                outcomes = item.get("possible_outcomes", [])
                 if outcomes:
-                    html_parts.append("<br>Possible outcomes: " + ", ".join(outcomes[:3]))
-                html_parts.append("</li>")
-            html_parts.append("</ul>")
+                    html_parts.append(
+                        "<div class='detail'><strong>Possible Outcomes:</strong></div>"
+                    )
+                    html_parts.append("<ul class='outcomes-list'>")
+                    for outcome in outcomes[:4]:
+                        html_parts.append(f"<li>{outcome}</li>")
+                    html_parts.append("</ul>")
+                factors = item.get("key_factors", [])
+                if factors:
+                    html_parts.append(
+                        f"<div class='detail'><strong>Key Factors:</strong> {', '.join(factors[:4])}</div>"
+                    )
+                html_parts.append("</div>")
+        else:
+            html_parts.append("<p>No evidence-based projections identified.</p>")
+        html_parts.append("</div>")
 
-            html_parts.append("<h3>Unknown Unknowns</h3><ul>")
-            for event in event_risks.get('unknown_unknowns', [])[:3]:
-                html_parts.append(f"<li><strong>{event.get('weak_signal', 'N/A')}</strong>")
-                if event.get('why_plausible'):
-                    html_parts.append(f"<br><em>Why plausible: {event.get('why_plausible')}</em>")
-                html_parts.append("</li>")
-            html_parts.append("</ul>")
-            html_parts.append("</div>")
+        # Unknown Unknowns
+        html_parts.append("<div class='unknown-unknowns'>")
+        html_parts.append("<h2>Unknown Unknowns</h2>")
+        html_parts.append(
+            "<p class='section-intro'>Speculative forecasts based on weak signals and emerging patterns.</p>"
+        )
+
+        unknown_unknowns = forecast_data.get("unknown_unknowns", [])
+        if unknown_unknowns:
+            for raw_item in unknown_unknowns:
+                item = self._normalize_item(raw_item)
+                html_parts.append("<div class='forecast-item'>")
+                html_parts.append(f"<div class='forecast-text'>{item.get('forecast', 'N/A')}</div>")
+                html_parts.append(
+                    f"<span class='timeline'>{item.get('timeline', 'Unknown')}</span>"
+                )
+                if item.get("weak_signal"):
+                    html_parts.append(
+                        f"<div class='detail'><strong>Weak Signal:</strong> {item['weak_signal']}</div>"
+                    )
+                if item.get("potential_impact"):
+                    html_parts.append(
+                        f"<div class='detail'><strong>If Occurs:</strong> {item['potential_impact']}</div>"
+                    )
+                if item.get("why_plausible"):
+                    html_parts.append(
+                        f"<div class='detail'><strong>Why Plausible:</strong> {item['why_plausible']}</div>"
+                    )
+                html_parts.append("</div>")
+        else:
+            html_parts.append("<p>No weak signal projections identified.</p>")
+        html_parts.append("</div>")
+
+        # Data sources
+        data_sources = forecast_data.get("data_sources_summary", "")
+        if data_sources:
+            html_parts.append(
+                f"<div class='detail' style='margin-top: 20px;'><strong>Data Sources:</strong> {data_sources}</div>"
+            )
 
         # Footer
-        html_parts.append(f"<hr><p style='color: #7f8c8d; font-size: 0.9em;'>Generated by InsightWeaver on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>")
+        html_parts.append(
+            f"<div class='footer'>Generated by InsightWeaver on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</div>"
+        )
+        html_parts.append("</div>")
         html_parts.append("</body></html>")
 
         # Save to file
-        output_dir = Path("data/forecasts")
+        output_dir = settings.forecasts_dir
         output_dir.mkdir(parents=True, exist_ok=True)
 
         filename = f"forecast_{result['run_id']}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html"
         filepath = output_dir / filename
 
         filepath.write_text("\n".join(html_parts))
+
+        return filepath
+
+    def save_json_report(self, result: dict[str, Any]) -> Path:
+        """
+        Generate and save JSON report for programmatic access
+
+        Args:
+            result: Forecast result dictionary from orchestrator
+
+        Returns:
+            Path to saved JSON file
+        """
+        output_dir = settings.forecasts_dir
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        filename = f"forecast_{result['run_id']}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        filepath = output_dir / filename
+
+        forecast = result.get("forecast", {})
+        # Handle case where forecast might be a string instead of dict
+        if isinstance(forecast, str):
+            forecast = {"forecast_data": {}, "generated_at": datetime.now().isoformat()}
+        forecast_data = forecast.get("forecast_data", {})
+        # Handle case where forecast_data might be a string
+        if isinstance(forecast_data, str):
+            forecast_data = {}
+
+        json_output = {
+            "version": "2.0",
+            "type": "certainty_based_forecast",
+            "generated_at": datetime.now().isoformat(),
+            "run_id": result["run_id"],
+            "articles_analyzed": forecast.get("articles_analyzed", 0),
+            "known_knowns": forecast_data.get("known_knowns", []),
+            "known_unknowns": forecast_data.get("known_unknowns", []),
+            "unknown_unknowns": forecast_data.get("unknown_unknowns", []),
+            "data_sources_summary": forecast_data.get("data_sources_summary", ""),
+        }
+
+        with open(filepath, "w", encoding="utf-8") as f:
+            json.dump(json_output, f, indent=2, ensure_ascii=False)
 
         return filepath

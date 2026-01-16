@@ -31,11 +31,11 @@ class ContextCurator:
 
     # Token budget allocation for Claude Sonnet 4 (200k context window)
     TOKEN_BUDGET = {
-        'system_prompt': 5000,      # Perspective + framework + examples
-        'articles': 50000,           # Article content (50 articles × ~1000 tokens)
-        'historical': 10000,         # Compressed memory/patterns
-        'response': 8000,            # Claude's output
-        'safety_margin': 127000      # Reserved buffer
+        "system_prompt": 5000,  # Perspective + framework + examples
+        "articles": 50000,  # Article content (50 articles × ~1000 tokens)
+        "historical": 10000,  # Compressed memory/patterns
+        "response": 8000,  # Claude's output
+        "safety_margin": 127000,  # Reserved buffer
     }
 
     # Total available: 200,000 tokens
@@ -46,7 +46,7 @@ class ContextCurator:
         self,
         user_profile: UserProfile | None = None,
         perspective_id: str | None = None,
-        topic_filters: dict | None = None
+        topic_filters: dict | None = None,
     ):
         """
         Initialize context curator
@@ -71,11 +71,12 @@ class ContextCurator:
             # Try to get from user profile preferences
             if self.user_profile:
                 profile_data = self.user_profile.profile
-                perspective_id = profile_data.get('briefing_preferences', {}).get('perspective')
+                perspective_id = profile_data.get("briefing_preferences", {}).get("perspective")
 
             # Fall back to default if not in profile
             if perspective_id is None:
                 from .perspectives import get_default_perspective
+
                 perspective_id = get_default_perspective()
 
         # Load perspective configuration
@@ -92,9 +93,7 @@ class ContextCurator:
         self.perception_engine = PerceptionEngine()
 
     async def curate_for_narrative_synthesis(
-        self,
-        hours: int = 48,
-        max_articles: int = 50
+        self, hours: int = 48, max_articles: int = 50
     ) -> dict[str, Any]:
         """
         Curate context for narrative synthesis with token budget enforcement
@@ -109,7 +108,7 @@ class ContextCurator:
         with profile("CONTEXT_CURATION_TOTAL"):
             with get_db() as session:
                 # Cleanup expired facts (if semantic memory enabled)
-                if getattr(settings, 'enable_semantic_memory', False):
+                if getattr(settings, "enable_semantic_memory", False):
                     try:
                         semantic_memory = SemanticMemory(session)
                         deleted_count = semantic_memory.cleanup_expired_facts()
@@ -128,12 +127,11 @@ class ContextCurator:
 
                 # Get semantic memory facts (if enabled)
                 semantic_facts = ""
-                if getattr(settings, 'enable_semantic_memory', False):
+                if getattr(settings, "enable_semantic_memory", False):
                     try:
                         semantic_memory = SemanticMemory(session)
                         relevant_facts = semantic_memory.retrieve_relevant_facts(
-                            articles,
-                            max_facts=20
+                            articles, max_facts=20
                         )
                         semantic_facts = semantic_memory.build_historical_context(relevant_facts)
                         if semantic_facts:
@@ -143,7 +141,7 @@ class ContextCurator:
 
                 # Load decision context module
                 modules = self.module_loader.load_all_modules()
-                decision_context = self._format_decision_context(modules.get('core', []))
+                decision_context = self._format_decision_context(modules.get("core", []))
 
                 # Extract perception (cross-article patterns)
                 with profile("PERCEPTION_EXTRACTION"):
@@ -173,7 +171,7 @@ class ContextCurator:
                 "perception": perception_context,
                 "anomaly_analysis": anomaly_context,
                 "memory": combined_memory,
-                "instructions": self._get_synthesis_instructions()
+                "instructions": self._get_synthesis_instructions(),
             }
 
             # Enforce token budget
@@ -182,9 +180,7 @@ class ContextCurator:
             return context
 
     def curate_for_summary(
-        self,
-        articles: list[Article],
-        brief_type: str = "daily"
+        self, articles: list[Article], brief_type: str = "daily"
     ) -> dict[str, Any]:
         """
         Curate context for executive summary generation
@@ -199,16 +195,13 @@ class ContextCurator:
         context = {
             "user_profile": self._format_user_profile(),
             "articles": self._format_articles(articles[:20]),  # Top 20
-            "instructions": self._get_summary_instructions(brief_type)
+            "instructions": self._get_summary_instructions(brief_type),
         }
 
         return context
 
     def _get_recent_articles(
-        self,
-        session: Session,
-        hours: int,
-        max_articles: int
+        self, session: Session, hours: int, max_articles: int
     ) -> list[Article]:
         """
         Get recent unfiltered articles from database with optional topic filtering
@@ -225,23 +218,18 @@ class ContextCurator:
 
         # Base query: recent, unfiltered articles
         query = session.query(Article).filter(
-            Article.fetched_at >= cutoff_time,
-            Article.filtered == False
+            Article.fetched_at >= cutoff_time, Article.filtered.is_(False)
         )
 
         # If no topic filters, use existing logic
         if not self.topic_filters:
-            articles = query.order_by(
-                Article.fetched_at.desc()
-            ).limit(max_articles).all()
+            articles = query.order_by(Article.fetched_at.desc()).limit(max_articles).all()
 
             logger.info(f"Curated {len(articles)} articles from last {hours} hours (no filters)")
             return articles
 
         # Fetch 2x candidates for filtering buffer
-        candidate_articles = query.order_by(
-            Article.fetched_at.desc()
-        ).limit(max_articles * 2).all()
+        candidate_articles = query.order_by(Article.fetched_at.desc()).limit(max_articles * 2).all()
 
         logger.info(
             f"Fetched {len(candidate_articles)} candidate articles for filtering "
@@ -253,7 +241,7 @@ class ContextCurator:
             filtered_articles = self.topic_matcher.filter_articles(
                 articles=candidate_articles,
                 topic_filters=self.topic_filters,
-                user_profile=self.user_profile
+                user_profile=self.user_profile,
             )
         else:
             logger.warning("TopicMatcher not initialized or user_profile missing, skipping filters")
@@ -291,9 +279,12 @@ class ContextCurator:
         - Identified patterns
         """
         # Get last 5 narrative syntheses (increased from 3)
-        syntheses = session.query(NarrativeSynthesis).order_by(
-            NarrativeSynthesis.generated_at.desc()
-        ).limit(5).all()
+        syntheses = (
+            session.query(NarrativeSynthesis)
+            .order_by(NarrativeSynthesis.generated_at.desc())
+            .limit(5)
+            .all()
+        )
 
         if not syntheses:
             return "No historical context available."
@@ -309,22 +300,29 @@ class ContextCurator:
             if synth.synthesis_data:
                 try:
                     import json
-                    data = json.loads(synth.synthesis_data) if isinstance(synth.synthesis_data, str) else synth.synthesis_data
-                    bottom_line = data.get('bottom_line', {})
-                    summary = bottom_line.get('summary', '')
+
+                    data = (
+                        json.loads(synth.synthesis_data)
+                        if isinstance(synth.synthesis_data, str)
+                        else synth.synthesis_data
+                    )
+                    bottom_line = data.get("bottom_line", {})
+                    summary = bottom_line.get("summary", "")
 
                     if summary:
                         memory_parts.append(f"\n**{date_str} ({i} days ago):**")
                         memory_parts.append(summary)
 
                         # Include immediate actions if present
-                        actions = bottom_line.get('immediate_actions', [])
+                        actions = bottom_line.get("immediate_actions", [])
                         if actions:
-                            memory_parts.append("  Key actions identified: " + "; ".join(actions[:2]))
+                            memory_parts.append(
+                                "  Key actions identified: " + "; ".join(actions[:2])
+                            )
                     elif synth.executive_summary:
                         # Fallback to old format
                         memory_parts.append(f"\n**{date_str}:** {synth.executive_summary[:400]}...")
-                except:
+                except Exception:
                     # If parsing fails, use executive_summary
                     if synth.executive_summary:
                         memory_parts.append(f"\n**{date_str}:** {synth.executive_summary[:400]}...")
@@ -364,49 +362,51 @@ class ContextCurator:
         logger.info(f"Initial context: ~{tokens['total']} tokens")
 
         # Check if we're over budget (system + articles + historical)
-        budget_used = tokens['system'] + tokens['articles'] + tokens['historical']
-        budget_limit = (self.TOKEN_BUDGET['system_prompt'] +
-                       self.TOKEN_BUDGET['articles'] +
-                       self.TOKEN_BUDGET['historical'])
+        budget_used = tokens["system"] + tokens["articles"] + tokens["historical"]
+        budget_limit = (
+            self.TOKEN_BUDGET["system_prompt"]
+            + self.TOKEN_BUDGET["articles"]
+            + self.TOKEN_BUDGET["historical"]
+        )
 
         if budget_used <= budget_limit:
             logger.info(f"Within token budget: {budget_used}/{budget_limit} tokens")
-            context['_token_metadata'] = tokens
+            context["_token_metadata"] = tokens
             return context
 
         logger.warning(f"Over token budget: {budget_used}/{budget_limit} tokens, compressing...")
 
         # Compression step 1: Reduce article count
-        if len(context['articles']) > 30:
+        if len(context["articles"]) > 30:
             logger.info(f"Reducing articles from {len(context['articles'])} to 30")
-            context['articles'] = context['articles'][:30]
+            context["articles"] = context["articles"][:30]
             tokens = self._estimate_tokens(context)
-            budget_used = tokens['system'] + tokens['articles'] + tokens['historical']
+            budget_used = tokens["system"] + tokens["articles"] + tokens["historical"]
 
         if budget_used <= budget_limit:
-            context['_token_metadata'] = tokens
+            context["_token_metadata"] = tokens
             return context
 
         # Compression step 2: Further reduce articles
-        if len(context['articles']) > 20:
+        if len(context["articles"]) > 20:
             logger.info(f"Further reducing articles from {len(context['articles'])} to 20")
-            context['articles'] = context['articles'][:20]
+            context["articles"] = context["articles"][:20]
             tokens = self._estimate_tokens(context)
-            budget_used = tokens['system'] + tokens['articles'] + tokens['historical']
+            budget_used = tokens["system"] + tokens["articles"] + tokens["historical"]
 
         if budget_used <= budget_limit:
-            context['_token_metadata'] = tokens
+            context["_token_metadata"] = tokens
             return context
 
         # Compression step 3: Trim historical memory
-        if "Recent Intelligence Summaries" in context['memory']:
+        if "Recent Intelligence Summaries" in context["memory"]:
             logger.info("Trimming historical memory to last 2 summaries")
-            memory_lines = context['memory'].split('\n')
+            memory_lines = context["memory"].split("\n")
             # Keep header + first 2 summaries (approximately)
-            context['memory'] = '\n'.join(memory_lines[:8])
+            context["memory"] = "\n".join(memory_lines[:8])
             tokens = self._estimate_tokens(context)
 
-        context['_token_metadata'] = tokens
+        context["_token_metadata"] = tokens
         logger.info(f"Compressed context: ~{tokens['total']} tokens")
         return context
 
@@ -423,51 +423,61 @@ class ContextCurator:
         Returns:
             Token count breakdown
         """
+
         def count_chars(obj):
             return len(json.dumps(obj)) if obj else 0
 
-        system_chars = (
-            count_chars(context.get('user_profile', {})) +
-            len(context.get('instructions', ''))
+        system_chars = count_chars(context.get("user_profile", {})) + len(
+            context.get("instructions", "")
         )
 
-        decision_chars = len(context.get('decision_context', ''))
-        articles_chars = count_chars(context.get('articles', []))
-        perception_chars = len(context.get('perception', ''))
-        anomaly_chars = len(context.get('anomaly_analysis', ''))
-        memory_chars = len(context.get('memory', ''))
+        decision_chars = len(context.get("decision_context", ""))
+        articles_chars = count_chars(context.get("articles", []))
+        perception_chars = len(context.get("perception", ""))
+        anomaly_chars = len(context.get("anomaly_analysis", ""))
+        memory_chars = len(context.get("memory", ""))
 
         return {
-            'system': system_chars // 4,
-            'decision_context': decision_chars // 4,
-            'articles': articles_chars // 4,
-            'perception': perception_chars // 4,
-            'anomaly_analysis': anomaly_chars // 4,
-            'historical': memory_chars // 4,
-            'total': (system_chars + decision_chars + articles_chars + perception_chars + anomaly_chars + memory_chars) // 4
+            "system": system_chars // 4,
+            "decision_context": decision_chars // 4,
+            "articles": articles_chars // 4,
+            "perception": perception_chars // 4,
+            "anomaly_analysis": anomaly_chars // 4,
+            "historical": memory_chars // 4,
+            "total": (
+                system_chars
+                + decision_chars
+                + articles_chars
+                + perception_chars
+                + anomaly_chars
+                + memory_chars
+            )
+            // 4,
         }
 
     def _format_user_profile(self) -> dict[str, Any]:
         """Format user profile for context"""
         if not self.user_profile:
-            return {
-                "location": "Unknown",
-                "professional_domains": [],
-                "civic_interests": []
-            }
+            return {"location": "Unknown", "professional_domains": [], "civic_interests": []}
 
         location = self.user_profile.get_primary_location()
-        location_str = f"{location.get('city', '')}, {location.get('state', '')}"
+        # Handle both string and dict formats for primary_location
+        if isinstance(location, str):
+            location_str = location
+        elif isinstance(location, dict):
+            location_str = f"{location.get('city', '')}, {location.get('state', '')}"
+        else:
+            location_str = "Unknown"
 
         return {
             "location": location_str,
             "professional_domains": self.user_profile.get_professional_domains(),
-            "civic_interests": self.user_profile.get_civic_interests()
+            "civic_interests": self.user_profile.get_civic_interests(),
         }
 
     def _format_decision_context(self, core_modules: list) -> str:
         """Format decision context from modules"""
-        decision_modules = [m for m in core_modules if 'decision_context' in m.name.lower()]
+        decision_modules = [m for m in core_modules if "decision_context" in m.name.lower()]
 
         if not decision_modules:
             return ""
@@ -481,17 +491,23 @@ class ContextCurator:
 
         for article in articles:
             # Use embedding_summary if available, fallback to normalized_content
-            content = article.embedding_summary or article.normalized_content or article.description or ""
+            content = (
+                article.embedding_summary or article.normalized_content or article.description or ""
+            )
 
-            formatted.append({
-                "id": article.id,  # Include ID for tracking
-                "title": article.title,
-                "source": article.feed.name if article.feed else "Unknown",
-                "published_date": article.published_date.isoformat() if article.published_date else None,
-                "content": content,
-                "url": article.url,
-                "entities": article.entities if article.entities else []
-            })
+            formatted.append(
+                {
+                    "id": article.id,  # Include ID for tracking
+                    "title": article.title,
+                    "source": article.feed.name if article.feed else "Unknown",
+                    "published_date": article.published_date.isoformat()
+                    if article.published_date
+                    else None,
+                    "content": content,
+                    "url": article.url,
+                    "entities": article.entities if article.entities else [],
+                }
+            )
 
         return formatted
 
@@ -505,13 +521,15 @@ class ContextCurator:
             civic = self.user_profile.get_civic_interests()
 
             # Prepare replacement values
-            city = location.get('city', 'your city')
-            state = location.get('state', 'your state')
-            region = location.get('region', location.get('city', 'your region'))
-            country = location.get('country', 'United States')
+            city = location.get("city", "your city")
+            state = location.get("state", "your state")
+            region = location.get("region", location.get("city", "your region"))
+            country = location.get("country", "United States")
 
-            professional_domains = ', '.join(professional.get('professional_domains', ['your profession']))
-            civic_focus = ', '.join(civic.get('policy_areas', ['civic issues'])[:3])
+            professional_domains = ", ".join(
+                professional.get("professional_domains", ["your profession"])
+            )
+            civic_focus = ", ".join(civic.get("policy_areas", ["civic issues"])[:3])
             tone = self.perspective.tone
 
             # Inject user data into perspective framework
@@ -522,7 +540,7 @@ class ContextCurator:
                 country=country,
                 professional_domains=professional_domains,
                 civic_focus=civic_focus,
-                tone=tone
+                tone=tone,
             )
         else:
             # No user profile - use framework as-is with generic placeholders
@@ -533,7 +551,7 @@ class ContextCurator:
                 country="your country",
                 professional_domains="your profession",
                 civic_focus="civic issues",
-                tone=self.perspective.tone
+                tone=self.perspective.tone,
             )
 
         perspective_instructions = f"""# Perspective: {self.perspective.name}
@@ -564,9 +582,19 @@ Analyze the provided articles and generate a structured narrative intelligence b
             professional = self.user_profile.get_professional_context()
             civic = self.user_profile.get_civic_interests()
 
-            location_str = f"{location.get('city', 'your city')}, {location.get('state', 'your state')}"
-            professional_domains = ', '.join(professional.get('professional_domains', ['your profession']))
-            civic_focus = ', '.join(civic.get('policy_areas', ['civic issues'])[:3])
+            # Handle both string and dict formats for primary_location
+            if isinstance(location, str):
+                location_str = location if location else "your location"
+            elif isinstance(location, dict):
+                location_str = (
+                    f"{location.get('city', 'your city')}, {location.get('state', 'your state')}"
+                )
+            else:
+                location_str = "your location"
+            professional_domains = ", ".join(
+                professional.get("professional_domains", ["your profession"])
+            )
+            civic_focus = ", ".join(civic.get("policy_areas", ["civic issues"])[:3])
         else:
             location_str = "your location"
             professional_domains = "your profession"

@@ -40,11 +40,7 @@ async def verify_brief_output(executive_summary: str) -> dict[str, Any] | None:
         return analysis
     except Exception as e:
         logger.error(f"Trust verification failed: {e}", exc_info=True)
-        return {
-            "analyzed": False,
-            "error": True,
-            "message": f"Verification unavailable: {str(e)}"
-        }
+        return {"analyzed": False, "error": True, "message": f"Verification unavailable: {str(e)}"}
 
 
 def format_brief_trust_section(analysis: dict[str, Any] | None) -> str:

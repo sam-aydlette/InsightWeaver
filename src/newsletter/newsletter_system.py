@@ -4,10 +4,12 @@ Main orchestrator for intelligence briefing generation and delivery
 """
 
 import asyncio
+import json
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+from ..config.settings import settings
 from .content_engine import NewsletterContentEngine
 from .email_sender import NewsletterScheduler
 from .templates import DailyBriefTemplate
@@ -28,7 +30,7 @@ class NewsletterSystem:
         save_local: bool = True,
         send_email: bool = False,
         topic_filters: dict | None = None,
-        synthesis_id: int | None = None
+        synthesis_id: int | None = None,
     ) -> dict[str, Any]:
         """
         Generate intelligence report for any time period
@@ -51,27 +53,27 @@ class NewsletterSystem:
             end_date=end_date,
             hours=hours,
             topic_filters=topic_filters,
-            synthesis_id=synthesis_id
+            synthesis_id=synthesis_id,
         )
 
         # Check trust verification status
-        trust_verification = content_data.get('trust_verification', {})
-        trust_passed = trust_verification.get('passed', True)  # Default to True for old syntheses
+        trust_verification = content_data.get("trust_verification", {})
+        trust_passed = trust_verification.get("passed", True)  # Default to True for old syntheses
 
         results = {
             "success": True,
-            "start_date": content_data['start_date'],
-            "end_date": content_data['end_date'],
-            "duration_hours": content_data['duration_hours'],
-            "report_type": content_data['report_type'],
-            "articles_analyzed": content_data['articles_analyzed'],
-            "synthesis_id": content_data.get('synthesis_id'),
-            "processing_time": content_data.get('processing_time'),
-            "executive_summary": content_data.get('executive_summary', ''),
-            "synthesis_data": content_data.get('synthesis_data', {}),
+            "start_date": content_data["start_date"],
+            "end_date": content_data["end_date"],
+            "duration_hours": content_data["duration_hours"],
+            "report_type": content_data["report_type"],
+            "articles_analyzed": content_data["articles_analyzed"],
+            "synthesis_id": content_data.get("synthesis_id"),
+            "processing_time": content_data.get("processing_time"),
+            "executive_summary": content_data.get("executive_summary", ""),
+            "synthesis_data": content_data.get("synthesis_data", {}),
             "trust_verification": trust_verification,  # Include trust verification metadata
             "local_saved": False,
-            "email_sent": False
+            "email_sent": False,
         }
 
         try:
@@ -117,18 +119,69 @@ class NewsletterSystem:
 
     def _save_report_local(self, content_data: dict[str, Any], html_content: str) -> Path:
         """Save report with descriptive filename"""
-        newsletters_dir = Path("data/newsletters")
-        newsletters_dir.mkdir(parents=True, exist_ok=True)
+        briefings_dir = settings.briefings_dir
+        briefings_dir.mkdir(parents=True, exist_ok=True)
 
-        start = content_data['start_date'].strftime('%Y-%m-%d')
-        end = content_data['end_date'].strftime('%Y-%m-%d')
-        report_type = content_data['report_type']
+        start = content_data["start_date"].strftime("%Y-%m-%d")
+        end = content_data["end_date"].strftime("%Y-%m-%d")
+        report_type = content_data["report_type"]
 
         filename = f"intel_report_{report_type}_{start}_to_{end}.html"
-        filepath = newsletters_dir / filename
+        filepath = briefings_dir / filename
 
-        with open(filepath, 'w', encoding='utf-8') as f:
+        with open(filepath, "w", encoding="utf-8") as f:
             f.write(html_content)
+
+        return filepath
+
+    def save_json_report(self, content_data: dict[str, Any]) -> Path:
+        """
+        Save report as JSON for programmatic access
+
+        Args:
+            content_data: Report content data from content engine
+
+        Returns:
+            Path to saved JSON file
+        """
+        briefings_dir = settings.briefings_dir
+        briefings_dir.mkdir(parents=True, exist_ok=True)
+
+        start = content_data["start_date"].strftime("%Y-%m-%d")
+        end = content_data["end_date"].strftime("%Y-%m-%d")
+        report_type = content_data["report_type"]
+
+        filename = f"intel_report_{report_type}_{start}_to_{end}.json"
+        filepath = briefings_dir / filename
+
+        # Build structured JSON output
+        synthesis_data = content_data.get("synthesis_data", {})
+        metadata = synthesis_data.get("metadata", {})
+
+        # Extract citation_map from synthesis metadata for source references
+        citation_map = metadata.get("citation_map", {})
+
+        json_output = {
+            "version": "1.0",
+            "type": "intelligence_brief",
+            "generated_at": datetime.now().isoformat(),
+            "time_window": {
+                "start": content_data["start_date"].isoformat(),
+                "end": content_data["end_date"].isoformat(),
+                "hours": content_data["duration_hours"],
+            },
+            "articles_analyzed": content_data["articles_analyzed"],
+            "report_type": report_type,
+            "executive_summary": content_data.get("executive_summary", ""),
+            "bottom_line": synthesis_data.get("bottom_line", ""),
+            "trends": synthesis_data.get("trends_and_patterns", []),
+            "priority_events": synthesis_data.get("priority_events", []),
+            "predictions": synthesis_data.get("predictions_scenarios", []),
+            "citations": citation_map,
+        }
+
+        with open(filepath, "w", encoding="utf-8") as f:
+            json.dump(json_output, f, indent=2, ensure_ascii=False)
 
         return filepath
 
@@ -140,7 +193,7 @@ class NewsletterSystem:
             "content_engine": False,
             "email_system": False,
             "template_rendering": False,
-            "overall_status": "FAILED"
+            "overall_status": "FAILED",
         }
 
         try:
@@ -149,8 +202,7 @@ class NewsletterSystem:
             end_date = datetime.now()
             start_date = end_date - timedelta(hours=24)
             content_data = await self.content_engine.generate_intelligence_report(
-                start_date=start_date,
-                end_date=end_date
+                start_date=start_date, end_date=end_date
             )
 
             if content_data and "executive_summary" in content_data:
@@ -188,7 +240,7 @@ class NewsletterSystem:
             # Overall status
             core_systems = [test_results["content_engine"], test_results["template_rendering"]]
             if all(core_systems):
-                if test_results["email_system"] == True:
+                if test_results["email_system"] is True:
                     test_results["overall_status"] = "FULLY_OPERATIONAL"
                 else:
                     test_results["overall_status"] = "OPERATIONAL_LOCAL_ONLY"
@@ -203,8 +255,12 @@ class NewsletterSystem:
             test_results["error"] = str(e)
             return test_results
 
-    async def preview_report(self, start_date: datetime | None = None,
-                            end_date: datetime | None = None, hours: int | None = None) -> str:
+    async def preview_report(
+        self,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
+        hours: int | None = None,
+    ) -> str:
         """
         Generate preview of intelligence report (HTML content only)
 
@@ -217,9 +273,7 @@ class NewsletterSystem:
             HTML content string
         """
         content_data = await self.content_engine.generate_intelligence_report(
-            start_date=start_date,
-            end_date=end_date,
-            hours=hours
+            start_date=start_date, end_date=end_date, hours=hours
         )
         return DailyBriefTemplate.generate_html(content_data)
 
@@ -235,12 +289,9 @@ class NewsletterSystem:
                 "enabled": email_status["email_enabled"],
                 "configured": email_status["credentials_configured"],
                 "smtp_server": email_status["smtp_server"],
-                "default_recipient": email_status["default_recipient"]
+                "default_recipient": email_status["default_recipient"],
             },
-            "local_storage": {
-                "enabled": True,
-                "directory": "data/newsletters/"
-            },
+            "local_storage": {"enabled": True, "directory": str(settings.briefings_dir)},
             "capabilities": [
                 "Intelligence reports for any time window",
                 "Narrative synthesis from RSS feeds",
@@ -248,8 +299,8 @@ class NewsletterSystem:
                 "Multi-format output (HTML/Text)",
                 "Email delivery with SMTP",
                 "Local file storage",
-                "System testing and validation"
-            ]
+                "System testing and validation",
+            ],
         }
 
 

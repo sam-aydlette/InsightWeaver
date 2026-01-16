@@ -2,7 +2,7 @@
 Unit tests for TrustReportFormatter
 Tests formatting methods including recent enhancement to format_compact_summary()
 """
-import pytest
+
 from src.trust.trust_report import TrustReportFormatter
 
 
@@ -77,10 +77,10 @@ class TestTrustAnalysisFormatting:
                         "confidence": 0.9,
                         "reasoning": "Verified",
                         "caveats": ["Caveat 1", "Caveat 2"],
-                        "contradictions": []
+                        "contradictions": [],
                     }
                 ]
-            }
+            },
         }
         result = TrustReportFormatter.format_trust_analysis(analysis)
 
@@ -99,10 +99,10 @@ class TestTrustAnalysisFormatting:
                         "confidence": 0.9,
                         "reasoning": "Contradicted",
                         "caveats": [],
-                        "contradictions": ["Contradiction 1", "Contradiction 2"]
+                        "contradictions": ["Contradiction 1", "Contradiction 2"],
                     }
                 ]
-            }
+            },
         }
         result = TrustReportFormatter.format_trust_analysis(analysis)
 
@@ -146,19 +146,19 @@ class TestCompactSummary:
                         "verdict": "VERIFIED",
                         "claim": {"text": "Fact 1"},
                         "confidence": 0.9,
-                        "reasoning": "Verified"
+                        "reasoning": "Verified",
                     },
                     {
                         "verdict": "VERIFIED",
                         "claim": {"text": "Fact 2"},
                         "confidence": 0.95,
-                        "reasoning": "Verified"
-                    }
+                        "reasoning": "Verified",
+                    },
                 ],
                 "verified_count": 2,
                 "uncertain_count": 0,
-                "contradicted_count": 0
-            }
+                "contradicted_count": 0,
+            },
         }
         result = TrustReportFormatter.format_compact_summary(analysis)
 
@@ -175,25 +175,25 @@ class TestCompactSummary:
                         "verdict": "VERIFIED",
                         "claim": {"text": "Verified fact"},
                         "confidence": 0.9,
-                        "reasoning": "Confirmed"
+                        "reasoning": "Confirmed",
                     },
                     {
                         "verdict": "UNVERIFIABLE",
                         "claim": {"text": "Cannot verify this claim"},
                         "confidence": 0.0,
-                        "reasoning": "No authoritative source available for verification beyond model knowledge cutoff"
+                        "reasoning": "No authoritative source available for verification beyond model knowledge cutoff",
                     },
                     {
                         "verdict": "UNVERIFIABLE",
                         "claim": {"text": "Another unverifiable claim"},
                         "confidence": 0.0,
-                        "reasoning": "Claim is speculation and cannot be factually verified"
-                    }
+                        "reasoning": "Claim is speculation and cannot be factually verified",
+                    },
                 ],
                 "verified_count": 1,
                 "uncertain_count": 2,
-                "contradicted_count": 0
-            }
+                "contradicted_count": 0,
+            },
         }
         result = TrustReportFormatter.format_compact_summary(analysis)
 
@@ -222,19 +222,19 @@ class TestCompactSummary:
                         "verdict": "CONTRADICTED",
                         "claim": {"text": "Wrong fact about president"},
                         "confidence": 0.9,
-                        "reasoning": "This contradicts current factual information. The president is not John Smith"
+                        "reasoning": "This contradicts current factual information. The president is not John Smith",
                     },
                     {
                         "verdict": "VERIFIED",
                         "claim": {"text": "Correct fact"},
                         "confidence": 0.95,
-                        "reasoning": "Verified"
-                    }
+                        "reasoning": "Verified",
+                    },
                 ],
                 "verified_count": 1,
                 "uncertain_count": 0,
-                "contradicted_count": 1
-            }
+                "contradicted_count": 1,
+            },
         }
         result = TrustReportFormatter.format_compact_summary(analysis)
 
@@ -259,19 +259,19 @@ class TestCompactSummary:
                         "verdict": "OUTDATED",
                         "claim": {"text": "Old CEO information"},
                         "confidence": 0.85,
-                        "reasoning": "This claim was true in 2023 but is now outdated. Current CEO is John Brown"
+                        "reasoning": "This claim was true in 2023 but is now outdated. Current CEO is John Brown",
                     },
                     {
                         "verdict": "VERIFIED",
                         "claim": {"text": "Current fact"},
                         "confidence": 0.9,
-                        "reasoning": "Verified"
-                    }
+                        "reasoning": "Verified",
+                    },
                 ],
                 "verified_count": 1,
                 "uncertain_count": 0,
-                "contradicted_count": 0
-            }
+                "contradicted_count": 0,
+            },
         }
         result = TrustReportFormatter.format_compact_summary(analysis)
 
@@ -296,31 +296,31 @@ class TestCompactSummary:
                         "verdict": "VERIFIED",
                         "claim": {"text": "Good fact"},
                         "confidence": 0.95,
-                        "reasoning": "Verified"
+                        "reasoning": "Verified",
                     },
                     {
                         "verdict": "UNVERIFIABLE",
                         "claim": {"text": "Unknown fact"},
                         "confidence": 0.0,
-                        "reasoning": "Cannot verify"
+                        "reasoning": "Cannot verify",
                     },
                     {
                         "verdict": "CONTRADICTED",
                         "claim": {"text": "Wrong fact"},
                         "confidence": 0.9,
-                        "reasoning": "Contradicted by evidence"
+                        "reasoning": "Contradicted by evidence",
                     },
                     {
                         "verdict": "OUTDATED",
                         "claim": {"text": "Old fact"},
                         "confidence": 0.8,
-                        "reasoning": "Outdated information"
-                    }
+                        "reasoning": "Outdated information",
+                    },
                 ],
                 "verified_count": 1,
                 "uncertain_count": 1,
-                "contradicted_count": 1
-            }
+                "contradicted_count": 1,
+            },
         }
         result = TrustReportFormatter.format_compact_summary(analysis)
 
@@ -345,13 +345,13 @@ class TestCompactSummary:
                         "verdict": "UNVERIFIABLE",
                         "claim": {"text": long_claim},
                         "confidence": 0.0,
-                        "reasoning": "Cannot verify"
+                        "reasoning": "Cannot verify",
                     }
                 ],
                 "verified_count": 0,
                 "uncertain_count": 1,
-                "contradicted_count": 0
-            }
+                "contradicted_count": 0,
+            },
         }
         result = TrustReportFormatter.format_compact_summary(analysis)
 
@@ -370,18 +370,18 @@ class TestCompactSummary:
                         "verdict": "UNVERIFIABLE",
                         "claim": {"text": "Test claim"},
                         "confidence": 0.0,
-                        "reasoning": long_reasoning
+                        "reasoning": long_reasoning,
                     }
                 ],
                 "verified_count": 0,
                 "uncertain_count": 1,
-                "contradicted_count": 0
-            }
+                "contradicted_count": 0,
+            },
         }
         result = TrustReportFormatter.format_compact_summary(analysis)
 
         # Should show first sentence only
-        first_sentence = long_reasoning.split('.')[0]
+        first_sentence = long_reasoning.split(".")[0]
         assert first_sentence in result
         assert "Second sentence" not in result
         assert "Third sentence" not in result
@@ -394,8 +394,8 @@ class TestCompactSummary:
                 "verifications": [],
                 "verified_count": 0,
                 "uncertain_count": 0,
-                "contradicted_count": 0
-            }
+                "contradicted_count": 0,
+            },
         }
         result = TrustReportFormatter.format_compact_summary(analysis)
 
@@ -411,8 +411,8 @@ class TestCompactSummary:
                 "omissions": [],
                 "loaded_terms": [],
                 "total_issues": 2,  # Add total_issues count
-                "analyzed": True
-            }
+                "analyzed": True,
+            },
         }
         result = TrustReportFormatter.format_compact_summary(analysis)
 
@@ -430,8 +430,8 @@ class TestCompactSummary:
                 "medium_severity_count": 1,
                 "low_severity_count": 0,
                 "overall_tone": "FAMILIAR",
-                "analyzed": True
-            }
+                "analyzed": True,
+            },
         }
         result = TrustReportFormatter.format_compact_summary(analysis)
 
@@ -475,11 +475,12 @@ class TestExportFunctions:
         result = {
             "original_query": "Test query",
             "response": "Test response",
-            "analysis": {"analyzed": True}
+            "analysis": {"analyzed": True},
         }
         json_output = TrustReportFormatter.export_to_json(result)
 
         import json
+
         parsed = json.loads(json_output)
         assert parsed["original_query"] == "Test query"
         assert parsed["response"] == "Test response"
@@ -490,7 +491,7 @@ class TestExportFunctions:
         result = {
             "original_query": "Test query",
             "response": "Test response",
-            "analysis": {"analyzed": True, "facts": {"verifications": []}}
+            "analysis": {"analyzed": True, "facts": {"verifications": []}},
         }
         text_output = TrustReportFormatter.export_to_text(result)
 
@@ -503,7 +504,7 @@ class TestExportFunctions:
         result = {
             "original_query": "What is quantum computing?",
             "response": "Quantum computing is a computing paradigm...",
-            "analysis": complete_analysis_result
+            "analysis": complete_analysis_result,
         }
         text_output = TrustReportFormatter.export_to_text(result)
 

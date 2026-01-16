@@ -31,7 +31,7 @@ class HealthMonitor:
             "timestamp": datetime.utcnow().isoformat(),
             "overall_status": "healthy",
             "issues": [],
-            "metrics": {}
+            "metrics": {},
         }
 
         try:
@@ -85,21 +85,23 @@ class HealthMonitor:
     def _check_feed_health(self, session) -> dict[str, Any]:
         """Check RSS feed collection health"""
         total_feeds = session.query(RSSFeed).count()
-        active_feeds = session.query(RSSFeed).filter(RSSFeed.is_active == True).count()
+        active_feeds = session.query(RSSFeed).filter(RSSFeed.is_active.is_(True)).count()
 
         # Feeds with recent errors
         error_threshold = datetime.utcnow() - timedelta(days=7)
-        feeds_with_errors = session.query(RSSFeed).filter(
-            RSSFeed.error_count > 0,
-            RSSFeed.last_fetched >= error_threshold
-        ).count()
+        feeds_with_errors = (
+            session.query(RSSFeed)
+            .filter(RSSFeed.error_count > 0, RSSFeed.last_fetched >= error_threshold)
+            .count()
+        )
 
         # Feeds not fetched recently (last 48 hours)
         stale_threshold = datetime.utcnow() - timedelta(hours=48)
-        stale_feeds = session.query(RSSFeed).filter(
-            RSSFeed.is_active == True,
-            RSSFeed.last_fetched < stale_threshold
-        ).count()
+        stale_feeds = (
+            session.query(RSSFeed)
+            .filter(RSSFeed.is_active.is_(True), RSSFeed.last_fetched < stale_threshold)
+            .count()
+        )
 
         status = "healthy"
         issues = []
@@ -118,26 +120,29 @@ class HealthMonitor:
             "active_feeds": active_feeds,
             "feeds_with_errors": feeds_with_errors,
             "stale_feeds": stale_feeds,
-            "issues": issues
+            "issues": issues,
         }
 
     def _check_synthesis_health(self, session) -> dict[str, Any]:
         """Check synthesis generation health"""
         # Recent syntheses (last 7 days)
         recent_threshold = datetime.utcnow() - timedelta(days=7)
-        recent_syntheses = session.query(NarrativeSynthesis).filter(
-            NarrativeSynthesis.generated_at >= recent_threshold
-        ).count()
+        recent_syntheses = (
+            session.query(NarrativeSynthesis)
+            .filter(NarrativeSynthesis.generated_at >= recent_threshold)
+            .count()
+        )
 
         # Latest synthesis
-        latest_synthesis = session.query(NarrativeSynthesis).order_by(
-            NarrativeSynthesis.generated_at.desc()
-        ).first()
+        latest_synthesis = (
+            session.query(NarrativeSynthesis)
+            .order_by(NarrativeSynthesis.generated_at.desc())
+            .first()
+        )
 
         latest_date = latest_synthesis.generated_at if latest_synthesis else None
         hours_since_last = (
-            (datetime.utcnow() - latest_date).total_seconds() / 3600
-            if latest_date else None
+            (datetime.utcnow() - latest_date).total_seconds() / 3600 if latest_date else None
         )
 
         status = "healthy"
@@ -152,7 +157,7 @@ class HealthMonitor:
             "recent_syntheses_7d": recent_syntheses,
             "latest_synthesis": latest_date.isoformat() if latest_date else None,
             "hours_since_last": round(hours_since_last, 1) if hours_since_last else None,
-            "issues": issues
+            "issues": issues,
         }
 
     def _check_memory_health(self, session) -> dict[str, Any]:
@@ -160,26 +165,28 @@ class HealthMonitor:
         total_facts = session.query(MemoryFact).count()
 
         # Active facts (not expired)
-        active_facts = session.query(MemoryFact).filter(
-            (MemoryFact.expires_at.is_(None)) |
-            (MemoryFact.expires_at > datetime.utcnow())
-        ).count()
+        active_facts = (
+            session.query(MemoryFact)
+            .filter((MemoryFact.expires_at.is_(None)) | (MemoryFact.expires_at > datetime.utcnow()))
+            .count()
+        )
 
         # Expired facts
         expired_facts = total_facts - active_facts
 
         # Facts by type
-        fact_types = session.query(
-            MemoryFact.fact_type,
-            func.count(MemoryFact.id)
-        ).group_by(MemoryFact.fact_type).all()
+        fact_types = (
+            session.query(MemoryFact.fact_type, func.count(MemoryFact.id))
+            .group_by(MemoryFact.fact_type)
+            .all()
+        )
 
         return {
             "status": "healthy",
             "total_facts": total_facts,
             "active_facts": active_facts,
             "expired_facts": expired_facts,
-            "facts_by_type": {ft: count for ft, count in fact_types}
+            "facts_by_type": dict(fact_types),
         }
 
     def _check_retention_status(self, session) -> dict[str, Any]:
@@ -187,13 +194,15 @@ class HealthMonitor:
         article_cutoff = datetime.utcnow() - timedelta(days=settings.retention_articles_days)
         synthesis_cutoff = datetime.utcnow() - timedelta(days=settings.retention_syntheses_days)
 
-        articles_pending_deletion = session.query(Article).filter(
-            Article.fetched_at < article_cutoff
-        ).count()
+        articles_pending_deletion = (
+            session.query(Article).filter(Article.fetched_at < article_cutoff).count()
+        )
 
-        syntheses_pending_deletion = session.query(NarrativeSynthesis).filter(
-            NarrativeSynthesis.generated_at < synthesis_cutoff
-        ).count()
+        syntheses_pending_deletion = (
+            session.query(NarrativeSynthesis)
+            .filter(NarrativeSynthesis.generated_at < synthesis_cutoff)
+            .count()
+        )
 
         status = "healthy"
         issues = []
@@ -208,7 +217,7 @@ class HealthMonitor:
             "syntheses_pending_deletion": syntheses_pending_deletion,
             "retention_days_articles": settings.retention_articles_days,
             "retention_days_syntheses": settings.retention_syntheses_days,
-            "issues": issues
+            "issues": issues,
         }
 
     def _check_disk_space(self) -> dict[str, Any]:
@@ -216,9 +225,7 @@ class HealthMonitor:
         data_dir = settings.data_dir
 
         # Calculate total size of data directory
-        total_size = sum(
-            f.stat().st_size for f in data_dir.rglob('*') if f.is_file()
-        )
+        total_size = sum(f.stat().st_size for f in data_dir.rglob("*") if f.is_file())
 
         size_mb = round(total_size / (1024 * 1024), 2)
 
@@ -229,18 +236,11 @@ class HealthMonitor:
             status = "warning"
             issues.append(f"Data directory size: {size_mb} MB")
 
-        return {
-            "status": status,
-            "data_dir_size_mb": size_mb,
-            "issues": issues
-        }
+        return {"status": status, "data_dir_size_mb": size_mb, "issues": issues}
 
     def _determine_overall_status(self, health: dict[str, Any]) -> str:
         """Determine overall system status from individual metrics"""
-        statuses = [
-            metric.get("status", "healthy")
-            for metric in health["metrics"].values()
-        ]
+        statuses = [metric.get("status", "healthy") for metric in health["metrics"].values()]
 
         # Collect all issues
         for metric_name, metric_data in health["metrics"].items():
@@ -279,24 +279,26 @@ class HealthMonitor:
         try:
             with get_db() as session:
                 # Article collection rate
-                articles_collected = session.query(Article).filter(
-                    Article.fetched_at >= cutoff_date
-                ).count()
+                articles_collected = (
+                    session.query(Article).filter(Article.fetched_at >= cutoff_date).count()
+                )
 
                 metrics["articles_collected"] = articles_collected
                 metrics["articles_per_day"] = round(articles_collected / days, 1)
 
                 # Synthesis generation
-                syntheses_generated = session.query(NarrativeSynthesis).filter(
-                    NarrativeSynthesis.generated_at >= cutoff_date
-                ).count()
+                syntheses_generated = (
+                    session.query(NarrativeSynthesis)
+                    .filter(NarrativeSynthesis.generated_at >= cutoff_date)
+                    .count()
+                )
 
                 metrics["syntheses_generated"] = syntheses_generated
 
                 # Memory facts created
-                facts_created = session.query(MemoryFact).filter(
-                    MemoryFact.created_at >= cutoff_date
-                ).count()
+                facts_created = (
+                    session.query(MemoryFact).filter(MemoryFact.created_at >= cutoff_date).count()
+                )
 
                 metrics["facts_created"] = facts_created
 

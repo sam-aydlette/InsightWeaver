@@ -1,11 +1,11 @@
 """
 Forecast Engine
-Core forecasting logic implementing 5 analysis types for long-term trend prediction
+Core forecasting logic using certainty-based categorization (Rumsfeld framework)
 """
 
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any
 
 from ..context.claude_client import ClaudeClient
@@ -15,14 +15,10 @@ logger = logging.getLogger(__name__)
 
 class ForecastEngine:
     """
-    Generates long-term forecasts using comprehensive analysis types
-
-    Implements 5 analysis methodologies:
-    1. Trend Extrapolation - Project current trends forward
-    2. Scenario Modeling - Generate optimistic/baseline/pessimistic scenarios
-    3. Pattern Recognition - Identify cyclical patterns and historical parallels
-    4. Causal Chain Analysis - Map cause→effect relationships over time
-    5. Event Risk Categorization - Rumsfeld framework (known knowns/unknowns/unknown unknowns)
+    Generates forecasts organized by certainty level using the Rumsfeld framework:
+    - Known Knowns: Certain or near-certain forecasts
+    - Known Unknowns: Mild conjecture grounded in significant evidence
+    - Unknown Unknowns: Conjecture based on some evidence (weak signals)
     """
 
     def __init__(self, claude_client: ClaudeClient | None = None):
@@ -34,32 +30,25 @@ class ForecastEngine:
         """
         self.client = claude_client or ClaudeClient()
 
-    async def generate_forecast(
-        self,
-        horizon: str,
-        context: dict[str, Any]
-    ) -> dict[str, Any]:
+    async def generate_forecast(self, context: dict[str, Any]) -> dict[str, Any]:
         """
-        Generate comprehensive forecast for specified time horizon
+        Generate forecasts organized by certainty level
 
         Args:
-            horizon: Time horizon (e.g., "6mo", "1yr", "3yr", "5yr")
             context: Curated context from ForecastContextCurator
 
         Returns:
-            Forecast data dictionary with all 5 analysis types
+            Forecast data dictionary with three certainty categories
         """
-        logger.info(f"Generating {horizon} forecast...")
+        logger.info("Generating certainty-based forecast...")
 
-        # Build comprehensive forecast task
-        task = self._build_forecast_task(horizon)
+        # Build forecast task
+        task = self._build_forecast_task()
 
         # Send to Claude
         try:
             response = await self.client.analyze_with_context(
-                context=context,
-                task=task,
-                temperature=1.0
+                context=context, task=task, temperature=1.0
             )
 
             # Parse JSON response
@@ -69,186 +58,133 @@ class ForecastEngine:
             self._validate_forecast_structure(forecast)
 
             # Add metadata
-            forecast['time_horizon'] = horizon
-            forecast['horizon_months'] = self._parse_horizon_to_months(horizon)
-            forecast['generated_at'] = datetime.utcnow().isoformat()
+            forecast["generated_at"] = datetime.utcnow().isoformat()
 
-            logger.info(f"Successfully generated {horizon} forecast")
+            logger.info("Successfully generated certainty-based forecast")
             return forecast
 
         except Exception as e:
             logger.error(f"Error generating forecast: {e}")
             raise
 
-    def _build_forecast_task(self, horizon: str) -> str:
+    def _build_forecast_task(self) -> str:
         """
-        Build comprehensive forecast task prompt requiring all 5 analysis types
-
-        Args:
-            horizon: Time horizon string
+        Build forecast task prompt using certainty-based categorization
 
         Returns:
             Formatted task prompt
         """
-        horizon_months = self._parse_horizon_to_months(horizon)
-        target_date = datetime.now() + timedelta(days=horizon_months * 30)
-        target_date_str = target_date.strftime("%B %Y")
+        task = """Generate forecasts organized by certainty level using the Rumsfeld framework.
 
-        task = f"""Generate a comprehensive {horizon} forecast (target: {target_date_str}).
+Analyze the provided articles and data to identify forecasts across three certainty categories.
+Use trend analysis, pattern recognition, and causal reasoning internally to ground your forecasts,
+but organize your output by certainty level rather than by methodology.
 
-You MUST provide ALL 5 analysis types below in valid JSON format.
+Each forecast MUST include its own timeline (when it will occur/unfold).
 
-### 1. TREND EXTRAPOLATION
-Identify 3-5 significant current trends and project their trajectory over the {horizon} time horizon.
+## CATEGORY 1: KNOWN KNOWNS (Certain or Near-Certain)
+These are forecasts that are virtually guaranteed to happen based on:
+- Scheduled events (elections, policy deadlines, product launches)
+- Announced plans (confirmed projects, stated intentions by authorities)
+- Legal/regulatory requirements (compliance deadlines, mandated changes)
+- Demographic certainties (population milestones, generational shifts)
 
-For each trend, provide:
-- Trend description and current state
-- Projected trajectory and endpoint
-- Key drivers and potential obstacles
-- Uncertainties and limiting factors
+For each Known Known, provide:
+- The forecast itself (what will happen)
+- Timeline (specific date or timeframe)
+- Basis for certainty (why this is certain - cite evidence)
+- Impact (how it affects the user's context)
 
-### 2. SCENARIO MODELING
-Generate 3 distinct scenarios (optimistic, baseline, pessimistic) for how the {horizon} period could unfold.
+## CATEGORY 2: KNOWN UNKNOWNS (Evidence-Based Projections)
+These are forecasts with significant supporting evidence but uncertain outcomes:
+- Clear trends with uncertain endpoints
+- Pending decisions with known options
+- Emerging patterns with multiple possible trajectories
+- Policy debates with foreseeable resolution paths
 
-For each scenario:
-- Scenario name and type
-- Key predictions and outcomes
-- Critical assumptions
-- Early warning signals/triggers
-- Plausibility reasoning (why this scenario is realistic)
+For each Known Unknown, provide:
+- The forecast (what is likely to happen)
+- Timeline (expected timeframe)
+- Evidence (what supports this projection)
+- Possible outcomes (2-3 ways this could unfold)
+- Key factors (what will determine the actual outcome)
 
-### 3. PATTERN RECOGNITION
-Identify historical patterns, cycles, or parallels that may repeat or inform the forecast.
+## CATEGORY 3: UNKNOWN UNKNOWNS (Weak Signal Projections)
+These are speculative forecasts based on emerging patterns or weak signals:
+- Early-stage trends that could accelerate
+- Potential disruptions visible only in weak signals
+- Black swan possibilities grounded in some evidence
+- Emergent phenomena that could materialize
 
-Include:
-- Cyclical patterns (if applicable)
-- Historical parallels (similar past situations)
-- Pattern evidence from the data
-- Implications for the forecast period
+For each Unknown Unknown, provide:
+- The forecast (what could happen)
+- Timeline (potential timeframe if it occurs)
+- Weak signal (what suggests this possibility)
+- Potential impact (consequences if it materializes)
+- Why plausible (reasoning for considering this)
 
-### 4. CAUSAL CHAIN ANALYSIS
-Map 2-4 causal chains showing how current causes will propagate through intermediate effects to final outcomes.
-
-For each chain:
-- Initial cause (current condition)
-- Intermediate effects (sequential steps)
-- Final outcome (endpoint at {horizon})
-- Time to unfold (in months)
-- Key uncertainties in the chain
-
-### 5. EVENT RISK CATEGORIZATION (Rumsfeld Framework)
-Categorize anticipated events and risks into three categories:
-
-**Known Knowns** (scheduled/confirmed events):
-- Elections, policy deadlines, demographic milestones, scheduled releases, etc.
-- Include specific dates where known
-
-**Known Unknowns** (recognized but uncertain events):
-- Geopolitical tensions, market volatility, policy debates, pending decisions, etc.
-- Describe the range of possible outcomes
-
-**Unknown Unknowns** (unforeseeable risks):
-- Potential black swans, weak signals, emergent phenomena
-- Acknowledge these are speculative by nature
-
-### OUTPUT FORMAT
+## OUTPUT FORMAT
 Return ONLY valid JSON matching this structure:
 
 ```json
-{{
-  "trend_extrapolations": [
-    {{
-      "trend": "Description of trend",
-      "current_state": "Current situation",
-      "projected_trajectory": "How it will evolve",
-      "projected_outcome": "Expected endpoint",
-      "key_drivers": ["driver1", "driver2"],
-      "obstacles": ["obstacle1", "obstacle2"],
-      "uncertainties": ["uncertainty1", "uncertainty2"]
-    }}
+{
+  "known_knowns": [
+    {
+      "forecast": "Clear description of the certain/near-certain forecast",
+      "timeline": "Specific date or timeframe (e.g., 'November 2026', 'Q2 2026', '6 months')",
+      "basis": "Why this is certain - cite specific evidence from articles",
+      "impact": "How this affects the user's local/professional context"
+    }
   ],
-  "scenarios": [
-    {{
-      "type": "optimistic",
-      "name": "Scenario name",
-      "predictions": ["prediction1", "prediction2"],
-      "key_assumptions": ["assumption1", "assumption2"],
-      "trigger_events": ["signal1", "signal2"],
-      "plausibility": "Why this scenario is realistic given the data"
-    }},
-    {{
-      "type": "baseline",
-      "name": "Most likely scenario",
-      "predictions": ["prediction1", "prediction2"],
-      "key_assumptions": ["assumption1"],
-      "trigger_events": ["signal1"],
-      "plausibility": "Why this is the baseline expectation"
-    }},
-    {{
-      "type": "pessimistic",
-      "name": "Downside scenario",
-      "predictions": ["prediction1", "prediction2"],
-      "key_assumptions": ["assumption1"],
-      "trigger_events": ["signal1"],
-      "plausibility": "Why this scenario cannot be ruled out"
-    }}
+  "known_unknowns": [
+    {
+      "forecast": "Description of the evidence-based projection",
+      "timeline": "Expected timeframe for resolution/occurrence",
+      "evidence": "What data/trends support this projection",
+      "possible_outcomes": ["outcome1", "outcome2", "outcome3"],
+      "key_factors": ["factor1", "factor2"]
+    }
   ],
-  "historical_patterns": [
-    {{
-      "pattern_type": "cyclical or parallel",
-      "pattern": "Description of pattern",
-      "evidence": ["evidence1", "evidence2"],
-      "historical_period": "When this occurred before",
-      "implications": "What this means for the forecast"
-    }}
+  "unknown_unknowns": [
+    {
+      "forecast": "Description of the speculative forecast",
+      "timeline": "Potential timeframe if it occurs",
+      "weak_signal": "What early indicator suggests this possibility",
+      "potential_impact": "Consequences if this materializes",
+      "why_plausible": "Reasoning for why this deserves consideration"
+    }
   ],
-  "causal_chains": [
-    {{
-      "chain_name": "Chain identifier",
-      "initial_cause": "Starting condition",
-      "intermediate_effects": ["effect1", "effect2", "effect3"],
-      "final_outcome": "Ultimate result",
-      "time_to_unfold_months": {horizon_months},
-      "key_uncertainties": ["uncertainty1", "uncertainty2"]
-    }}
-  ],
-  "event_risks": {{
-    "known_knowns": [
-      {{
-        "event": "Scheduled event",
-        "date": "Specific date if known, or timeframe",
-        "impact": "Expected impact",
-        "certainty_basis": "Why this is certain (e.g., 'announced by', 'legally required')"
-      }}
-    ],
-    "known_unknowns": [
-      {{
-        "uncertainty": "Recognized risk",
-        "possible_outcomes": ["outcome1", "outcome2"],
-        "factors_affecting_outcome": ["factor1", "factor2"]
-      }}
-    ],
-    "unknown_unknowns": [
-      {{
-        "weak_signal": "Speculative risk",
-        "potential_impact": "Possible impact if occurs",
-        "why_plausible": "Reasoning for considering this risk"
-      }}
-    ]
-  }},
-  "key_uncertainties": ["uncertainty1", "uncertainty2"],
-  "data_limitations": ["limitation1", "limitation2"],
-  "data_sources_summary": "Brief summary of what data informed this forecast"
-}}
+  "data_sources_summary": "Brief summary of what data informed these forecasts"
+}
 ```
 
-IMPORTANT:
+## GUIDELINES
+- Generate 4-6 forecasts per category (12-18 total)
+- Timelines can range from weeks to years - use appropriate granularity
+- Base ALL forecasts on evidence from the provided articles and data
+- For Known Knowns, only include truly certain events with clear evidence
+- For Known Unknowns, ensure significant supporting evidence exists
+- For Unknown Unknowns, identify genuine weak signals, not pure speculation
 - Return ONLY the JSON object, no explanatory text before or after
-- Base analysis ONLY on the articles and data provided in context
-- Be explicit about uncertainties - acknowledge what you don't know
-- For Known Knowns, provide evidence/source for why it's certain
-- For scenarios, explain plausibility rather than assigning probabilities
-- Be specific and grounded - avoid generic predictions
+
+## CRITICAL: FORECAST PRECISION REQUIREMENTS
+Every forecast MUST be specific and precise. Vague predictions are useless.
+
+BAD (too vague):
+- "Federal contractor landscape may shift based on policy changes"
+- "Housing market could change"
+- "Technology sector will evolve"
+
+GOOD (specific and precise):
+- "Federal cybersecurity contractors will see 15-20% budget increases as agencies implement new CISA mandates"
+- "Fairfax County housing prices will rise 5-8% as Dulles Tech Center converts to residential"
+- "AI governance roles will become mandatory for federal contractors handling sensitive data"
+
+For each forecast, clearly state:
+- WHAT specifically will happen (not "may change" but the actual change)
+- WHO is affected
+- The DIRECTION and MAGNITUDE when quantifiable
+- The SPECIFIC OUTCOME, not just that something "will shift"
 """
 
         return task
@@ -290,7 +226,7 @@ IMPORTANT:
 
     def _validate_forecast_structure(self, forecast: dict[str, Any]) -> None:
         """
-        Validate that forecast contains all required analysis types
+        Validate that forecast contains all required certainty categories
 
         Args:
             forecast: Parsed forecast dictionary
@@ -298,52 +234,16 @@ IMPORTANT:
         Raises:
             ValueError: If required fields are missing
         """
-        required_fields = [
-            'trend_extrapolations',
-            'scenarios',
-            'historical_patterns',
-            'causal_chains',
-            'event_risks'
-        ]
+        required_categories = ["known_knowns", "known_unknowns", "unknown_unknowns"]
 
-        missing_fields = [field for field in required_fields if field not in forecast]
+        missing_categories = [cat for cat in required_categories if cat not in forecast]
 
-        if missing_fields:
-            raise ValueError(f"Forecast missing required fields: {missing_fields}")
+        if missing_categories:
+            raise ValueError(f"Forecast missing required categories: {missing_categories}")
 
-        # Validate event_risks structure
-        if 'event_risks' in forecast:
-            event_risks = forecast['event_risks']
-            required_categories = ['known_knowns', 'known_unknowns', 'unknown_unknowns']
-            missing_categories = [cat for cat in required_categories if cat not in event_risks]
-            if missing_categories:
-                raise ValueError(f"Event risks missing categories: {missing_categories}")
+        # Validate each category has at least one item
+        for category in required_categories:
+            if not forecast.get(category):
+                logger.warning(f"Category '{category}' is empty")
 
         logger.info("Forecast structure validation passed")
-
-    def _parse_horizon_to_months(self, horizon: str) -> int:
-        """
-        Parse horizon string to number of months
-
-        Args:
-            horizon: Horizon string (e.g., "6mo", "1yr", "18 months")
-
-        Returns:
-            Number of months
-        """
-        horizon = horizon.lower().strip()
-
-        if 'mo' in horizon:
-            return int(horizon.replace('mo', '').strip())
-        elif 'yr' in horizon or 'year' in horizon:
-            years = int(horizon.replace('yr', '').replace('year', '').replace('s', '').strip())
-            return years * 12
-        elif 'month' in horizon:
-            return int(horizon.replace('months', '').replace('month', '').strip())
-        else:
-            # Try to parse as just a number (assume months)
-            try:
-                return int(horizon)
-            except ValueError:
-                logger.warning(f"Could not parse horizon '{horizon}', defaulting to 12 months")
-                return 12

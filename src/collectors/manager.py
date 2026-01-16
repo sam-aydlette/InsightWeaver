@@ -45,37 +45,34 @@ class CollectorManager:
         """Load collector configuration from JSON"""
         if not self.config_path.exists():
             logger.warning(f"Collector config not found: {self.config_path}")
-            return {'collectors': {}}
+            return {"collectors": {}}
 
         with open(self.config_path) as f:
             return json.load(f)
 
-    def initialize_collectors(self, decision_context: dict | None = None) -> None:
+    def initialize_collectors(self, _decision_context: dict | None = None) -> None:
         """
         Initialize all enabled collectors
 
         Args:
             decision_context: User's decision context for relevance scoring
         """
-        collector_configs = self.config.get('collectors', {})
+        collector_configs = self.config.get("collectors", {})
 
         for name, config in collector_configs.items():
-            if not config.get('enabled', False):
+            if not config.get("enabled", False):
                 logger.info(f"Collector '{name}' is disabled, skipping")
                 continue
 
             try:
                 collector = self._create_collector(name, config)
                 if collector:
-                    self.collectors[name] = {
-                        'instance': collector,
-                        'config': config
-                    }
+                    self.collectors[name] = {"instance": collector, "config": config}
                     logger.info(f"Initialized collector: {name}")
             except Exception as e:
                 logger.error(f"Failed to initialize collector '{name}': {e}")
 
-    def _create_collector(self, name: str, config: dict) -> Any | None:
+    def _create_collector(self, _name: str, config: dict) -> Any | None:
         """
         Create collector instance based on configuration
 
@@ -86,26 +83,23 @@ class CollectorManager:
         Returns:
             Collector instance or None
         """
-        class_name = config.get('class')
-        collector_config = config.get('config', {})
+        class_name = config.get("class")
+        collector_config = config.get("config", {})
 
-        if class_name == 'FairfaxCalendarCollector':
+        if class_name == "FairfaxCalendarCollector":
             return FairfaxCalendarCollector()
 
-        elif class_name == 'EventMonitorCollector':
-            artists = collector_config.get('artists', [])
-            app_id = collector_config.get('app_id', 'insightweaver')
+        elif class_name == "EventMonitorCollector":
+            artists = collector_config.get("artists", [])
+            app_id = collector_config.get("app_id", "insightweaver")
             return EventMonitorCollector(artists=artists, app_id=app_id)
 
-        elif class_name == 'JobMarketCollector':
-            keywords = collector_config.get('keywords', [])
-            location_codes = collector_config.get('location_codes', [])
-            return JobMarketCollector(
-                keywords=keywords,
-                location_codes=location_codes
-            )
+        elif class_name == "JobMarketCollector":
+            keywords = collector_config.get("keywords", [])
+            location_codes = collector_config.get("location_codes", [])
+            return JobMarketCollector(keywords=keywords, location_codes=location_codes)
 
-        elif class_name == 'VulnCheckKEVCollector':
+        elif class_name == "VulnCheckKEVCollector":
             return VulnCheckKEVCollector()
 
         else:
@@ -113,9 +107,7 @@ class CollectorManager:
             return None
 
     def collect_all(
-        self,
-        decision_context: dict | None = None,
-        force: bool = False
+        self, decision_context: dict | None = None, force: bool = False
     ) -> dict[str, Any]:
         """
         Run all collectors that are due for refresh
@@ -131,46 +123,42 @@ class CollectorManager:
             self.initialize_collectors(decision_context)
 
         summary = {
-            'total_collectors': len(self.collectors),
-            'collectors_run': 0,
-            'collectors_skipped': 0,
-            'collectors_failed': 0,
-            'total_items_collected': 0,
-            'results': {}
+            "total_collectors": len(self.collectors),
+            "collectors_run": 0,
+            "collectors_skipped": 0,
+            "collectors_failed": 0,
+            "total_items_collected": 0,
+            "results": {},
         }
 
         for name, collector_data in self.collectors.items():
-            collector = collector_data['instance']
-            config = collector_data['config']
+            collector = collector_data["instance"]
+            config = collector_data["config"]
 
             try:
                 # Check if collection is due
                 if not force and not self._should_collect(collector, config):
                     logger.info(f"Skipping {name} - not due for refresh")
-                    summary['collectors_skipped'] += 1
+                    summary["collectors_skipped"] += 1
                     continue
 
                 logger.info(f"Running collector: {name}")
 
                 # Run collection
                 result = collector.collect_and_store(
-                    decision_context=decision_context,
-                    max_items=100
+                    decision_context=decision_context, max_items=100
                 )
 
-                summary['collectors_run'] += 1
-                summary['total_items_collected'] += result.get('new_items', 0)
-                summary['results'][name] = result
+                summary["collectors_run"] += 1
+                summary["total_items_collected"] += result.get("new_items", 0)
+                summary["results"][name] = result
 
                 logger.info(f"Collector '{name}' completed: {result}")
 
             except Exception as e:
                 logger.error(f"Collector '{name}' failed: {e}")
-                summary['collectors_failed'] += 1
-                summary['results'][name] = {
-                    'success': False,
-                    'error': str(e)
-                }
+                summary["collectors_failed"] += 1
+                summary["results"][name] = {"success": False, "error": str(e)}
 
         return summary
 
@@ -185,13 +173,15 @@ class CollectorManager:
         Returns:
             True if collection is due
         """
-        refresh_hours = config.get('refresh_hours', 24)
+        refresh_hours = config.get("refresh_hours", 24)
 
         with get_db() as session:
             # Find source record
-            source = session.query(APIDataSource).filter(
-                APIDataSource.name == collector.source_name
-            ).first()
+            source = (
+                session.query(APIDataSource)
+                .filter(APIDataSource.name == collector.source_name)
+                .first()
+            )
 
             if not source or not source.last_fetched:
                 return True  # Never fetched, should run
@@ -214,19 +204,19 @@ class CollectorManager:
 
             for source in sources:
                 status[source.name] = {
-                    'source_type': source.source_type,
-                    'is_active': source.is_active,
-                    'last_fetched': source.last_fetched.isoformat() if source.last_fetched else None,
-                    'error_count': source.error_count,
-                    'last_error': source.last_error
+                    "source_type": source.source_type,
+                    "is_active": source.is_active,
+                    "last_fetched": source.last_fetched.isoformat()
+                    if source.last_fetched
+                    else None,
+                    "error_count": source.error_count,
+                    "last_error": source.last_error,
                 }
 
         return status
 
     def run_specific_collector(
-        self,
-        collector_name: str,
-        decision_context: dict | None = None
+        self, collector_name: str, decision_context: dict | None = None
     ) -> dict[str, Any]:
         """
         Run a specific collector by name
@@ -245,12 +235,9 @@ class CollectorManager:
         if collector_name not in self.collectors:
             raise ValueError(f"Collector '{collector_name}' not found or not enabled")
 
-        collector = self.collectors[collector_name]['instance']
+        collector = self.collectors[collector_name]["instance"]
 
         logger.info(f"Running specific collector: {collector_name}")
-        result = collector.collect_and_store(
-            decision_context=decision_context,
-            max_items=100
-        )
+        result = collector.collect_and_store(decision_context=decision_context, max_items=100)
 
         return result

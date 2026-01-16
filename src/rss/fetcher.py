@@ -13,6 +13,7 @@ from src.database.models import Article, RSSFeed
 
 logger = logging.getLogger(__name__)
 
+
 class RSSFetcher:
     def __init__(self, timeout: int = 30, max_retries: int = 3):
         self.timeout = timeout
@@ -39,7 +40,9 @@ class RSSFetcher:
                 feed_data = feedparser.parse(response.content)
 
                 if feed_data.bozo:
-                    logger.warning(f"Feed parsing issues for {feed_url}: {feed_data.bozo_exception}")
+                    logger.warning(
+                        f"Feed parsing issues for {feed_url}: {feed_data.bozo_exception}"
+                    )
 
                 return True, feed_data, None
 
@@ -47,7 +50,7 @@ class RSSFetcher:
                 logger.warning(f"HTTP error fetching {feed_url}: {e}")
                 if attempt == self.max_retries - 1:
                     return False, None, f"HTTP error: {str(e)}"
-                await asyncio.sleep(2 ** attempt)  # Exponential backoff
+                await asyncio.sleep(2**attempt)  # Exponential backoff
 
             except Exception as e:
                 logger.error(f"Unexpected error fetching {feed_url}: {e}")
@@ -55,21 +58,21 @@ class RSSFetcher:
 
         return False, None, "Max retries exceeded"
 
-    def normalize_article(self, entry, feed_info: dict) -> dict:
+    def normalize_article(self, entry, _feed_info: dict) -> dict:
         """Normalize an RSS entry into our article format"""
 
         # Extract published date
         published_date = None
-        if hasattr(entry, 'published_parsed') and entry.published_parsed:
+        if hasattr(entry, "published_parsed") and entry.published_parsed:
             published_date = datetime(*entry.published_parsed[:6])
-        elif hasattr(entry, 'updated_parsed') and entry.updated_parsed:
+        elif hasattr(entry, "updated_parsed") and entry.updated_parsed:
             published_date = datetime(*entry.updated_parsed[:6])
 
         # Extract and clean content
         content = ""
-        if hasattr(entry, 'content') and entry.content:
+        if hasattr(entry, "content") and entry.content:
             content = entry.content[0].value if isinstance(entry.content, list) else entry.content
-        elif hasattr(entry, 'summary'):
+        elif hasattr(entry, "summary"):
             content = entry.summary
 
         # Clean HTML from content
@@ -77,21 +80,21 @@ class RSSFetcher:
 
         # Extract categories
         categories = []
-        if hasattr(entry, 'tags'):
+        if hasattr(entry, "tags"):
             categories = [tag.term for tag in entry.tags]
 
         return {
-            'guid': getattr(entry, 'id', entry.link),
-            'url': getattr(entry, 'link', ''),
-            'title': getattr(entry, 'title', ''),
-            'description': getattr(entry, 'summary', ''),
-            'content': content,
-            'normalized_content': normalized_content,
-            'published_date': published_date,
-            'author': getattr(entry, 'author', ''),
-            'categories': categories,
-            'word_count': len(normalized_content.split()) if normalized_content else 0,
-            'language': 'en'  # Default to English for now
+            "guid": getattr(entry, "id", entry.link),
+            "url": getattr(entry, "link", ""),
+            "title": getattr(entry, "title", ""),
+            "description": getattr(entry, "summary", ""),
+            "content": content,
+            "normalized_content": normalized_content,
+            "published_date": published_date,
+            "author": getattr(entry, "author", ""),
+            "categories": categories,
+            "word_count": len(normalized_content.split()) if normalized_content else 0,
+            "language": "en",  # Default to English for now
         }
 
     def clean_html(self, html_content: str) -> str:
@@ -99,7 +102,7 @@ class RSSFetcher:
         if not html_content:
             return ""
 
-        soup = BeautifulSoup(html_content, 'html.parser')
+        soup = BeautifulSoup(html_content, "html.parser")
 
         # Remove script and style elements
         for script in soup(["script", "style"]):
@@ -109,7 +112,7 @@ class RSSFetcher:
         text = soup.get_text()
         lines = (line.strip() for line in text.splitlines())
         chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
-        clean_text = ' '.join(chunk for chunk in chunks if chunk)
+        clean_text = " ".join(chunk for chunk in chunks if chunk)
 
         return clean_text
 
@@ -139,7 +142,9 @@ class RSSFetcher:
                 # Auto-deactivate feeds with too many consecutive errors
                 if feed.error_count >= 10:
                     feed.is_active = False
-                    logger.warning(f"Auto-deactivated feed {feed.name} after {feed.error_count} consecutive errors")
+                    logger.warning(
+                        f"Auto-deactivated feed {feed.name} after {feed.error_count} consecutive errors"
+                    )
 
                 db.commit()
                 return False, 0, error
@@ -160,20 +165,18 @@ class RSSFetcher:
                     article_data = self.normalize_article(entry, feed_data.feed)
 
                     # Skip articles with insufficient data
-                    if not article_data.get('title') or not article_data.get('guid'):
+                    if not article_data.get("title") or not article_data.get("guid"):
                         continue
 
                     # Check if article already exists (improved deduplication check)
-                    existing = db.query(Article).filter(
-                        Article.feed_id == feed.id,
-                        Article.guid == article_data['guid']
-                    ).first()
+                    existing = (
+                        db.query(Article)
+                        .filter(Article.feed_id == feed.id, Article.guid == article_data["guid"])
+                        .first()
+                    )
 
                     if not existing:
-                        article = Article(
-                            feed_id=feed.id,
-                            **article_data
-                        )
+                        article = Article(feed_id=feed.id, **article_data)
                         db.add(article)
                         articles_count += 1
                     else:
@@ -183,7 +186,9 @@ class RSSFetcher:
                     articles_with_errors += 1
                     logger.error(f"Error processing article from {feed.name}: {e}")
                     if articles_with_errors > 5:  # Stop processing if too many article errors
-                        logger.error(f"Too many article processing errors for {feed.name}, stopping")
+                        logger.error(
+                            f"Too many article processing errors for {feed.name}, stopping"
+                        )
                         break
                     continue
 
@@ -192,19 +197,24 @@ class RSSFetcher:
                 db.commit()
             except IntegrityError:
                 db.rollback()
-                logger.warning(f"Duplicate articles detected in {feed.name} during commit, skipping duplicates")
+                logger.warning(
+                    f"Duplicate articles detected in {feed.name} during commit, skipping duplicates"
+                )
                 # Re-process articles one by one to identify duplicates
                 articles_count = 0
                 for entry in feed_data.entries:
                     try:
                         article_data = self.normalize_article(entry, feed_data.feed)
-                        if not article_data.get('title') or not article_data.get('guid'):
+                        if not article_data.get("title") or not article_data.get("guid"):
                             continue
 
-                        existing = db.query(Article).filter(
-                            Article.feed_id == feed.id,
-                            Article.guid == article_data['guid']
-                        ).first()
+                        existing = (
+                            db.query(Article)
+                            .filter(
+                                Article.feed_id == feed.id, Article.guid == article_data["guid"]
+                            )
+                            .first()
+                        )
 
                         if not existing:
                             article = Article(feed_id=feed.id, **article_data)
@@ -227,7 +237,9 @@ class RSSFetcher:
             logger.info(log_msg)
             return True, articles_count, None
 
-    async def _fetch_with_retry(self, url: str, feed_name: str) -> tuple[bool, dict | None, str | None]:
+    async def _fetch_with_retry(
+        self, url: str, feed_name: str
+    ) -> tuple[bool, dict | None, str | None]:
         """Enhanced fetch with smarter retry logic"""
         last_error = None
 
@@ -243,7 +255,9 @@ class RSSFetcher:
 
                 # Check for parsing issues
                 if feed_data.bozo:
-                    logger.warning(f"Feed parsing issues for {feed_name}: {feed_data.bozo_exception}")
+                    logger.warning(
+                        f"Feed parsing issues for {feed_name}: {feed_data.bozo_exception}"
+                    )
                     # Still continue if we got some data
                     if not feed_data.entries:
                         return False, None, f"Feed parsing failed: {feed_data.bozo_exception}"
@@ -252,7 +266,9 @@ class RSSFetcher:
                 if not feed_data.entries:
                     return False, None, "Feed contains no entries"
 
-                logger.debug(f"Successfully fetched {len(feed_data.entries)} entries from {feed_name}")
+                logger.debug(
+                    f"Successfully fetched {len(feed_data.entries)} entries from {feed_name}"
+                )
                 return True, feed_data, None
 
             except Exception as e:
@@ -262,23 +278,24 @@ class RSSFetcher:
                 # Exponential backoff with jitter
                 if attempt < self.max_retries - 1:
                     import random
-                    backoff_time = (2 ** attempt) + random.uniform(0, 1)
+
+                    backoff_time = (2**attempt) + random.uniform(0, 1)
                     await asyncio.sleep(backoff_time)
 
         return False, None, f"Failed after {self.max_retries} attempts: {last_error}"
 
-def create_test_feed(db: Session, name: str = "NASA Breaking News", url: str = "https://www.nasa.gov/rss/dyn/breaking_news.rss") -> RSSFeed:
+
+def create_test_feed(
+    db: Session,
+    name: str = "NASA Breaking News",
+    url: str = "https://www.nasa.gov/rss/dyn/breaking_news.rss",
+) -> RSSFeed:
     """Create a test RSS feed for development"""
     existing = db.query(RSSFeed).filter(RSSFeed.url == url).first()
     if existing:
         return existing
 
-    feed = RSSFeed(
-        name=name,
-        url=url,
-        category="news",
-        is_active=True
-    )
+    feed = RSSFeed(name=name, url=url, category="news", is_active=True)
     db.add(feed)
     db.commit()
     db.refresh(feed)

@@ -14,44 +14,78 @@ class ContentFilter:
     # Sports keywords - only highly specific terms with no dual-use
     SPORTS_KEYWORDS = {
         # League names (highly specific)
-        'nfl', 'nba', 'mlb', 'nhl', 'mls', 'ncaa',
-        'fifa', 'uefa', 'premier league',
-
+        "nfl",
+        "nba",
+        "mlb",
+        "nhl",
+        "mls",
+        "ncaa",
+        "fifa",
+        "uefa",
+        "premier league",
         # Sport names
-        'football', 'basketball', 'baseball', 'hockey', 'soccer',
-        'tennis', 'golf', 'nascar', 'formula 1',
-
+        "football",
+        "basketball",
+        "baseball",
+        "hockey",
+        "soccer",
+        "tennis",
+        "golf",
+        "nascar",
+        "formula 1",
         # Championship events
-        'super bowl', 'world series', 'stanley cup', 'playoffs',
-        'olympics',
-
+        "super bowl",
+        "world series",
+        "stanley cup",
+        "playoffs",
+        "olympics",
         # Position-specific terms
-        'touchdown', 'quarterback', 'pitcher', 'batter',
-        'goalie', 'striker', 'innings',
-
+        "touchdown",
+        "quarterback",
+        "pitcher",
+        "batter",
+        "goalie",
+        "striker",
+        "innings",
         # Combat sports
-        'ufc', 'boxing match', 'wrestling match', 'mma fight'
+        "ufc",
+        "boxing match",
+        "wrestling match",
+        "mma fight",
     }
 
     # Clickbait indicators - only unambiguous phrases
     CLICKBAIT_KEYWORDS = {
-        'you won\'t believe',
-        'mind-blowing', 'jaw-dropping',
-        'goes viral', 'breaks the internet',
-        'what happens next',
-        'this one trick', 'doctors hate', 'experts hate',
-        'literally exploded', 'won the internet',
-        'everyone is talking about'
+        "you won't believe",
+        "mind-blowing",
+        "jaw-dropping",
+        "goes viral",
+        "breaks the internet",
+        "what happens next",
+        "this one trick",
+        "doctors hate",
+        "experts hate",
+        "literally exploded",
+        "won the internet",
+        "everyone is talking about",
     }
 
     # Celebrity/entertainment keywords - remove dual-use terms
     ENTERTAINMENT_KEYWORDS = {
-        'celebrity', 'movie star',
-        'red carpet', 'oscars', 'grammys', 'emmys',
-        'kardashian', 'hollywood',
-        'fashion week', 'tiktok trend',
-        'instagram model', 'influencer drama',
-        'celebrity gossip', 'box office'
+        "celebrity",
+        "movie star",
+        "red carpet",
+        "oscars",
+        "grammys",
+        "emmys",
+        "kardashian",
+        "hollywood",
+        "fashion week",
+        "tiktok trend",
+        "instagram model",
+        "influencer drama",
+        "celebrity gossip",
+        "box office",
     }
 
     def __init__(self, user_profile=None):
@@ -67,7 +101,9 @@ class ContentFilter:
         if user_profile:
             self.excluded_topics = [topic.lower() for topic in user_profile.get_excluded_topics()]
 
-    def should_filter(self, title: str, description: str = "", content: str = "") -> tuple[bool, str | None]:
+    def should_filter(
+        self, title: str, description: str = "", _content: str = ""
+    ) -> tuple[bool, str | None]:
         """
         Determine if article should be filtered based on content
 
@@ -135,7 +171,7 @@ class ContentFilter:
                 return True
 
         # Heuristic: Excessive punctuation
-        if title.count('!') >= 2 or title.count('?') >= 2:
+        if title.count("!") >= 2 or title.count("?") >= 2:
             return True
 
         # Heuristic: ALL CAPS words (excluding acronyms)
@@ -146,15 +182,11 @@ class ContentFilter:
 
         # Heuristic: Numbers in clickbait patterns
         clickbait_number_patterns = [
-            r'\d+ (reasons|ways|things|tips|tricks)',
-            r'number \d+',
-            r'#\d+ will'
+            r"\d+ (reasons|ways|things|tips|tricks)",
+            r"number \d+",
+            r"#\d+ will",
         ]
-        for pattern in clickbait_number_patterns:
-            if re.search(pattern, title_lower):
-                return True
-
-        return False
+        return any(re.search(pattern, title_lower) for pattern in clickbait_number_patterns)
 
     def _is_entertainment_content(self, text: str) -> bool:
         """
@@ -221,9 +253,9 @@ class ContentFilter:
                 reasons[reason] = reasons.get(reason, 0) + 1
 
         return {
-            'total_articles': total,
-            'filtered_count': filtered_count,
-            'kept_count': total - filtered_count,
-            'filter_rate': filtered_count / total if total > 0 else 0,
-            'reasons': reasons
+            "total_articles": total,
+            "filtered_count": filtered_count,
+            "kept_count": total - filtered_count,
+            "filter_rate": filtered_count / total if total > 0 else 0,
+            "reasons": reasons,
         }

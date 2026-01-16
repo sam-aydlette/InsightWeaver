@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - InsightWeaver{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Dashboard</h1>
+    <p class="page-subtitle">Welcome back!</p>
+</div>
+
+<div class="dashboard-grid">
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Quick Actions</h3>
+        </div>
+        <div class="action-buttons">
+            <a href="{{ url_for('brief.index') }}" class="action-btn">
+                <svg class="action-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+                <span>Generate Daily Brief</span>
+            </a>
+            <a href="{{ url_for('forecast.index') }}" class="action-btn">
+                <svg class="action-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+                </svg>
+                <span>Generate Forecast</span>
+            </a>
+            <a href="{{ url_for('trust.index') }}" class="action-btn">
+                <svg class="action-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+                </svg>
+                <span>Ask AI</span>
+            </a>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Your Profile</h3>
+            <a href="{{ url_for('settings.index') }}" class="btn btn-secondary" style="padding: 6px 12px; font-size: 13px;">Edit</a>
+        </div>
+        {% if profile %}
+        <div class="profile-summary">
+            <div class="profile-item">
+                <span class="profile-label">Location</span>
+                <span class="profile-value">{{ profile.city }}, {{ profile.state }}</span>
+            </div>
+            <div class="profile-item">
+                <span class="profile-label">Industry</span>
+                <span class="profile-value">{{ profile.industry }}</span>
+            </div>
+            {% if profile.role %}
+            <div class="profile-item">
+                <span class="profile-label">Role</span>
+                <span class="profile-value">{{ profile.role }}</span>
+            </div>
+            {% endif %}
+            <div class="profile-item">
+                <span class="profile-label">Interests</span>
+                <span class="profile-value">{{ profile.interests | join(', ') if profile.interests else 'None set' }}</span>
+            </div>
+        </div>
+        {% else %}
+        <p class="text-muted">No profile configured. <a href="{{ url_for('setup.welcome') }}">Complete setup</a></p>
+        {% endif %}
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Recent Reports</h3>
+        </div>
+        {% if recent_reports %}
+        <ul class="list">
+            {% for report in recent_reports %}
+            <li class="list-item">
+                <div>
+                    <div class="list-item-title">{{ report.type }}</div>
+                    <div class="list-item-meta">{{ report.date }}</div>
+                </div>
+                <a href="{{ report.url }}" class="btn btn-secondary" style="padding: 6px 12px; font-size: 13px;">View</a>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="text-muted">No reports generated yet. Generate your first brief above.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

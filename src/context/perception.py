@@ -21,10 +21,7 @@ class PerceptionEngine:
         """Initialize perception engine"""
         self.client = ClaudeClient()
 
-    async def extract_perception(
-        self,
-        articles: list[Article]
-    ) -> dict[str, Any]:
+    async def extract_perception(self, articles: list[Article]) -> dict[str, Any]:
         """
         Extract cross-article patterns and relationships
 
@@ -51,15 +48,17 @@ class PerceptionEngine:
                 system_prompt="You are a pattern recognition system. Identify connections across news articles.",
                 user_message=f"{prompt}\n\n{articles_text}",
                 temperature=0.3,  # Lower temperature for consistent extraction
-                max_tokens=3000   # Keep perception concise
+                max_tokens=3000,  # Keep perception concise
             )
 
             # Parse response
             perception = self._parse_response(response)
 
-            logger.info(f"Extracted perception: {len(perception.get('entity_mentions', []))} entities, "
-                       f"{len(perception.get('cross_article_connections', []))} connections, "
-                       f"{len(perception.get('event_sequences', []))} sequences")
+            logger.info(
+                f"Extracted perception: {len(perception.get('entity_mentions', []))} entities, "
+                f"{len(perception.get('cross_article_connections', []))} connections, "
+                f"{len(perception.get('event_sequences', []))} sequences"
+            )
 
             return perception
 
@@ -77,37 +76,41 @@ class PerceptionEngine:
         Returns:
             Formatted markdown string
         """
-        if not perception or perception.get('_empty'):
+        if not perception or perception.get("_empty"):
             return ""
 
         parts = ["## Cross-Article Insights (Perception Layer)\n"]
 
         # Entity mentions across articles
-        entities = perception.get('entity_mentions', [])
+        entities = perception.get("entity_mentions", [])
         if entities:
             parts.append("### Key Entities Appearing Across Multiple Articles:")
             for entity in entities[:10]:  # Top 10
-                article_count = len(entity.get('article_ids', []))
-                contexts = entity.get('contexts', [])
+                article_count = len(entity.get("article_ids", []))
+                contexts = entity.get("contexts", [])
                 context_str = "; ".join(contexts[:2])  # First 2 contexts
-                parts.append(f"- **{entity['entity']}** ({entity['type']}) - {article_count} articles: {context_str}")
+                parts.append(
+                    f"- **{entity['entity']}** ({entity['type']}) - {article_count} articles: {context_str}"
+                )
             parts.append("")
 
         # Cross-article connections
-        connections = perception.get('cross_article_connections', [])
+        connections = perception.get("cross_article_connections", [])
         if connections:
             parts.append("### Patterns Across Articles:")
             for conn in connections[:8]:  # Top 8
-                article_count = len(conn.get('article_ids', []))
-                parts.append(f"- **{conn['theme']}** ({article_count} articles): {conn['connection']}")
+                article_count = len(conn.get("article_ids", []))
+                parts.append(
+                    f"- **{conn['theme']}** ({article_count} articles): {conn['connection']}"
+                )
             parts.append("")
 
         # Event sequences
-        sequences = perception.get('event_sequences', [])
+        sequences = perception.get("event_sequences", [])
         if sequences:
             parts.append("### Event Timelines:")
             for seq in sequences[:5]:  # Top 5
-                timeframe = seq.get('timeframe', 'recent')
+                timeframe = seq.get("timeframe", "recent")
                 parts.append(f"- {seq['sequence']} ({timeframe})")
             parts.append("")
 
@@ -118,8 +121,14 @@ class PerceptionEngine:
         formatted = []
 
         for i, article in enumerate(articles, 1):
-            content = article.embedding_summary or article.normalized_content or article.description or ""
-            date_str = article.published_date.strftime("%Y-%m-%d") if article.published_date else "unknown date"
+            content = (
+                article.embedding_summary or article.normalized_content or article.description or ""
+            )
+            date_str = (
+                article.published_date.strftime("%Y-%m-%d")
+                if article.published_date
+                else "unknown date"
+            )
 
             formatted.append(f"Article {i} ({date_str}):")
             formatted.append(f"Title: {article.title}")
@@ -196,9 +205,9 @@ Return ONLY the JSON, no markdown formatting or additional text."""
                 return self._empty_perception()
 
             # Ensure required keys exist
-            perception.setdefault('entity_mentions', [])
-            perception.setdefault('cross_article_connections', [])
-            perception.setdefault('event_sequences', [])
+            perception.setdefault("entity_mentions", [])
+            perception.setdefault("cross_article_connections", [])
+            perception.setdefault("event_sequences", [])
 
             return perception
 
@@ -210,8 +219,8 @@ Return ONLY the JSON, no markdown formatting or additional text."""
     def _empty_perception(self) -> dict[str, Any]:
         """Return empty perception structure"""
         return {
-            'entity_mentions': [],
-            'cross_article_connections': [],
-            'event_sequences': [],
-            '_empty': True
+            "entity_mentions": [],
+            "cross_article_connections": [],
+            "event_sequences": [],
+            "_empty": True,
         }

@@ -2,6 +2,7 @@
 Topic Matcher - Article filtering by topic and geographic scope
 Uses keyword matching and metadata to filter articles without AI inference
 """
+
 import logging
 
 from src.database.models import Article
@@ -11,150 +12,329 @@ logger = logging.getLogger(__name__)
 
 # Topic keyword dictionaries with broad interpretation
 TOPIC_KEYWORDS = {
-    'cybersecurity': {
-        'core': [
-            'cybersecurity', 'cyber security', 'infosec', 'information security',
-            'cyber', 'security breach', 'data security', 'network security'
+    "cybersecurity": {
+        "core": [
+            "cybersecurity",
+            "cyber security",
+            "infosec",
+            "information security",
+            "cyber",
+            "security breach",
+            "data security",
+            "network security",
         ],
-        'threats': [
-            'ransomware', 'malware', 'phishing', 'breach', 'hack', 'hacker',
-            'zero day', 'zero-day', 'vulnerability', 'exploit', 'attack',
-            'threat actor', 'backdoor', 'trojan', 'spyware', 'botnet',
-            'ddos', 'denial of service', 'sql injection', 'xss'
+        "threats": [
+            "ransomware",
+            "malware",
+            "phishing",
+            "breach",
+            "hack",
+            "hacker",
+            "zero day",
+            "zero-day",
+            "vulnerability",
+            "exploit",
+            "attack",
+            "threat actor",
+            "backdoor",
+            "trojan",
+            "spyware",
+            "botnet",
+            "ddos",
+            "denial of service",
+            "sql injection",
+            "xss",
         ],
-        'tech': [
-            'firewall', 'encryption', 'authentication', 'access control',
-            'vpn', 'ids', 'intrusion detection', 'penetration test',
-            'security patch', 'security update', 'mfa', 'multi-factor'
+        "tech": [
+            "firewall",
+            "encryption",
+            "authentication",
+            "access control",
+            "vpn",
+            "ids",
+            "intrusion detection",
+            "penetration test",
+            "security patch",
+            "security update",
+            "mfa",
+            "multi-factor",
         ],
-        'policy': [
-            'cyber policy', 'data privacy', 'surveillance', 'CISA',
-            'cybersecurity framework', 'nist', 'compliance', 'gdpr',
-            'hipaa', 'data protection', 'privacy law'
+        "policy": [
+            "cyber policy",
+            "data privacy",
+            "surveillance",
+            "CISA",
+            "cybersecurity framework",
+            "nist",
+            "compliance",
+            "gdpr",
+            "hipaa",
+            "data protection",
+            "privacy law",
         ],
-        'industry': [
-            'supply chain security', 'critical infrastructure',
-            'industrial control', 'scada', 'ot security',
-            'third-party risk', 'vendor security'
+        "industry": [
+            "supply chain security",
+            "critical infrastructure",
+            "industrial control",
+            "scada",
+            "ot security",
+            "third-party risk",
+            "vendor security",
         ],
-        'geopolitical': [
-            'cyber warfare', 'state-sponsored', 'espionage',
-            'nation-state', 'apt', 'advanced persistent threat',
-            'cyber attack', 'cyber espionage'
+        "geopolitical": [
+            "cyber warfare",
+            "state-sponsored",
+            "espionage",
+            "nation-state",
+            "apt",
+            "advanced persistent threat",
+            "cyber attack",
+            "cyber espionage",
         ],
-        'entities': [
-            'crowdstrike', 'palo alto', 'mandiant', 'cisa', 'nsa',
-            'cisco', 'fortinet', 'microsoft security', 'google security',
-            'amazon security', 'cloudflare'
-        ]
+        "entities": [
+            "crowdstrike",
+            "palo alto",
+            "mandiant",
+            "cisa",
+            "nsa",
+            "cisco",
+            "fortinet",
+            "microsoft security",
+            "google security",
+            "amazon security",
+            "cloudflare",
+        ],
     },
-    'ai/ml': {
-        'core': [
-            'artificial intelligence', 'ai', 'machine learning', 'ml',
-            'deep learning', 'neural network', 'ai model', 'ai system'
+    "ai/ml": {
+        "core": [
+            "artificial intelligence",
+            "ai",
+            "machine learning",
+            "ml",
+            "deep learning",
+            "neural network",
+            "ai model",
+            "ai system",
         ],
-        'tech': [
-            'llm', 'large language model', 'gpt', 'transformer',
-            'generative ai', 'computer vision', 'nlp', 'natural language',
-            'reinforcement learning', 'supervised learning', 'unsupervised learning',
-            'training data', 'ai training', 'inference'
+        "tech": [
+            "llm",
+            "large language model",
+            "gpt",
+            "transformer",
+            "generative ai",
+            "computer vision",
+            "nlp",
+            "natural language",
+            "reinforcement learning",
+            "supervised learning",
+            "unsupervised learning",
+            "training data",
+            "ai training",
+            "inference",
         ],
-        'policy': [
-            'ai regulation', 'ai safety', 'ai ethics', 'ai governance',
-            'ai bias', 'algorithmic fairness', 'responsible ai',
-            'ai transparency', 'explainable ai'
+        "policy": [
+            "ai regulation",
+            "ai safety",
+            "ai ethics",
+            "ai governance",
+            "ai bias",
+            "algorithmic fairness",
+            "responsible ai",
+            "ai transparency",
+            "explainable ai",
         ],
-        'entities': [
-            'openai', 'anthropic', 'google ai', 'microsoft ai',
-            'deepmind', 'meta ai', 'nvidia', 'hugging face'
-        ]
+        "entities": [
+            "openai",
+            "anthropic",
+            "google ai",
+            "microsoft ai",
+            "deepmind",
+            "meta ai",
+            "nvidia",
+            "hugging face",
+        ],
     },
-    'software development': {
-        'core': [
-            'software development', 'programming', 'coding', 'developer',
-            'software engineer', 'devops', 'agile', 'scrum'
+    "software development": {
+        "core": [
+            "software development",
+            "programming",
+            "coding",
+            "developer",
+            "software engineer",
+            "devops",
+            "agile",
+            "scrum",
         ],
-        'tech': [
-            'git', 'github', 'ci/cd', 'docker', 'kubernetes',
-            'api', 'microservices', 'cloud native', 'serverless',
-            'react', 'python', 'javascript', 'java', 'go'
+        "tech": [
+            "git",
+            "github",
+            "ci/cd",
+            "docker",
+            "kubernetes",
+            "api",
+            "microservices",
+            "cloud native",
+            "serverless",
+            "react",
+            "python",
+            "javascript",
+            "java",
+            "go",
         ],
-        'tools': [
-            'ide', 'visual studio', 'vscode', 'intellij',
-            'jenkins', 'gitlab', 'jira', 'slack'
-        ]
+        "tools": [
+            "ide",
+            "visual studio",
+            "vscode",
+            "intellij",
+            "jenkins",
+            "gitlab",
+            "jira",
+            "slack",
+        ],
     },
-    'cloud computing': {
-        'core': [
-            'cloud computing', 'cloud', 'saas', 'paas', 'iaas',
-            'cloud services', 'cloud platform'
+    "cloud computing": {
+        "core": [
+            "cloud computing",
+            "cloud",
+            "saas",
+            "paas",
+            "iaas",
+            "cloud services",
+            "cloud platform",
         ],
-        'providers': [
-            'aws', 'amazon web services', 'azure', 'microsoft azure',
-            'gcp', 'google cloud', 'ibm cloud', 'oracle cloud'
+        "providers": [
+            "aws",
+            "amazon web services",
+            "azure",
+            "microsoft azure",
+            "gcp",
+            "google cloud",
+            "ibm cloud",
+            "oracle cloud",
         ],
-        'tech': [
-            's3', 'ec2', 'lambda', 'cloud storage', 'cloud database',
-            'cloud security', 'cloud migration', 'multi-cloud', 'hybrid cloud'
-        ]
+        "tech": [
+            "s3",
+            "ec2",
+            "lambda",
+            "cloud storage",
+            "cloud database",
+            "cloud security",
+            "cloud migration",
+            "multi-cloud",
+            "hybrid cloud",
+        ],
     },
-    'technology policy': {
-        'core': [
-            'technology policy', 'tech policy', 'tech regulation',
-            'digital policy', 'internet policy'
+    "technology policy": {
+        "core": [
+            "technology policy",
+            "tech policy",
+            "tech regulation",
+            "digital policy",
+            "internet policy",
         ],
-        'topics': [
-            'net neutrality', 'data privacy', 'antitrust', 'section 230',
-            'content moderation', 'platform regulation', 'digital markets',
-            'competition policy', 'tech monopoly'
+        "topics": [
+            "net neutrality",
+            "data privacy",
+            "antitrust",
+            "section 230",
+            "content moderation",
+            "platform regulation",
+            "digital markets",
+            "competition policy",
+            "tech monopoly",
         ],
-        'entities': [
-            'ftc', 'fcc', 'doj', 'eu commission', 'congress'
-        ]
+        "entities": ["ftc", "fcc", "doj", "eu commission", "congress"],
     },
-    'privacy': {
-        'core': [
-            'privacy', 'data privacy', 'personal data', 'user data',
-            'privacy rights', 'data protection'
+    "privacy": {
+        "core": [
+            "privacy",
+            "data privacy",
+            "personal data",
+            "user data",
+            "privacy rights",
+            "data protection",
         ],
-        'topics': [
-            'gdpr', 'ccpa', 'surveillance', 'tracking', 'cookies',
-            'consent', 'data collection', 'privacy policy',
-            'encryption', 'anonymization'
-        ]
+        "topics": [
+            "gdpr",
+            "ccpa",
+            "surveillance",
+            "tracking",
+            "cookies",
+            "consent",
+            "data collection",
+            "privacy policy",
+            "encryption",
+            "anonymization",
+        ],
     },
-    'education': {
-        'core': [
-            'education', 'school', 'university', 'college', 'student',
-            'teacher', 'classroom', 'learning'
+    "education": {
+        "core": [
+            "education",
+            "school",
+            "university",
+            "college",
+            "student",
+            "teacher",
+            "classroom",
+            "learning",
         ],
-        'topics': [
-            'education policy', 'curriculum', 'standardized test',
-            'school funding', 'education budget', 'school board',
-            'online learning', 'edtech', 'student loan'
-        ]
+        "topics": [
+            "education policy",
+            "curriculum",
+            "standardized test",
+            "school funding",
+            "education budget",
+            "school board",
+            "online learning",
+            "edtech",
+            "student loan",
+        ],
     },
-    'transportation': {
-        'core': [
-            'transportation', 'transit', 'commute', 'traffic',
-            'infrastructure', 'public transport'
+    "transportation": {
+        "core": [
+            "transportation",
+            "transit",
+            "commute",
+            "traffic",
+            "infrastructure",
+            "public transport",
         ],
-        'topics': [
-            'metro', 'subway', 'bus', 'train', 'highway', 'road',
-            'ev', 'electric vehicle', 'autonomous vehicle', 'self-driving'
-        ]
+        "topics": [
+            "metro",
+            "subway",
+            "bus",
+            "train",
+            "highway",
+            "road",
+            "ev",
+            "electric vehicle",
+            "autonomous vehicle",
+            "self-driving",
+        ],
     },
-    'housing': {
-        'core': [
-            'housing', 'real estate', 'property', 'home', 'apartment',
-            'rent', 'mortgage', 'housing market'
+    "housing": {
+        "core": [
+            "housing",
+            "real estate",
+            "property",
+            "home",
+            "apartment",
+            "rent",
+            "mortgage",
+            "housing market",
         ],
-        'topics': [
-            'affordable housing', 'housing crisis', 'zoning',
-            'development', 'construction', 'homeowner', 'renter',
-            'eviction', 'housing policy'
-        ]
-    }
+        "topics": [
+            "affordable housing",
+            "housing crisis",
+            "zoning",
+            "development",
+            "construction",
+            "homeowner",
+            "renter",
+            "eviction",
+            "housing policy",
+        ],
+    },
 }
 
 
@@ -199,16 +379,16 @@ class TopicMatcher:
 
         # Category weights (how strongly each keyword category signals relevance)
         category_weights = {
-            'core': 3.0,        # Core terms are strongest signal
-            'threats': 2.0,     # Specific threats/technologies
-            'policy': 2.0,      # Policy/governance terms
-            'geopolitical': 2.0,
-            'tech': 1.5,
-            'industry': 1.5,
-            'topics': 1.5,
-            'tools': 1.0,
-            'providers': 1.0,
-            'entities': 1.0     # Mentioned companies/orgs
+            "core": 3.0,  # Core terms are strongest signal
+            "threats": 2.0,  # Specific threats/technologies
+            "policy": 2.0,  # Policy/governance terms
+            "geopolitical": 2.0,
+            "tech": 1.5,
+            "industry": 1.5,
+            "topics": 1.5,
+            "tools": 1.0,
+            "providers": 1.0,
+            "entities": 1.0,  # Mentioned companies/orgs
         }
 
         # Score based on keyword matches
@@ -218,8 +398,8 @@ class TopicMatcher:
             score += matches * weight
 
         # Entity matching (strong signal if relevant entities mentioned)
-        if article.entities and 'entities' in keywords:
-            entity_keywords = keywords['entities']
+        if article.entities and "entities" in keywords:
+            entity_keywords = keywords["entities"]
             for entity in article.entities:
                 if any(kw in entity.lower() for kw in entity_keywords):
                     score += 3.0  # High confidence for entity match
@@ -231,8 +411,8 @@ class TopicMatcher:
             # Check if topic or core keywords in feed category
             if topic in category_lower:
                 score += 2.0
-            elif 'core' in keywords:
-                core_keywords = keywords['core']
+            elif "core" in keywords:
+                core_keywords = keywords["core"]
                 if any(kw in category_lower for kw in core_keywords):
                     score += 2.0
 
@@ -242,18 +422,12 @@ class TopicMatcher:
 
         if matches:
             logger.debug(
-                f"Article '{article.title[:50]}...' matched topic '{topic}' "
-                f"with score {score:.1f}"
+                f"Article '{article.title[:50]}...' matched topic '{topic}' with score {score:.1f}"
             )
 
         return matches, score
 
-    def matches_scope(
-        self,
-        article: Article,
-        scope: str,
-        user_location: dict
-    ) -> bool:
+    def matches_scope(self, article: Article, scope: str, user_location: dict) -> bool:
         """
         Check if article matches geographic scope
 
@@ -272,10 +446,10 @@ class TopicMatcher:
         if article.description:
             text += article.description.lower()
 
-        if scope == 'local':
+        if scope == "local":
             # Extract user location details
-            city = user_location.get('city', '').lower()
-            region = user_location.get('region', '').lower()
+            city = user_location.get("city", "").lower()
+            region = user_location.get("region", "").lower()
 
             # Check for direct mentions
             if city and city in text:
@@ -291,14 +465,12 @@ class TopicMatcher:
                         return True
 
             # Check feed category for 'local'
-            if article.feed and article.feed.category:
-                if 'local' in article.feed.category.lower():
-                    return True
+            return bool(
+                article.feed and article.feed.category and "local" in article.feed.category.lower()
+            )
 
-            return False
-
-        elif scope == 'state':
-            state = user_location.get('state', '').lower()
+        elif scope == "state":
+            state = user_location.get("state", "").lower()
 
             # State name in text
             if state and state in text:
@@ -307,16 +479,28 @@ class TopicMatcher:
             # State in feed category
             if article.feed and article.feed.category:
                 cat = article.feed.category.lower()
-                if state in cat or 'state' in cat or 'regional' in cat:
+                if state in cat or "state" in cat or "regional" in cat:
                     return True
 
             return False
 
-        elif scope == 'national':
+        elif scope == "national":
             national_keywords = [
-                'federal', 'congress', 'senate', 'house of representatives',
-                'washington', 'white house', 'national', 'u.s.', 'usa',
-                'president', 'supreme court', 'fbi', 'cia', 'dhs', 'nationwide'
+                "federal",
+                "congress",
+                "senate",
+                "house of representatives",
+                "washington",
+                "white house",
+                "national",
+                "u.s.",
+                "usa",
+                "president",
+                "supreme court",
+                "fbi",
+                "cia",
+                "dhs",
+                "nationwide",
             ]
 
             # Check for national keywords
@@ -326,17 +510,28 @@ class TopicMatcher:
             # Check feed category
             if article.feed and article.feed.category:
                 cat = article.feed.category.lower()
-                if any(kw in cat for kw in ['national', 'federal', 'us', 'usa']):
+                if any(kw in cat for kw in ["national", "federal", "us", "usa"]):
                     return True
 
             return False
 
-        elif scope == 'global':
+        elif scope == "global":
             # Global is more permissive - includes international news
             global_keywords = [
-                'international', 'global', 'worldwide', 'world',
-                'europe', 'asia', 'africa', 'united nations', 'nato',
-                'g7', 'g20', 'china', 'russia', 'india'
+                "international",
+                "global",
+                "worldwide",
+                "world",
+                "europe",
+                "asia",
+                "africa",
+                "united nations",
+                "nato",
+                "g7",
+                "g20",
+                "china",
+                "russia",
+                "india",
             ]
 
             if any(kw in text for kw in global_keywords):
@@ -344,7 +539,7 @@ class TopicMatcher:
 
             if article.feed and article.feed.category:
                 cat = article.feed.category.lower()
-                if any(kw in cat for kw in ['global', 'international', 'world']):
+                if any(kw in cat for kw in ["global", "international", "world"]):
                     return True
 
             return False
@@ -354,10 +549,7 @@ class TopicMatcher:
         return True
 
     def filter_articles(
-        self,
-        articles: list[Article],
-        topic_filters: dict,
-        user_profile: UserProfile
+        self, articles: list[Article], topic_filters: dict, user_profile: UserProfile
     ) -> list[Article]:
         """
         Apply topic and scope filters to article list
@@ -372,13 +564,13 @@ class TopicMatcher:
         """
         filtered = articles.copy()
         filter_stats = {
-            'input_count': len(articles),
-            'topics': topic_filters.get('topics', []),
-            'scopes': topic_filters.get('scopes', [])
+            "input_count": len(articles),
+            "topics": topic_filters.get("topics", []),
+            "scopes": topic_filters.get("scopes", []),
         }
 
         # Apply topic filters (OR logic within topics)
-        topics = topic_filters.get('topics', [])
+        topics = topic_filters.get("topics", [])
         if topics:
             topic_matches = []
             for article in filtered:
@@ -392,10 +584,10 @@ class TopicMatcher:
             topic_matches.sort(key=lambda x: x[1], reverse=True)
             filtered = [article for article, score in topic_matches]
 
-            filter_stats['after_topic_filter'] = len(filtered)
+            filter_stats["after_topic_filter"] = len(filtered)
 
         # Apply scope filters (OR logic within scopes)
-        scopes = topic_filters.get('scopes', [])
+        scopes = topic_filters.get("scopes", [])
         if scopes:
             user_location = user_profile.get_primary_location()
             scope_matches = []
@@ -407,9 +599,9 @@ class TopicMatcher:
                         break  # Article matches at least one scope
 
             filtered = scope_matches
-            filter_stats['after_scope_filter'] = len(filtered)
+            filter_stats["after_scope_filter"] = len(filtered)
 
-        filter_stats['output_count'] = len(filtered)
+        filter_stats["output_count"] = len(filtered)
 
         logger.info(
             f"TopicMatcher: {filter_stats['output_count']}/{filter_stats['input_count']} "

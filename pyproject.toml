@@ -38,6 +38,9 @@ dependencies = [
     "textblob>=0.15.0",
     "pydantic-settings>=2.0.0",
     "markdownify>=0.11.0",
+    # Web UI
+    "flask>=3.0.0",
+    "flask-cors>=4.0.0",
 ]
 
 [project.optional-dependencies]

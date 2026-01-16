@@ -2,6 +2,7 @@
 Output management for CLI commands
 Handles output suppression and debug mode
 """
+
 import logging
 import sys
 from contextlib import contextmanager
@@ -65,16 +66,16 @@ class OutputManager:
             # In debug mode, show all logs
             logging.basicConfig(
                 level=level,
-                format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                force=True
+                format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+                force=True,
             )
         else:
             # In non-debug mode, suppress all logs by using CRITICAL level
             # (higher than ERROR, so errors won't show either)
             logging.basicConfig(
                 level=logging.CRITICAL,
-                format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                force=True
+                format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+                force=True,
             )
 
     def print(self, message):

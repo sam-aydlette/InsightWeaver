@@ -35,11 +35,7 @@ class NarrativeSynthesizer:
         self.client = ClaudeClient()
         self.reflection_engine = ReflectionEngine()
 
-    async def synthesize(
-        self,
-        hours: int = 48,
-        max_articles: int = 50
-    ) -> dict[str, Any]:
+    async def synthesize(self, hours: int = 48, max_articles: int = 50) -> dict[str, Any]:
         """
         Generate narrative synthesis from recent articles
 
@@ -57,11 +53,7 @@ class NarrativeSynthesizer:
 
         if not context["articles"]:
             logger.warning("No articles available for synthesis")
-            return {
-                "articles_analyzed": 0,
-                "synthesis_id": None,
-                "status": "no_articles"
-            }
+            return {"articles_analyzed": 0, "synthesis_id": None, "status": "no_articles"}
 
         # Build synthesis task
         task = self._build_synthesis_task(len(context["articles"]))
@@ -69,9 +61,7 @@ class NarrativeSynthesizer:
         try:
             # Get Claude's analysis
             response = await self.client.analyze_with_context(
-                context=context,
-                task=task,
-                temperature=1.0
+                context=context, task=task, temperature=1.0
             )
 
             # Parse structured output
@@ -81,7 +71,7 @@ class NarrativeSynthesizer:
             synthesis_id = self._store_synthesis(
                 synthesis_data=synthesis_data,
                 articles_count=len(context["articles"]),
-                context=context
+                context=context,
             )
 
             logger.info(f"Narrative synthesis complete: {synthesis_id}")
@@ -90,7 +80,7 @@ class NarrativeSynthesizer:
                 "articles_analyzed": len(context["articles"]),
                 "synthesis_id": synthesis_id,
                 "synthesis_data": synthesis_data,
-                "status": "success"
+                "status": "success",
             }
 
         except Exception as e:
@@ -99,14 +89,11 @@ class NarrativeSynthesizer:
                 "articles_analyzed": 0,
                 "synthesis_id": None,
                 "status": "error",
-                "error": str(e)
+                "error": str(e),
             }
 
     async def synthesize_with_trust_verification(
-        self,
-        hours: int = 48,
-        max_articles: int = 50,
-        max_retries: int = 3
+        self, hours: int = 48, max_articles: int = 50, max_retries: int = 3
     ) -> dict[str, Any]:
         """
         Generate narrative synthesis with trust verification and citation requirements
@@ -123,21 +110,20 @@ class NarrativeSynthesizer:
             Synthesis results dictionary with trust verification metadata
         """
         with profile("SYNTHESIS_TOTAL"):
-            logger.info(f"Starting narrative synthesis with trust verification (max retries: {max_retries})")
+            logger.info(
+                f"Starting narrative synthesis with trust verification (max retries: {max_retries})"
+            )
 
             # Curate context (NOTE: This already has profiling inside curator.py)
             context = await self.curator.curate_for_narrative_synthesis(hours, max_articles)
 
             if not context["articles"]:
                 logger.warning("No articles available for synthesis")
-                return {
-                    "articles_analyzed": 0,
-                    "synthesis_id": None,
-                    "status": "no_articles"
-                }
+                return {"articles_analyzed": 0, "synthesis_id": None, "status": "no_articles"}
 
             # Initialize trust pipeline
             from ..trust.trust_pipeline import TrustPipeline
+
             trust_pipeline = TrustPipeline()
 
             # Verification loop
@@ -154,8 +140,7 @@ class NarrativeSynthesizer:
                     try:
                         # Build citation-enhanced task
                         task = self._build_synthesis_task_with_citations(
-                            context["articles"],
-                            len(context["articles"])
+                            context["articles"], len(context["articles"])
                         )
 
                         # Generate synthesis (progressively stricter)
@@ -163,18 +148,18 @@ class NarrativeSynthesizer:
                             if attempt == 1:
                                 # First attempt: normal temperature
                                 response = await self.client.analyze_with_context(
-                                    context=context,
-                                    task=task,
-                                    temperature=1.0
+                                    context=context, task=task, temperature=1.0
                                 )
                             else:
                                 # Retry with stricter prompt and lower temperature
-                                logger.info(f"Retry {attempt}: Using stricter constraints and temperature=0.7")
-                                stricter_task = self._add_trust_constraints(task, verification_history)
+                                logger.info(
+                                    f"Retry {attempt}: Using stricter constraints and temperature=0.7"
+                                )
+                                stricter_task = self._add_trust_constraints(
+                                    task, verification_history
+                                )
                                 response = await self.client.analyze_with_context(
-                                    context=context,
-                                    task=stricter_task,
-                                    temperature=0.7
+                                    context=context, task=stricter_task, temperature=0.7
                                 )
 
                         # Parse synthesis
@@ -185,11 +170,13 @@ class NarrativeSynthesizer:
 
                         if not narrative_text:
                             logger.warning("No narrative text extracted for verification")
-                            verification_history.append({
-                                "attempt": attempt,
-                                "passed": False,
-                                "error": "No narrative text extracted"
-                            })
+                            verification_history.append(
+                                {
+                                    "attempt": attempt,
+                                    "passed": False,
+                                    "error": "No narrative text extracted",
+                                }
+                            )
                             continue
 
                         # Verify trustworthiness (NOTE: This already has profiling inside trust_pipeline.py)
@@ -199,17 +186,15 @@ class NarrativeSynthesizer:
                                 response=narrative_text,
                                 verify_facts=True,
                                 check_bias=True,
-                                check_intimacy=True
+                                check_intimacy=True,
                             )
 
                         # Evaluate against thresholds
                         trust_passed = self._evaluate_trust_threshold(trust_analysis)
 
-                        verification_history.append({
-                            "attempt": attempt,
-                            "passed": trust_passed,
-                            "analysis": trust_analysis
-                        })
+                        verification_history.append(
+                            {"attempt": attempt, "passed": trust_passed, "analysis": trust_analysis}
+                        )
 
                         if trust_passed:
                             logger.info(f"Trust verification passed on attempt {attempt}")
@@ -228,11 +213,9 @@ class NarrativeSynthesizer:
 
                     except Exception as e:
                         logger.error(f"Synthesis attempt {attempt} failed: {e}", exc_info=True)
-                        verification_history.append({
-                            "attempt": attempt,
-                            "passed": False,
-                            "error": str(e)
-                        })
+                        verification_history.append(
+                            {"attempt": attempt, "passed": False, "error": str(e)}
+                        )
 
         # Handle outcome
         if not trust_passed:
@@ -246,15 +229,17 @@ class NarrativeSynthesizer:
                     "passed": False,
                     "attempts": attempt,
                     "warning": f"Failed trust verification after {max_retries} attempts",
-                    "final_analysis": verification_history[-1]["analysis"] if verification_history else {},
-                    "verification_history": verification_history
+                    "final_analysis": verification_history[-1]["analysis"]
+                    if verification_history
+                    else {},
+                    "verification_history": verification_history,
                 }
 
                 # Store with warning flag
                 synthesis_id = self._store_synthesis(
                     synthesis_data=synthesis_data,
                     articles_count=len(context["articles"]),
-                    context=context
+                    context=context,
                 )
 
                 logger.warning(f"Synthesis stored with trust warning: {synthesis_id}")
@@ -268,8 +253,8 @@ class NarrativeSynthesizer:
                         "passed": False,
                         "attempts": attempt,
                         "warning": "Synthesis did not meet all trust thresholds",
-                        "verification_history": verification_history
-                    }
+                        "verification_history": verification_history,
+                    },
                 }
             else:
                 # No synthesis data at all - complete failure
@@ -277,21 +262,19 @@ class NarrativeSynthesizer:
                     "status": "verification_failed",
                     "articles_analyzed": len(context["articles"]),
                     "verification_history": verification_history,
-                    "error": f"Synthesis failed trust verification after {max_retries} attempts"
+                    "error": f"Synthesis failed trust verification after {max_retries} attempts",
                 }
 
         # Success: Add trust verification metadata to synthesis
         synthesis_data["trust_verification"] = {
             "passed": True,
             "attempts": attempt,
-            "final_analysis": verification_history[-1]["analysis"] if verification_history else {}
+            "final_analysis": verification_history[-1]["analysis"] if verification_history else {},
         }
 
         # Store successful synthesis in database
         synthesis_id = self._store_synthesis(
-            synthesis_data=synthesis_data,
-            articles_count=len(context["articles"]),
-            context=context
+            synthesis_data=synthesis_data, articles_count=len(context["articles"]), context=context
         )
 
         logger.info(f"Trust-verified synthesis complete: {synthesis_id} (attempts: {attempt})")
@@ -304,15 +287,12 @@ class NarrativeSynthesizer:
             "trust_verification": {
                 "passed": True,
                 "attempts": attempt,
-                "verification_history": verification_history
-            }
+                "verification_history": verification_history,
+            },
         }
 
     async def synthesize_with_reflection(
-        self,
-        hours: int = 48,
-        max_articles: int = 50,
-        depth_threshold: float = 8.0
+        self, hours: int = 48, max_articles: int = 50, depth_threshold: float = 8.0
     ) -> dict[str, Any]:
         """
         Generate narrative synthesis with reflection loop for deeper analysis
@@ -325,10 +305,12 @@ class NarrativeSynthesizer:
         Returns:
             Synthesis results dictionary with reflection metadata
         """
-        logger.info(f"Starting narrative synthesis with reflection (depth threshold: {depth_threshold})")
+        logger.info(
+            f"Starting narrative synthesis with reflection (depth threshold: {depth_threshold})"
+        )
 
         # Check if reflection is enabled
-        enable_reflection = getattr(settings, 'enable_reflection', True)
+        enable_reflection = getattr(settings, "enable_reflection", True)
         if not enable_reflection:
             logger.info("Reflection disabled in settings, using standard synthesis")
             return await self.synthesize(hours, max_articles)
@@ -338,11 +320,7 @@ class NarrativeSynthesizer:
 
         if not context["articles"]:
             logger.warning("No articles available for synthesis")
-            return {
-                "articles_analyzed": 0,
-                "synthesis_id": None,
-                "status": "no_articles"
-            }
+            return {"articles_analyzed": 0, "synthesis_id": None, "status": "no_articles"}
 
         # Build synthesis task
         task = self._build_synthesis_task(len(context["articles"]))
@@ -351,9 +329,7 @@ class NarrativeSynthesizer:
             # STEP 1: Initial synthesis
             logger.info("Step 1: Generating initial synthesis")
             response = await self.client.analyze_with_context(
-                context=context,
-                task=task,
-                temperature=1.0
+                context=context, task=task, temperature=1.0
             )
 
             # Parse structured output
@@ -362,8 +338,7 @@ class NarrativeSynthesizer:
             # STEP 2: Evaluate depth with reflection engine
             logger.info("Step 2: Evaluating synthesis depth")
             reflection = await self.reflection_engine.evaluate_depth(
-                synthesis_data=initial_synthesis,
-                context=context
+                synthesis_data=initial_synthesis, context=context
             )
 
             logger.info(f"Initial depth score: {reflection.depth_score}/10")
@@ -372,21 +347,23 @@ class NarrativeSynthesizer:
             initial_synthesis["reflection"] = {
                 "initial_depth_score": reflection.depth_score,
                 "dimension_scores": reflection.evaluation_metadata.get("dimension_scores", {}),
-                "refinement_applied": False
+                "refinement_applied": False,
             }
 
             # STEP 3: Decide if refinement needed
             if reflection.depth_score >= depth_threshold:
-                logger.info(f"Depth score {reflection.depth_score} meets threshold {depth_threshold}, skipping refinement")
+                logger.info(
+                    f"Depth score {reflection.depth_score} meets threshold {depth_threshold}, skipping refinement"
+                )
                 final_synthesis = initial_synthesis
             else:
-                logger.info(f"Depth score {reflection.depth_score} below threshold {depth_threshold}, refining analysis")
+                logger.info(
+                    f"Depth score {reflection.depth_score} below threshold {depth_threshold}, refining analysis"
+                )
 
                 # Generate refinement prompt
                 refinement_prompt = await self.reflection_engine.generate_refinement_prompt(
-                    synthesis_data=initial_synthesis,
-                    reflection=reflection,
-                    context=context
+                    synthesis_data=initial_synthesis, reflection=reflection, context=context
                 )
 
                 # STEP 4: Regenerate with deeper focus
@@ -396,7 +373,7 @@ class NarrativeSynthesizer:
                 refined_response = await self.client.analyze(
                     system_prompt=complete_system_prompt,
                     user_message=refinement_prompt,
-                    temperature=1.0
+                    temperature=1.0,
                 )
 
                 # Parse refined synthesis
@@ -407,8 +384,10 @@ class NarrativeSynthesizer:
                     "initial_depth_score": reflection.depth_score,
                     "dimension_scores": reflection.evaluation_metadata.get("dimension_scores", {}),
                     "refinement_applied": True,
-                    "shallow_areas_addressed": [area.to_dict() for area in reflection.shallow_areas],
-                    "recommendations_followed": reflection.recommendations
+                    "shallow_areas_addressed": [
+                        area.to_dict() for area in reflection.shallow_areas
+                    ],
+                    "recommendations_followed": reflection.recommendations,
                 }
 
                 logger.info("Refinement complete")
@@ -417,20 +396,19 @@ class NarrativeSynthesizer:
             synthesis_id = self._store_synthesis(
                 synthesis_data=final_synthesis,
                 articles_count=len(context["articles"]),
-                context=context
+                context=context,
             )
 
             logger.info(f"Narrative synthesis with reflection complete: {synthesis_id}")
 
             # Extract and store facts for semantic memory (if enabled)
-            if synthesis_id and getattr(settings, 'enable_semantic_memory', False):
+            if synthesis_id and getattr(settings, "enable_semantic_memory", False):
                 try:
                     logger.info("Extracting facts for semantic memory")
                     with get_db() as memory_session:
                         memory = SemanticMemory(memory_session)
                         facts = await memory.extract_facts_from_synthesis(
-                            final_synthesis,
-                            synthesis_id
+                            final_synthesis, synthesis_id
                         )
                         stored_count = memory.store_facts(facts)
                         logger.info(f"Stored {stored_count} facts in semantic memory")
@@ -443,7 +421,7 @@ class NarrativeSynthesizer:
                 "synthesis_id": synthesis_id,
                 "synthesis_data": final_synthesis,
                 "reflection_metadata": final_synthesis.get("reflection", {}),
-                "status": "success"
+                "status": "success",
             }
 
         except Exception as e:
@@ -452,7 +430,7 @@ class NarrativeSynthesizer:
                 "articles_analyzed": 0,
                 "synthesis_id": None,
                 "status": "error",
-                "error": str(e)
+                "error": str(e),
             }
 
     def _build_system_prompt(self, context: dict[str, Any]) -> str:
@@ -464,7 +442,9 @@ class NarrativeSynthesizer:
             profile = context["user_profile"]
             parts.append("## User Context")
             parts.append(f"Location: {profile.get('location', 'Unknown')}")
-            parts.append(f"Professional Domains: {', '.join(profile.get('professional_domains', []))}")
+            parts.append(
+                f"Professional Domains: {', '.join(profile.get('professional_domains', []))}"
+            )
             parts.append(f"Civic Interests: {', '.join(profile.get('civic_interests', []))}")
             parts.append("")
 
@@ -494,7 +474,9 @@ class NarrativeSynthesizer:
             profile = context["user_profile"]
             parts.append("## User Context")
             parts.append(f"Location: {profile.get('location', 'Unknown')}")
-            parts.append(f"Professional Domains: {', '.join(profile.get('professional_domains', []))}")
+            parts.append(
+                f"Professional Domains: {', '.join(profile.get('professional_domains', []))}"
+            )
             parts.append(f"Civic Interests: {', '.join(profile.get('civic_interests', []))}")
             parts.append("")
 
@@ -517,12 +499,12 @@ class NarrativeSynthesizer:
                 parts.append(f"\n### Article {i}")
                 parts.append(f"**Title:** {article.get('title', 'Untitled')}")
                 parts.append(f"**Source:** {article.get('source', 'Unknown')}")
-                if article.get('published_date'):
+                if article.get("published_date"):
                     parts.append(f"**Date:** {article['published_date']}")
-                if article.get('content'):
-                    content = article['content']
+                if article.get("content"):
+                    content = article["content"]
                     parts.append(f"**Content:** {content}")
-                if article.get('entities'):
+                if article.get("entities"):
                     parts.append(f"**Entities:** {', '.join(article['entities'][:10])}")
             parts.append("")
 
@@ -659,7 +641,7 @@ Return ONLY valid JSON, no markdown formatting or additional text."""
                 "article_id": article.get("id"),
                 "title": article.get("title", "Untitled"),
                 "source": article.get("source", "Unknown"),
-                "url": article.get("url", "")
+                "url": article.get("url", ""),
             }
 
         article_ref_list = "\n".join(article_refs)
@@ -806,16 +788,33 @@ Return ONLY valid JSON, no markdown formatting or additional text."""
             Enhanced task prompt with stricter trust constraints
         """
         constraints = ["\n## TRUST VERIFICATION REQUIREMENTS (STRICT)\n"]
-        constraints.append("Previous attempts failed trust verification. You MUST address these issues:\n")
+        constraints.append(
+            "Previous attempts failed trust verification. You MUST address these issues:\n"
+        )
 
         # Analyze failure patterns from history
-        fact_failures = sum(1 for v in verification_history
-                          if v.get("analysis", {}).get("facts", {}).get("contradicted_count", 0) > 0)
-        bias_failures = sum(1 for v in verification_history
-                          if len(v.get("analysis", {}).get("bias", {}).get("loaded_language", [])) > 3)
-        intimacy_failures = sum(1 for v in verification_history
-                              if len([i for i in v.get("analysis", {}).get("intimacy", {}).get("issues", [])
-                                     if i.get("severity") == "HIGH"]) > 0)
+        fact_failures = sum(
+            1
+            for v in verification_history
+            if v.get("analysis", {}).get("facts", {}).get("contradicted_count", 0) > 0
+        )
+        bias_failures = sum(
+            1
+            for v in verification_history
+            if len(v.get("analysis", {}).get("bias", {}).get("loaded_language", [])) > 3
+        )
+        intimacy_failures = sum(
+            1
+            for v in verification_history
+            if len(
+                [
+                    i
+                    for i in v.get("analysis", {}).get("intimacy", {}).get("issues", [])
+                    if i.get("severity") == "HIGH"
+                ]
+            )
+            > 0
+        )
 
         if fact_failures > 0:
             constraints.append(
@@ -888,27 +887,33 @@ Return ONLY valid JSON, no markdown formatting or additional text."""
         for scope in ["local", "state_regional", "national", "global", "niche_field"]:
             for trend in trends.get(scope, [])[:3]:
                 trend_text = f"{trend.get('subject', '')} {trend.get('direction', '')} "
-                if quantifier := trend.get('quantifier'):
+                if quantifier := trend.get("quantifier"):
                     trend_text += f"{quantifier} "
-                if description := trend.get('description'):
+                if description := trend.get("description"):
                     trend_text += description
                 parts.append(trend_text.strip())
 
         # Extract priority events (top 5)
         for event in synthesis_data.get("priority_events", [])[:5]:
             event_text = f"{event.get('event', '')} "
-            if why_matters := event.get('why_matters'):
+            if why_matters := event.get("why_matters"):
                 event_text += f"{why_matters} "
-            if action := event.get('recommended_action'):
+            if action := event.get("recommended_action"):
                 event_text += action
             parts.append(event_text.strip())
 
         # Sample predictions (2 per category)
         predictions = synthesis_data.get("predictions_scenarios", {})
-        for category in ["local_governance", "education", "niche_field", "economic_conditions", "infrastructure"]:
+        for category in [
+            "local_governance",
+            "education",
+            "niche_field",
+            "economic_conditions",
+            "infrastructure",
+        ]:
             for pred in predictions.get(category, [])[:2]:
                 pred_text = f"{pred.get('prediction', '')} "
-                if rationale := pred.get('rationale'):
+                if rationale := pred.get("rationale"):
                     pred_text += rationale
                 parts.append(pred_text.strip())
 
@@ -940,21 +945,27 @@ Return ONLY valid JSON, no markdown formatting or additional text."""
         contradicted_ratio = contradicted / max(total_claims, 1)
         fact_pass = contradicted_ratio <= 0.05  # Max 5% contradicted
 
-        logger.info(f"Fact verification: {contradicted}/{total_claims} contradicted ({contradicted_ratio:.1%}) - {'PASS' if fact_pass else 'FAIL'}")
+        logger.info(
+            f"Fact verification: {contradicted}/{total_claims} contradicted ({contradicted_ratio:.1%}) - {'PASS' if fact_pass else 'FAIL'}"
+        )
 
         # Bias threshold
         bias = trust_analysis.get("bias", {})
         loaded_language = bias.get("loaded_language", [])
         bias_pass = len(loaded_language) <= 3  # Max 3 instances
 
-        logger.info(f"Bias check: {len(loaded_language)} loaded language instances - {'PASS' if bias_pass else 'FAIL'}")
+        logger.info(
+            f"Bias check: {len(loaded_language)} loaded language instances - {'PASS' if bias_pass else 'FAIL'}"
+        )
 
         # Intimacy/tone threshold
         intimacy = trust_analysis.get("intimacy", {})
         high_issues = [i for i in intimacy.get("issues", []) if i.get("severity") == "HIGH"]
         tone_pass = len(high_issues) == 0  # Zero high-severity issues
 
-        logger.info(f"Tone check: {len(high_issues)} high-severity intimacy issues - {'PASS' if tone_pass else 'FAIL'}")
+        logger.info(
+            f"Tone check: {len(high_issues)} high-severity intimacy issues - {'PASS' if tone_pass else 'FAIL'}"
+        )
 
         # All must pass
         overall_pass = fact_pass and bias_pass and tone_pass
@@ -989,19 +1000,19 @@ Return ONLY valid JSON, no markdown formatting or additional text."""
             logger.debug(f"Response was: {response[:500]}...")
 
             # Return fallback structure matching new schema
-            # Note: No citations in fallback since parsing failed
+            # Note: Provide user-friendly error message, not raw JSON
             return {
                 "bottom_line": {
-                    "summary": response[:500] if len(response) > 500 else response,
+                    "summary": "Synthesis generation encountered an error. The AI response was incomplete or malformed. Please try regenerating the report.",
                     "immediate_actions": [],
-                    "article_citations": []
+                    "article_citations": [],
                 },
                 "trends_and_patterns": {
                     "local": [],
                     "state_regional": [],
                     "national": [],
                     "global": [],
-                    "niche_field": []
+                    "niche_field": [],
                 },
                 "priority_events": [],
                 "predictions_scenarios": {
@@ -1009,20 +1020,20 @@ Return ONLY valid JSON, no markdown formatting or additional text."""
                     "education": [],
                     "niche_field": [],
                     "economic_conditions": [],
-                    "infrastructure": []
+                    "infrastructure": [],
                 },
                 "metadata": {
                     "generated_at": datetime.utcnow().isoformat(),
                     "parse_error": str(e),
-                    "citation_map": {}
-                }
+                    "citation_map": {},
+                },
             }
 
     def _store_synthesis(
         self,
         synthesis_data: dict[str, Any],
         articles_count: int,
-        context: dict[str, Any] | None = None
+        context: dict[str, Any] | None = None,
     ) -> int | None:
         """Store synthesis and context snapshot in database"""
         try:
@@ -1035,7 +1046,7 @@ Return ONLY valid JSON, no markdown formatting or additional text."""
                     completed_at=datetime.utcnow(),
                     articles_processed=articles_count,
                     context_token_count=self._estimate_tokens(context) if context else None,
-                    claude_model="claude-sonnet-4-20250514"
+                    claude_model="claude-sonnet-4-20250514",
                 )
                 session.add(run)
                 session.flush()
@@ -1051,7 +1062,7 @@ Return ONLY valid JSON, no markdown formatting or additional text."""
                         context_size_tokens=self._estimate_tokens(context),
                         user_profile_hash=self._hash_profile(context.get("user_profile")),
                         historical_summaries=context.get("memory", ""),
-                        instructions=context.get("instructions", "")
+                        instructions=context.get("instructions", ""),
                     )
                     session.add(snapshot)
                     session.flush()
@@ -1070,24 +1081,27 @@ Return ONLY valid JSON, no markdown formatting or additional text."""
                     executive_summary=exec_summary,
                     articles_analyzed=articles_count,
                     temporal_scope="local,state,national,global,niche",
-                    generated_at=datetime.utcnow()
+                    generated_at=datetime.utcnow(),
                 )
                 session.add(synthesis)
                 session.flush()
 
                 # Update context snapshot with synthesis_id
                 if context_snapshot_id:
-                    session.query(ContextSnapshot).filter_by(id=context_snapshot_id).update({
-                        "synthesis_id": synthesis.id
-                    })
+                    session.query(ContextSnapshot).filter_by(id=context_snapshot_id).update(
+                        {"synthesis_id": synthesis.id}
+                    )
 
                 # Update articles: mark as included in synthesis
                 if context:
-                    article_ids = [int(a.get("id")) for a in context.get("articles", []) if a.get("id")]
+                    article_ids = [
+                        int(a.get("id")) for a in context.get("articles", []) if a.get("id")
+                    ]
                     if article_ids:
-                        session.query(Article).filter(Article.id.in_(article_ids)).update({
-                            "last_included_in_synthesis": datetime.utcnow()
-                        }, synchronize_session=False)
+                        session.query(Article).filter(Article.id.in_(article_ids)).update(
+                            {"last_included_in_synthesis": datetime.utcnow()},
+                            synchronize_session=False,
+                        )
 
                 session.commit()
 
@@ -1101,6 +1115,7 @@ Return ONLY valid JSON, no markdown formatting or additional text."""
     def _estimate_tokens(self, context: dict[str, Any]) -> int:
         """Estimate token count for context (rough approximation)"""
         import json
+
         context_str = json.dumps(context)
         # Rough approximation: 1 token ≈ 4 characters
         return len(context_str) // 4
@@ -1109,6 +1124,7 @@ Return ONLY valid JSON, no markdown formatting or additional text."""
         """Hash user profile for tracking"""
         import hashlib
         import json
+
         if not profile:
             return "none"
         profile_str = json.dumps(profile, sort_keys=True)

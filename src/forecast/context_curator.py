@@ -30,21 +30,19 @@ class ForecastContextCurator(ContextCurator):
 
     # Forecast-specific token budget (200k total)
     FORECAST_TOKEN_BUDGET = {
-        'system_prompt': 8000,       # Forecast instructions + framework
-        'articles': 40000,            # Stratified historical articles
-        'authoritative_data': 30000,  # Census, World Bank, UN, etc.
-        'historical_memory': 15000,   # Semantic memory + past syntheses
-        'response': 12000,            # Claude's forecast output
-        'safety_margin': 95000        # Reserved buffer
+        "system_prompt": 8000,  # Forecast instructions + framework
+        "articles": 40000,  # Stratified historical articles
+        "authoritative_data": 30000,  # Census, World Bank, UN, etc.
+        "historical_memory": 15000,  # Semantic memory + past syntheses
+        "response": 12000,  # Claude's forecast output
+        "safety_margin": 95000,  # Reserved buffer
     }
 
     # Total allocated: 105,000 tokens
     # Safety margin: 95,000 tokens
 
     async def curate_for_horizon(
-        self,
-        horizon_months: int,
-        topic_filters: dict | None = None
+        self, horizon_months: int, topic_filters: dict | None = None
     ) -> dict[str, Any]:
         """
         Curate context for specific forecast horizon
@@ -60,20 +58,18 @@ class ForecastContextCurator(ContextCurator):
             # 1. Stratified article sampling (evenly distributed across time)
             lookback_months = min(horizon_months, 12)  # Cap at 12 months of history
             articles = self._get_stratified_articles(
-                session,
-                months=lookback_months,
-                articles_per_month=8
+                session, months=lookback_months, articles_per_month=8
             )
 
             # Apply topic filters if provided
             if topic_filters and self.topic_matcher and self.user_profile:
                 articles = self.topic_matcher.filter_articles(
-                    articles=articles,
-                    topic_filters=topic_filters,
-                    user_profile=self.user_profile
+                    articles=articles, topic_filters=topic_filters, user_profile=self.user_profile
                 )
 
-            logger.info(f"Curated {len(articles)} stratified articles for {horizon_months}mo forecast")
+            logger.info(
+                f"Curated {len(articles)} stratified articles for {horizon_months}mo forecast"
+            )
 
             # 2. Authoritative data (NEW for forecasting)
             authoritative_data = self._get_authoritative_data(session, horizon_months)
@@ -88,7 +84,7 @@ class ForecastContextCurator(ContextCurator):
                 "authoritative_data": self._format_authoritative_data(authoritative_data),
                 "historical_memory": memory_facts,
                 "instructions": self._get_forecast_instructions(horizon_months),
-                "article_count": len(articles)  # Track count for metadata
+                "article_count": len(articles),  # Track count for metadata
             }
 
             # 5. Enforce forecast token budget
@@ -97,10 +93,7 @@ class ForecastContextCurator(ContextCurator):
             return context
 
     def _get_stratified_articles(
-        self,
-        session: Session,
-        months: int,
-        articles_per_month: int
+        self, session: Session, months: int, articles_per_month: int
     ) -> list[Article]:
         """
         Get articles evenly distributed across time period (stratified sampling)
@@ -124,13 +117,17 @@ class ForecastContextCurator(ContextCurator):
             start_date = end_date - timedelta(days=30)
 
             # Query articles in this month
-            month_articles = session.query(Article).filter(
-                Article.fetched_at >= start_date,
-                Article.fetched_at < end_date,
-                Article.filtered == False
-            ).order_by(
-                Article.fetched_at.desc()
-            ).limit(articles_per_month).all()
+            month_articles = (
+                session.query(Article)
+                .filter(
+                    Article.fetched_at >= start_date,
+                    Article.fetched_at < end_date,
+                    Article.filtered.is_(False),
+                )
+                .order_by(Article.fetched_at.desc())
+                .limit(articles_per_month)
+                .all()
+            )
 
             all_articles.extend(month_articles)
 
@@ -142,11 +139,7 @@ class ForecastContextCurator(ContextCurator):
         logger.info(f"Stratified sampling: {len(all_articles)} articles across {months} months")
         return all_articles
 
-    def _get_authoritative_data(
-        self,
-        session: Session,
-        horizon_months: int
-    ) -> list[APIDataPoint]:
+    def _get_authoritative_data(self, session: Session, _horizon_months: int) -> list[APIDataPoint]:
         """
         Get authoritative data from external sources for forecasting
 
@@ -164,27 +157,27 @@ class ForecastContextCurator(ContextCurator):
 
         # Query for statistical and authoritative data
         authoritative_sources = [
-            'census_statistical',
-            'world_bank_indicator',
-            'un_statistical',
-            'think_tank_research'
+            "census_statistical",
+            "world_bank_indicator",
+            "un_statistical",
+            "think_tank_research",
         ]
 
-        data_points = session.query(APIDataPoint).filter(
-            APIDataPoint.data_type.in_(authoritative_sources),
-            APIDataPoint.fetched_at >= cutoff_date
-        ).order_by(
-            APIDataPoint.relevance_score.desc()
-        ).limit(50).all()  # Top 50 most relevant data points
+        data_points = (
+            session.query(APIDataPoint)
+            .filter(
+                APIDataPoint.data_type.in_(authoritative_sources),
+                APIDataPoint.fetched_at >= cutoff_date,
+            )
+            .order_by(APIDataPoint.relevance_score.desc())
+            .limit(50)
+            .all()
+        )  # Top 50 most relevant data points
 
         logger.info(f"Retrieved {len(data_points)} authoritative data points for forecasting")
         return data_points
 
-    def _get_forecast_memory(
-        self,
-        session: Session,
-        articles: list[Article]
-    ) -> str:
+    def _get_forecast_memory(self, session: Session, articles: list[Article]) -> str:
         """
         Get historical memory relevant to forecasting
 
@@ -203,12 +196,12 @@ class ForecastContextCurator(ContextCurator):
         memory_parts = []
 
         # Get semantic memory if enabled
-        if getattr(settings, 'enable_semantic_memory', False):
+        if getattr(settings, "enable_semantic_memory", False):
             try:
                 semantic_memory = SemanticMemory(session)
                 relevant_facts = semantic_memory.retrieve_relevant_facts(
                     articles,
-                    max_facts=30  # More facts for long-term context
+                    max_facts=30,  # More facts for long-term context
                 )
                 semantic_context = semantic_memory.build_historical_context(relevant_facts)
                 if semantic_context:
@@ -327,32 +320,39 @@ Return structured JSON with all 5 analysis types as specified in the forecast en
                 estimated_tokens[key] = len(str(value)) // 4
 
         total_estimated = sum(estimated_tokens.values())
-        budget_limit = sum(self.FORECAST_TOKEN_BUDGET.values()) - self.FORECAST_TOKEN_BUDGET['safety_margin']
+        budget_limit = (
+            sum(self.FORECAST_TOKEN_BUDGET.values()) - self.FORECAST_TOKEN_BUDGET["safety_margin"]
+        )
 
         logger.info(f"Estimated context tokens: {total_estimated} (budget: {budget_limit})")
 
         # If over budget, compress
         if total_estimated > budget_limit:
-            logger.warning(f"Context exceeds budget ({total_estimated} > {budget_limit}), compressing...")
+            logger.warning(
+                f"Context exceeds budget ({total_estimated} > {budget_limit}), compressing..."
+            )
 
             # Compression priority: articles first, then authoritative, then memory
-            if estimated_tokens.get('articles', 0) > self.FORECAST_TOKEN_BUDGET['articles']:
+            if estimated_tokens.get("articles", 0) > self.FORECAST_TOKEN_BUDGET["articles"]:
                 # Truncate article content
-                context['articles'] = self._compress_text(
-                    context['articles'],
-                    self.FORECAST_TOKEN_BUDGET['articles']
+                context["articles"] = self._compress_text(
+                    context["articles"], self.FORECAST_TOKEN_BUDGET["articles"]
                 )
 
-            if estimated_tokens.get('authoritative_data', 0) > self.FORECAST_TOKEN_BUDGET['authoritative_data']:
-                context['authoritative_data'] = self._compress_text(
-                    context['authoritative_data'],
-                    self.FORECAST_TOKEN_BUDGET['authoritative_data']
+            if (
+                estimated_tokens.get("authoritative_data", 0)
+                > self.FORECAST_TOKEN_BUDGET["authoritative_data"]
+            ):
+                context["authoritative_data"] = self._compress_text(
+                    context["authoritative_data"], self.FORECAST_TOKEN_BUDGET["authoritative_data"]
                 )
 
-            if estimated_tokens.get('historical_memory', 0) > self.FORECAST_TOKEN_BUDGET['historical_memory']:
-                context['historical_memory'] = self._compress_text(
-                    context['historical_memory'],
-                    self.FORECAST_TOKEN_BUDGET['historical_memory']
+            if (
+                estimated_tokens.get("historical_memory", 0)
+                > self.FORECAST_TOKEN_BUDGET["historical_memory"]
+            ):
+                context["historical_memory"] = self._compress_text(
+                    context["historical_memory"], self.FORECAST_TOKEN_BUDGET["historical_memory"]
                 )
 
         return context

@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ContextModule:
     """Represents a loaded context module"""
+
     name: str
     description: str
     content: str  # Formatted content ready for Claude
@@ -44,12 +45,7 @@ class ContextModuleLoader:
         Returns:
             Dictionary organized by module type
         """
-        modules_by_type = {
-            'domain_knowledge': [],
-            'supplemental': [],
-            'historical': [],
-            'core': []
-        }
+        modules_by_type = {"domain_knowledge": [], "supplemental": [], "historical": [], "core": []}
 
         if not self.modules_dir.exists():
             logger.warning(f"Modules directory not found: {self.modules_dir}")
@@ -66,16 +62,14 @@ class ContextModuleLoader:
         return modules_by_type
 
     def _load_modules_from_directory(
-        self,
-        directory: Path,
-        module_type: str
+        self, directory: Path, module_type: str
     ) -> list[ContextModule]:
         """Load all JSON modules from a directory"""
         modules = []
 
         for json_file in directory.glob("*.json"):
             try:
-                with open(json_file, encoding='utf-8') as f:
+                with open(json_file, encoding="utf-8") as f:
                     data = json.load(f)
 
                 module = self._parse_module(data, module_type)
@@ -93,13 +87,13 @@ class ContextModuleLoader:
         formatted_content = self._format_module_content(data)
 
         return ContextModule(
-            name=data.get('module_name', 'unknown'),
-            description=data.get('description', ''),
+            name=data.get("module_name", "unknown"),
+            description=data.get("description", ""),
             content=formatted_content,
-            priority=data.get('priority', 'medium'),
-            token_estimate=data.get('token_estimate', 0),
+            priority=data.get("priority", "medium"),
+            token_estimate=data.get("token_estimate", 0),
             module_type=module_type,
-            last_updated=data.get('last_updated', 'unknown')
+            last_updated=data.get("last_updated", "unknown"),
         )
 
     def _format_module_content(self, data: dict[str, Any]) -> str:
@@ -108,19 +102,19 @@ class ContextModuleLoader:
 
         # Module header
         parts.append(f"## {data.get('module_name', 'Module')}")
-        if 'description' in data:
+        if "description" in data:
             parts.append(f"{data['description']}\n")
 
         # Content sections
-        if 'content_sections' in data:
-            for section_name, section_data in data['content_sections'].items():
+        if "content_sections" in data:
+            for section_name, section_data in data["content_sections"].items():
                 parts.append(f"\n### {section_name.replace('_', ' ').title()}")
 
                 if isinstance(section_data, dict):
-                    if 'description' in section_data:
-                        parts.append(section_data['description'])
-                    if 'content' in section_data:
-                        content = section_data['content']
+                    if "description" in section_data:
+                        parts.append(section_data["description"])
+                    if "content" in section_data:
+                        content = section_data["content"]
                         if isinstance(content, list):
                             for item in content:
                                 parts.append(f"• {item}")
@@ -133,9 +127,9 @@ class ContextModuleLoader:
                     parts.append(section_data)
 
         # Key metrics (if present)
-        if 'key_metrics_baselines' in data:
+        if "key_metrics_baselines" in data:
             parts.append("\n### Key Metrics (Baseline)")
-            for category, metrics in data['key_metrics_baselines'].items():
+            for category, metrics in data["key_metrics_baselines"].items():
                 parts.append(f"\n**{category.title()}:**")
                 for metric, value in metrics.items():
                     parts.append(f"• {metric.replace('_', ' ').title()}: {value}")
@@ -143,9 +137,7 @@ class ContextModuleLoader:
         return "\n".join(parts)
 
     def get_modules_by_priority(
-        self,
-        modules: list[ContextModule],
-        priority: str = 'high'
+        self, modules: list[ContextModule], priority: str = "high"
     ) -> list[ContextModule]:
         """Filter modules by priority level"""
         return [m for m in modules if m.priority == priority]
@@ -155,9 +147,7 @@ class ContextModuleLoader:
         return sum(m.token_estimate for m in modules)
 
     def format_for_claude_context(
-        self,
-        modules: list[ContextModule],
-        max_tokens: int | None = None
+        self, modules: list[ContextModule], max_tokens: int | None = None
     ) -> str:
         """
         Format modules for inclusion in Claude context
@@ -173,11 +163,8 @@ class ContextModuleLoader:
             return ""
 
         # Sort by priority (high -> medium -> low)
-        priority_order = {'high': 0, 'medium': 1, 'low': 2}
-        sorted_modules = sorted(
-            modules,
-            key=lambda m: priority_order.get(m.priority, 3)
-        )
+        priority_order = {"high": 0, "medium": 1, "low": 2}
+        sorted_modules = sorted(modules, key=lambda m: priority_order.get(m.priority, 3))
 
         # Apply token budget if specified
         if max_tokens:
@@ -210,22 +197,23 @@ class ContextModuleLoader:
     def get_module_summary(self) -> dict[str, Any]:
         """Get summary of all loaded modules"""
         summary = {
-            'total_modules': len(self.loaded_modules),
-            'by_type': {},
-            'by_priority': {'high': 0, 'medium': 0, 'low': 0},
-            'total_tokens': 0
+            "total_modules": len(self.loaded_modules),
+            "by_type": {},
+            "by_priority": {"high": 0, "medium": 0, "low": 0},
+            "total_tokens": 0,
         }
 
         for module in self.loaded_modules.values():
             # Count by type
-            summary['by_type'][module.module_type] = \
-                summary['by_type'].get(module.module_type, 0) + 1
+            summary["by_type"][module.module_type] = (
+                summary["by_type"].get(module.module_type, 0) + 1
+            )
 
             # Count by priority
-            if module.priority in summary['by_priority']:
-                summary['by_priority'][module.priority] += 1
+            if module.priority in summary["by_priority"]:
+                summary["by_priority"][module.priority] += 1
 
             # Sum tokens
-            summary['total_tokens'] += module.token_estimate
+            summary["total_tokens"] += module.token_estimate
 
         return summary

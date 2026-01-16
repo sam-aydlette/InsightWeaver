@@ -3,6 +3,7 @@ VulnCheck KEV Collector
 Collects Known Exploited Vulnerabilities from VulnCheck's free community API
 """
 
+import contextlib
 import logging
 import os
 from datetime import UTC, datetime
@@ -32,13 +33,13 @@ class VulnCheckKEVCollector(BaseCollector):
         Args:
             api_token: VulnCheck API token (or set VULNCHECK_API_TOKEN env var)
         """
-        self.api_token = api_token or os.getenv('VULNCHECK_API_TOKEN')
+        self.api_token = api_token or os.getenv("VULNCHECK_API_TOKEN")
 
         super().__init__(
             source_name="VulnCheck KEV",
             source_type="vulnerability",
             endpoint_url=self.VULNCHECK_KEV_URL,
-            api_key=self.api_token
+            api_key=self.api_token,
         )
 
     def fetch_data(self) -> list[dict[str, Any]]:
@@ -52,24 +53,21 @@ class VulnCheckKEVCollector(BaseCollector):
             logger.error("VulnCheck API token not provided")
             return []
 
-        headers = {
-            'Authorization': f'Bearer {self.api_token}',
-            'Accept': 'application/json'
-        }
+        headers = {"Authorization": f"Bearer {self.api_token}", "Accept": "application/json"}
 
         try:
             logger.info("Fetching VulnCheck KEV data...")
             response = self.http_client.get(
                 self.VULNCHECK_KEV_URL,
                 headers=headers,
-                timeout=60.0  # KEV data can be large
+                timeout=60.0,  # KEV data can be large
             )
             response.raise_for_status()
 
             data = response.json()
 
             # VulnCheck KEV returns data in 'data' field
-            vulnerabilities = data.get('data', [])
+            vulnerabilities = data.get("data", [])
 
             logger.info(f"Fetched {len(vulnerabilities)} KEV entries from VulnCheck")
             return vulnerabilities
@@ -89,19 +87,16 @@ class VulnCheckKEVCollector(BaseCollector):
             Standardized data point dict
         """
         # Extract core fields
-        cve_list = raw_item.get('cve', [])
-        cve_id = cve_list[0] if cve_list else 'UNKNOWN'
+        cve_list = raw_item.get("cve", [])
+        cve_id = cve_list[0] if cve_list else "UNKNOWN"
 
-        vendor = raw_item.get('vendorProject', 'Unknown Vendor')
-        product = raw_item.get('product', 'Unknown Product')
-        vuln_name = raw_item.get('vulnerabilityName', '')
-        short_desc = raw_item.get('shortDescription', '')
+        vendor = raw_item.get("vendorProject", "Unknown Vendor")
+        product = raw_item.get("product", "Unknown Product")
+        vuln_name = raw_item.get("vulnerabilityName", "")
+        short_desc = raw_item.get("shortDescription", "")
 
         # Build title
-        if vuln_name:
-            title = f"{cve_id}: {vuln_name}"
-        else:
-            title = f"{cve_id}: {vendor} {product}"
+        title = f"{cve_id}: {vuln_name}" if vuln_name else f"{cve_id}: {vendor} {product}"
 
         # Build description
         description = f"Vendor: {vendor}\n"
@@ -111,55 +106,49 @@ class VulnCheckKEVCollector(BaseCollector):
         description += f"\n{short_desc}\n"
 
         # Add exploit info if available
-        xdb_exploits = raw_item.get('vulncheck_xdb', [])
+        xdb_exploits = raw_item.get("vulncheck_xdb", [])
         if xdb_exploits:
             description += f"\nExploits Available: {len(xdb_exploits)}"
 
         # Add ransomware campaign info
-        ransomware = raw_item.get('knownRansomwareCampaignUse', '')
-        if ransomware and ransomware.lower() not in ['unknown', 'no']:
+        ransomware = raw_item.get("knownRansomwareCampaignUse", "")
+        if ransomware and ransomware.lower() not in ["unknown", "no"]:
             description += f"\nRansomware Campaign Use: {ransomware}"
 
         # Add required action
-        required_action = raw_item.get('required_action', '')
+        required_action = raw_item.get("required_action", "")
         if required_action:
             description += f"\nRequired Action: {required_action}"
 
         # Parse dates
-        date_added_str = raw_item.get('date_added', '')
+        date_added_str = raw_item.get("date_added", "")
         date_added = None
         if date_added_str:
-            try:
-                date_added = datetime.fromisoformat(date_added_str.replace('Z', '+00:00'))
-            except:
-                pass
+            with contextlib.suppress(ValueError):
+                date_added = datetime.fromisoformat(date_added_str.replace("Z", "+00:00"))
 
-        due_date_str = raw_item.get('dueDate', '')
+        due_date_str = raw_item.get("dueDate", "")
         due_date = None
         if due_date_str:
-            try:
-                due_date = datetime.fromisoformat(due_date_str.replace('Z', '+00:00'))
-            except:
-                pass
+            with contextlib.suppress(ValueError):
+                due_date = datetime.fromisoformat(due_date_str.replace("Z", "+00:00"))
 
         # Use CVE ID as external ID
         external_id = cve_id
 
         return {
-            'data_type': 'vulnerability_kev',
-            'external_id': external_id,
-            'title': title,
-            'description': description,
-            'data_payload': raw_item,
-            'event_date': date_added,
-            'published_date': date_added,
-            'expires_date': due_date  # Due date for remediation
+            "data_type": "vulnerability_kev",
+            "external_id": external_id,
+            "title": title,
+            "description": description,
+            "data_payload": raw_item,
+            "event_date": date_added,
+            "published_date": date_added,
+            "expires_date": due_date,  # Due date for remediation
         }
 
     def score_relevance(
-        self,
-        item: dict[str, Any],
-        decision_context: dict | None = None
+        self, item: dict[str, Any], decision_context: dict | None = None
     ) -> tuple[float, list[str]]:
         """
         Score KEV relevance - cybersecurity vulnerabilities are always relevant
@@ -177,13 +166,10 @@ class VulnCheckKEVCollector(BaseCollector):
         matching_decisions = []
 
         # Boost for recently added vulnerabilities (last 30 days)
-        if item.get('event_date'):
-            event_date = item['event_date']
+        if item.get("event_date"):
+            event_date = item["event_date"]
             # Ensure both datetimes are timezone-aware or both are naive
-            if event_date.tzinfo is not None:
-                now = datetime.now(UTC)
-            else:
-                now = datetime.utcnow()
+            now = datetime.now(UTC) if event_date.tzinfo is not None else datetime.utcnow()
 
             days_old = (now - event_date).days
             if days_old < 7:
@@ -192,27 +178,24 @@ class VulnCheckKEVCollector(BaseCollector):
                 relevance_score += 0.2  # Recent
 
         # Boost if exploits are available
-        payload = item.get('data_payload', {})
-        if payload.get('vulncheck_xdb'):
+        payload = item.get("data_payload", {})
+        if payload.get("vulncheck_xdb"):
             relevance_score += 0.1
 
         # Boost for ransomware campaigns
-        ransomware = payload.get('knownRansomwareCampaignUse', '')
-        if ransomware and ransomware.lower() not in ['unknown', 'no']:
+        ransomware = payload.get("knownRansomwareCampaignUse", "")
+        if ransomware and ransomware.lower() not in ["unknown", "no"]:
             relevance_score += 0.15
 
         # Check against decision context if provided
         if decision_context:
             searchable_text = f"{item.get('title', '')} {item.get('description', '')}".lower()
 
-            for decision in decision_context.get('active_decisions', []):
-                decision_id = decision.get('decision_id')
-                relevant_signals = decision.get('relevant_signals', [])
+            for decision in decision_context.get("active_decisions", []):
+                decision_id = decision.get("decision_id")
+                relevant_signals = decision.get("relevant_signals", [])
 
-                matches = sum(
-                    1 for signal in relevant_signals
-                    if signal.lower() in searchable_text
-                )
+                matches = sum(1 for signal in relevant_signals if signal.lower() in searchable_text)
 
                 if matches > 0:
                     matching_decisions.append(decision_id)

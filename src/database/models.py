@@ -26,6 +26,7 @@ Base = declarative_base()
 
 class RSSFeed(Base):
     """RSS feed sources - unchanged"""
+
     __tablename__ = "rss_feeds"
 
     id = Column(Integer, primary_key=True)
@@ -47,6 +48,7 @@ class Article(Base):
     Articles from RSS feeds
     Optimized for context engineering - stores raw content and minimal metadata
     """
+
     __tablename__ = "articles"
 
     id = Column(Integer, primary_key=True)
@@ -71,10 +73,10 @@ class Article(Base):
     relevance_score = Column(Float)  # Simple score: recency + user profile match
     last_included_in_synthesis = Column(DateTime)  # Track usage in context
 
-    # Legacy fields (kept for backward compatibility)
-    priority_score = Column(Float)  # Legacy priority scoring
-    priority_metadata = Column(JSON)  # Legacy priority metadata
-    trend_metadata = Column(JSON)  # Legacy trend metadata
+    # Priority and deduplication fields
+    priority_score = Column(Float)  # Used for article filtering/sorting
+    priority_metadata = Column(JSON)  # Stores duplicate tracking info
+    trend_metadata = Column(JSON)  # Trend-related metadata
 
     # Content filtering (user preference based)
     filtered = Column(Boolean, default=False)
@@ -87,14 +89,18 @@ class Article(Base):
     feed = relationship("RSSFeed", back_populates="articles")
 
     __table_args__ = (
-        UniqueConstraint('feed_id', 'guid', name='_feed_guid_uc'),
-        Index('idx_published_date', 'published_date'),
-        Index('idx_fetched_at', 'fetched_at'),
-        Index('idx_relevance_score', 'relevance_score'),  # For context selection
-        Index('idx_filtered', 'filtered'),  # Quick filtering queries
+        UniqueConstraint("feed_id", "guid", name="_feed_guid_uc"),
+        Index("idx_published_date", "published_date"),
+        Index("idx_fetched_at", "fetched_at"),
+        Index("idx_relevance_score", "relevance_score"),  # For context selection
+        Index("idx_filtered", "filtered"),  # Quick filtering queries
         # Composite indexes for critical query paths
-        Index('idx_articles_filtered_fetched', 'filtered', 'fetched_at'),  # curator.py synthesis queries
-        Index('idx_articles_filtered_published', 'filtered', 'published_date'),  # content_engine.py queries
+        Index(
+            "idx_articles_filtered_fetched", "filtered", "fetched_at"
+        ),  # curator.py synthesis queries
+        Index(
+            "idx_articles_filtered_published", "filtered", "published_date"
+        ),  # content_engine.py queries
     )
 
 
@@ -103,6 +109,7 @@ class AnalysisRun(Base):
     Execution tracking for synthesis runs
     Simplified for context engineering approach
     """
+
     __tablename__ = "analysis_runs"
 
     id = Column(Integer, primary_key=True)
@@ -115,9 +122,7 @@ class AnalysisRun(Base):
     claude_model = Column(String(100))  # Track which model was used
     error_message = Column(Text)
 
-    __table_args__ = (
-        Index('idx_run_started_at', 'started_at'),
-    )
+    __table_args__ = (Index("idx_run_started_at", "started_at"),)
 
 
 class NarrativeSynthesis(Base):
@@ -125,6 +130,7 @@ class NarrativeSynthesis(Base):
     Primary output: Claude-generated narrative intelligence briefs
     Contains all analysis (trends, predictions, insights) in structured JSON
     """
+
     __tablename__ = "narrative_syntheses"
 
     id = Column(Integer, primary_key=True)
@@ -144,8 +150,8 @@ class NarrativeSynthesis(Base):
     generated_at = Column(DateTime, default=datetime.utcnow)
 
     __table_args__ = (
-        Index('idx_narrative_generated_at', 'generated_at'),
-        Index('idx_narrative_profile_version', 'user_profile_version'),
+        Index("idx_narrative_generated_at", "generated_at"),
+        Index("idx_narrative_profile_version", "user_profile_version"),
     )
 
 
@@ -154,6 +160,7 @@ class ContextSnapshot(Base):
     Stores exact context sent to Claude for each synthesis
     Enables reproducibility and debugging
     """
+
     __tablename__ = "context_snapshots"
 
     id = Column(Integer, primary_key=True)
@@ -170,55 +177,25 @@ class ContextSnapshot(Base):
 
     created_at = Column(DateTime, default=datetime.utcnow)
 
-    __table_args__ = (
-        Index('idx_context_created_at', 'created_at'),
-    )
+    __table_args__ = (Index("idx_context_created_at", "created_at"),)
 
 
-# Migration compatibility - keep these for backward compatibility during migration
-# Remove after migration is complete
-class TrendAnalysis(Base):
-    """DEPRECATED: Trends now in NarrativeSynthesis.synthesis_data"""
-    __tablename__ = "trend_analyses"
+# Models for enhanced data collection
 
-    id = Column(Integer, primary_key=True)
-    analysis_run_id = Column(Integer, ForeignKey("analysis_runs.id"))
-    trend_name = Column(String(200))
-    trend_type = Column(String(50))
-    confidence = Column(Float)
-    timeframe_start = Column(DateTime)
-    timeframe_end = Column(DateTime)
-    data_points = Column(JSON)
-    related_articles = Column(JSON)
-    created_at = Column(DateTime, default=datetime.utcnow)
-
-
-class Prediction(Base):
-    """DEPRECATED: Predictions now in NarrativeSynthesis.synthesis_data"""
-    __tablename__ = "predictions"
-
-    id = Column(Integer, primary_key=True)
-    analysis_run_id = Column(Integer, ForeignKey("analysis_runs.id"))
-    prediction_text = Column(Text)
-    confidence = Column(Float)
-    category = Column(String(100))
-    timeframe = Column(String(50))
-    supporting_evidence = Column(JSON)
-    created_at = Column(DateTime, default=datetime.utcnow)
-
-
-# New models for enhanced data collection
 
 class APIDataSource(Base):
     """
     Configuration for API-based data sources (Tier 1 + Tier 4)
     Examples: Government calendars, job boards, event APIs, economic data
     """
+
     __tablename__ = "api_data_sources"
 
     id = Column(Integer, primary_key=True)
     name = Column(String(200), nullable=False)
-    source_type = Column(String(50), nullable=False)  # 'calendar', 'job_market', 'events', 'economic', etc.
+    source_type = Column(
+        String(50), nullable=False
+    )  # 'calendar', 'job_market', 'events', 'economic', etc.
     endpoint_url = Column(String(500))
     api_key_required = Column(Boolean, default=False)
     refresh_frequency_hours = Column(Integer, default=24)  # How often to fetch
@@ -231,8 +208,8 @@ class APIDataSource(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     __table_args__ = (
-        Index('idx_source_type', 'source_type'),
-        Index('idx_last_fetched', 'last_fetched'),
+        Index("idx_source_type", "source_type"),
+        Index("idx_last_fetched", "last_fetched"),
     )
 
 
@@ -241,6 +218,7 @@ class APIDataPoint(Base):
     Individual data points collected from API sources
     Flexible schema to handle different data types (events, jobs, metrics)
     """
+
     __tablename__ = "api_data_points"
 
     id = Column(Integer, primary_key=True)
@@ -269,10 +247,10 @@ class APIDataPoint(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     __table_args__ = (
-        Index('idx_api_data_type', 'data_type'),
-        Index('idx_api_event_date', 'event_date'),
-        Index('idx_api_relevance_score', 'relevance_score'),
-        UniqueConstraint('source_id', 'external_id', name='_source_external_id_uc'),
+        Index("idx_api_data_type", "data_type"),
+        Index("idx_api_event_date", "event_date"),
+        Index("idx_api_relevance_score", "relevance_score"),
+        UniqueConstraint("source_id", "external_id", name="_source_external_id_uc"),
     )
 
 
@@ -281,6 +259,7 @@ class MonitoredPage(Base):
     Configuration for website change monitoring (Tier 2)
     Tracks specific pages for changes relevant to user decisions
     """
+
     __tablename__ = "monitored_pages"
 
     id = Column(Integer, primary_key=True)
@@ -305,8 +284,8 @@ class MonitoredPage(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     __table_args__ = (
-        Index('idx_page_type', 'page_type'),
-        Index('idx_last_checked', 'last_checked'),
+        Index("idx_page_type", "page_type"),
+        Index("idx_last_checked", "last_checked"),
     )
 
 
@@ -315,6 +294,7 @@ class PageChange(Base):
     Detected changes from monitored pages
     Stored as context for Claude analysis
     """
+
     __tablename__ = "page_changes"
 
     id = Column(Integer, primary_key=True)
@@ -340,8 +320,8 @@ class PageChange(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     __table_args__ = (
-        Index('idx_page_change_detected_at', 'detected_at'),
-        Index('idx_page_change_relevance_score', 'relevance_score'),
+        Index("idx_page_change_detected_at", "detected_at"),
+        Index("idx_page_change_relevance_score", "relevance_score"),
     )
 
 
@@ -350,37 +330,38 @@ class MemoryFact(Base):
     Persistent semantic facts extracted from narrative syntheses
     Enables historical context and temporal awareness
     """
+
     __tablename__ = "memory_facts"
 
     id = Column(Integer, primary_key=True)
 
     # Fact structure (subject-predicate-object triple)
     fact_type = Column(String(50), nullable=False)  # 'metric', 'trend', 'relationship', 'decision'
-    subject = Column(String(200), nullable=False)   # 'Fairfax County unemployment'
-    predicate = Column(String(100), nullable=False) # 'rate'
-    object = Column(Text, nullable=False)           # '2.3%'
-    temporal_context = Column(String(50))           # '2025-01-15', 'Q4 2024', 'January 2025'
+    subject = Column(String(200), nullable=False)  # 'Fairfax County unemployment'
+    predicate = Column(String(100), nullable=False)  # 'rate'
+    object = Column(Text, nullable=False)  # '2.3%'
+    temporal_context = Column(String(50))  # '2025-01-15', 'Q4 2024', 'January 2025'
 
     # Quality metadata
-    confidence = Column(Float, default=0.7)         # 0.0-1.0
+    confidence = Column(Float, default=0.7)  # 0.0-1.0
     source_synthesis_id = Column(Integer, ForeignKey("narrative_syntheses.id"))
 
     # Lifecycle
     created_at = Column(DateTime, default=datetime.utcnow)
-    expires_at = Column(DateTime, nullable=True)   # NULL for evergreen facts
+    expires_at = Column(DateTime, nullable=True)  # NULL for evergreen facts
 
     # Additional context
-    fact_metadata = Column(JSON)                    # Extra context, related entities, etc.
+    fact_metadata = Column(JSON)  # Extra context, related entities, etc.
 
     __table_args__ = (
-        Index('idx_memory_fact_subject', 'subject'),
-        Index('idx_memory_fact_type', 'fact_type'),
-        Index('idx_memory_fact_temporal', 'temporal_context'),
-        Index('idx_memory_fact_composite', 'temporal_context', 'confidence'),
+        Index("idx_memory_fact_subject", "subject"),
+        Index("idx_memory_fact_type", "fact_type"),
+        Index("idx_memory_fact_temporal", "temporal_context"),
+        Index("idx_memory_fact_composite", "temporal_context", "confidence"),
         # Additional indexes for semantic memory retrieval optimization
-        Index('idx_memory_fact_expires', 'expires_at'),  # For expiration filtering
-        Index('idx_memory_fact_confidence', 'confidence'),  # For confidence-based ordering
-        Index('idx_memory_fact_created', 'created_at'),  # For recency-based ordering
+        Index("idx_memory_fact_expires", "expires_at"),  # For expiration filtering
+        Index("idx_memory_fact_confidence", "confidence"),  # For confidence-based ordering
+        Index("idx_memory_fact_created", "created_at"),  # For recency-based ordering
     )
 
 
@@ -389,6 +370,7 @@ class ForecastRun(Base):
     Execution tracking for long-term forecast runs
     Each run can generate multiple horizon forecasts
     """
+
     __tablename__ = "forecast_runs"
 
     id = Column(Integer, primary_key=True)
@@ -406,8 +388,8 @@ class ForecastRun(Base):
     error_message = Column(Text, nullable=True)
 
     __table_args__ = (
-        Index('idx_forecast_run_started', 'started_at'),
-        Index('idx_forecast_run_status', 'status'),
+        Index("idx_forecast_run_started", "started_at"),
+        Index("idx_forecast_run_status", "status"),
     )
 
 
@@ -416,6 +398,7 @@ class LongTermForecast(Base):
     Long-term forecasts (6mo - 5yr horizons)
     Separate from NarrativeSynthesis for distinct analysis types
     """
+
     __tablename__ = "long_term_forecasts"
 
     id = Column(Integer, primary_key=True)
@@ -453,9 +436,9 @@ class LongTermForecast(Base):
     generated_at = Column(DateTime, default=datetime.utcnow)
 
     __table_args__ = (
-        Index('idx_forecast_horizon', 'time_horizon'),
-        Index('idx_forecast_target_date', 'target_date'),
-        Index('idx_forecast_generated_at', 'generated_at'),
+        Index("idx_forecast_horizon", "time_horizon"),
+        Index("idx_forecast_target_date", "target_date"),
+        Index("idx_forecast_generated_at", "generated_at"),
     )
 
 
@@ -464,6 +447,7 @@ class ForecastScenario(Base):
     Individual scenario branches for a forecast
     Optimistic/baseline/pessimistic or custom scenarios
     """
+
     __tablename__ = "forecast_scenarios"
 
     id = Column(Integer, primary_key=True)
@@ -483,8 +467,8 @@ class ForecastScenario(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     __table_args__ = (
-        Index('idx_scenario_forecast', 'forecast_id'),
-        Index('idx_scenario_type', 'scenario_type'),
+        Index("idx_scenario_forecast", "forecast_id"),
+        Index("idx_scenario_type", "scenario_type"),
     )
 
 
@@ -493,6 +477,7 @@ class CausalChain(Base):
     Cause-effect relationships mapped over time
     Tracks how initial causes lead to final outcomes
     """
+
     __tablename__ = "causal_chains"
 
     id = Column(Integer, primary_key=True)
@@ -511,6 +496,6 @@ class CausalChain(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     __table_args__ = (
-        Index('idx_causal_forecast', 'forecast_id'),
-        Index('idx_causal_confidence', 'confidence'),
+        Index("idx_causal_forecast", "forecast_id"),
+        Index("idx_causal_confidence", "confidence"),
     )

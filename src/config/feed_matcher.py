@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class Feed:
     """Represents an RSS feed with applicability metadata"""
+
     name: str
     url: str
     scope: list[str]  # always, global, national, regional, local
@@ -48,21 +49,21 @@ class FeedMatcher:
         # Load feeds from all JSON files recursively
         for json_file in self.feeds_dir.rglob("*.json"):
             try:
-                with open(json_file, encoding='utf-8') as f:
+                with open(json_file, encoding="utf-8") as f:
                     data = json.load(f)
 
-                for feed_data in data.get('feeds', []):
-                    applicability = feed_data.get('applicability', {})
+                for feed_data in data.get("feeds", []):
+                    applicability = feed_data.get("applicability", {})
 
                     feed = Feed(
-                        name=feed_data['name'],
-                        url=feed_data['url'],
-                        scope=applicability.get('scope', []),
-                        geo_tags=applicability.get('geo_tags', []),
-                        domain_tags=applicability.get('domain_tags', []),
-                        specialty_tags=applicability.get('specialty_tags', []),
-                        relevance_score=feed_data.get('relevance_score', 0.5),
-                        source_file=str(json_file.relative_to(self.feeds_dir))
+                        name=feed_data["name"],
+                        url=feed_data["url"],
+                        scope=applicability.get("scope", []),
+                        geo_tags=applicability.get("geo_tags", []),
+                        domain_tags=applicability.get("domain_tags", []),
+                        specialty_tags=applicability.get("specialty_tags", []),
+                        relevance_score=feed_data.get("relevance_score", 0.5),
+                        source_file=str(json_file.relative_to(self.feeds_dir)),
                     )
                     self.all_feeds.append(feed)
 
@@ -84,7 +85,7 @@ class FeedMatcher:
             List of feed dictionaries sorted by relevance
         """
         try:
-            prefs = user_profile.profile.get('feed_preferences', {})
+            prefs = user_profile.profile.get("feed_preferences", {})
         except AttributeError:
             logger.warning("User profile has no feed_preferences, using defaults")
             prefs = self._get_default_preferences()
@@ -95,16 +96,18 @@ class FeedMatcher:
             score = self._calculate_match_score(feed, prefs)
 
             if score > 0:
-                matched_feeds.append({
-                    'name': feed.name,
-                    'url': feed.url,
-                    'category': feed.domain_tags[0] if feed.domain_tags else 'uncategorized',
-                    'match_score': score,
-                    'source_file': feed.source_file
-                })
+                matched_feeds.append(
+                    {
+                        "name": feed.name,
+                        "url": feed.url,
+                        "category": feed.domain_tags[0] if feed.domain_tags else "uncategorized",
+                        "match_score": score,
+                        "source_file": feed.source_file,
+                    }
+                )
 
         # Sort by match score (highest first)
-        matched_feeds.sort(key=lambda x: x['match_score'], reverse=True)
+        matched_feeds.sort(key=lambda x: x["match_score"], reverse=True)
 
         logger.info(f"Matched {len(matched_feeds)} feeds to user profile")
         return matched_feeds
@@ -131,17 +134,19 @@ class FeedMatcher:
         score = 0.0
 
         # Get preference lists
-        required_scopes = preferences.get('required_scopes', ['always', 'national'])
-        geo_interests = preferences.get('geographic_interests', [])
-        prof_domains = preferences.get('professional_domains', [])
-        specialty_interests = preferences.get('specialty_interests', [])
-        excluded_topics = preferences.get('excluded_topics', [])
+        required_scopes = preferences.get("required_scopes", ["always", "national"])
+        geo_interests = preferences.get("geographic_interests", [])
+        prof_domains = preferences.get("professional_domains", [])
+        specialty_interests = preferences.get("specialty_interests", [])
+        excluded_topics = preferences.get("excluded_topics", [])
 
         # 1. Check for exclusions (hard stop)
         for excluded in excluded_topics:
-            if (excluded in feed.domain_tags or
-                excluded in feed.specialty_tags or
-                excluded in feed.geo_tags):
+            if (
+                excluded in feed.domain_tags
+                or excluded in feed.specialty_tags
+                or excluded in feed.geo_tags
+            ):
                 return 0.0
 
         # 2. Scope matching (most important)
@@ -168,38 +173,40 @@ class FeedMatcher:
     def _get_default_preferences(self) -> dict[str, Any]:
         """Get default feed preferences for users without configuration"""
         return {
-            'required_scopes': ['always', 'national'],
-            'geographic_interests': ['usa'],
-            'professional_domains': [],
-            'specialty_interests': [],
-            'excluded_topics': []
+            "required_scopes": ["always", "national"],
+            "geographic_interests": ["usa"],
+            "professional_domains": [],
+            "specialty_interests": [],
+            "excluded_topics": [],
         }
 
     def get_feed_statistics(self) -> dict[str, Any]:
         """Get statistics about loaded feeds"""
         stats = {
-            'total_feeds': len(self.all_feeds),
-            'by_scope': {},
-            'by_geo': {},
-            'by_domain': {},
-            'by_source_file': {}
+            "total_feeds": len(self.all_feeds),
+            "by_scope": {},
+            "by_geo": {},
+            "by_domain": {},
+            "by_source_file": {},
         }
 
         for feed in self.all_feeds:
             # Count by scope
             for scope in feed.scope:
-                stats['by_scope'][scope] = stats['by_scope'].get(scope, 0) + 1
+                stats["by_scope"][scope] = stats["by_scope"].get(scope, 0) + 1
 
             # Count by geography
             for geo in feed.geo_tags:
-                stats['by_geo'][geo] = stats['by_geo'].get(geo, 0) + 1
+                stats["by_geo"][geo] = stats["by_geo"].get(geo, 0) + 1
 
             # Count by domain
             for domain in feed.domain_tags:
-                stats['by_domain'][domain] = stats['by_domain'].get(domain, 0) + 1
+                stats["by_domain"][domain] = stats["by_domain"].get(domain, 0) + 1
 
             # Count by source file
-            stats['by_source_file'][feed.source_file] = stats['by_source_file'].get(feed.source_file, 0) + 1
+            stats["by_source_file"][feed.source_file] = (
+                stats["by_source_file"].get(feed.source_file, 0) + 1
+            )
 
         return stats
 
@@ -217,8 +224,8 @@ class FeedMatcher:
             specialty_tags.update(feed.specialty_tags)
 
         return {
-            'scopes': sorted(list(scopes)),
-            'geographic_tags': sorted(list(geo_tags)),
-            'domain_tags': sorted(list(domain_tags)),
-            'specialty_tags': sorted(list(specialty_tags))
+            "scopes": sorted(scopes),
+            "geographic_tags": sorted(geo_tags),
+            "domain_tags": sorted(domain_tags),
+            "specialty_tags": sorted(specialty_tags),
         }

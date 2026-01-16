@@ -44,20 +44,20 @@ class AuthoritativeSourceMatcher:
             with open(self.config_path) as f:
                 config = yaml.safe_load(f)
 
-            self.sources = config.get('sources', [])
-            self.fallback_config = config.get('fallback', {})
+            self.sources = config.get("sources", [])
+            self.fallback_config = config.get("fallback", {})
 
             logger.info(f"Loaded {len(self.sources)} authoritative sources from config")
 
         except FileNotFoundError:
             logger.warning(f"Authoritative sources config not found at {self.config_path}")
             self.sources = []
-            self.fallback_config = {'enabled': False}
+            self.fallback_config = {"enabled": False}
 
         except Exception as e:
             logger.error(f"Failed to load authoritative sources: {e}")
             self.sources = []
-            self.fallback_config = {'enabled': False}
+            self.fallback_config = {"enabled": False}
 
     async def find_source(self, claim_text: str) -> dict[str, Any] | None:
         """
@@ -83,11 +83,13 @@ class AuthoritativeSourceMatcher:
         # Format sources for Claude
         sources_list = []
         for i, source in enumerate(self.sources):
-            sources_list.append({
-                "id": i,
-                "name": source.get('name'),
-                "description": f"Keywords: {', '.join(source.get('keywords', []))}"
-            })
+            sources_list.append(
+                {
+                    "id": i,
+                    "name": source.get("name"),
+                    "description": f"Keywords: {', '.join(source.get('keywords', []))}",
+                }
+            )
 
         sources_json = json.dumps(sources_list, indent=2)
 
@@ -120,7 +122,7 @@ If no source is appropriate, set best_match_id to null."""
             result = await self.claude_client.analyze(
                 system_prompt="You are a source matching specialist. Select the most appropriate authoritative source for fact verification.",
                 user_message=matching_prompt,
-                temperature=0.0
+                temperature=0.0,
             )
 
             # Parse JSON response
@@ -138,21 +140,23 @@ If no source is appropriate, set best_match_id to null."""
 
             if best_match_id is not None and 0 <= best_match_id < len(self.sources):
                 source = self.sources[best_match_id]
-                logger.info(f"Claude matched claim to source: {source.get('name')} (confidence: {match_data.get('confidence')}, reasoning: {match_data.get('reasoning')})")
+                logger.info(
+                    f"Claude matched claim to source: {source.get('name')} (confidence: {match_data.get('confidence')}, reasoning: {match_data.get('reasoning')})"
+                )
 
                 # Check if this source requires dynamic URL construction
-                if source.get('requires_country_extraction') and source.get('url_template'):
+                if source.get("requires_country_extraction") and source.get("url_template"):
                     final_url = await self._construct_dynamic_url(claim_text, source)
                     if not final_url:
                         logger.error("Failed to construct dynamic URL for source")
                         return None
                 else:
-                    final_url = source.get('url')
+                    final_url = source.get("url")
 
                 return {
-                    'name': source.get('name'),
-                    'url': final_url,
-                    'query_prompt': source.get('query_prompt')
+                    "name": source.get("name"),
+                    "url": final_url,
+                    "query_prompt": source.get("query_prompt"),
                 }
             else:
                 logger.info(f"Claude found no appropriate source: {match_data.get('reasoning')}")
@@ -177,7 +181,7 @@ If no source is appropriate, set best_match_id to null."""
             logger.error("No Claude client for country extraction")
             return None
 
-        url_template = source.get('url_template')
+        url_template = source.get("url_template")
         if not url_template:
             return None
 
@@ -202,7 +206,7 @@ Examples:
             result = await self.claude_client.analyze(
                 system_prompt="You are a country name extraction specialist.",
                 user_message=extraction_prompt,
-                temperature=0.0
+                temperature=0.0,
             )
 
             # Parse JSON
@@ -218,20 +222,22 @@ Examples:
             data = json.loads(result_clean)
 
             # Determine which slug format to use based on source
-            source_name = source.get('name', '')
-            if 'Wikipedia' in source_name:
-                country_slug = data.get('slug_underscore')
+            source_name = source.get("name", "")
+            if "Wikipedia" in source_name:
+                country_slug = data.get("slug_underscore")
             else:
                 # Use hyphenated slug for all other sources (CIA, BBC, Reuters, etc.)
-                country_slug = data.get('slug_hyphen')
+                country_slug = data.get("slug_hyphen")
 
             if not country_slug:
                 logger.error("No country slug extracted")
                 return None
 
             # Construct URL from template
-            final_url = url_template.replace('{country}', country_slug)
-            logger.info(f"Constructed dynamic URL: {final_url} (country: {data.get('country')}, source: {source_name})")
+            final_url = url_template.replace("{country}", country_slug)
+            logger.info(
+                f"Constructed dynamic URL: {final_url} (country: {data.get('country')}, source: {source_name})"
+            )
             return final_url
 
         except Exception as e:
@@ -256,7 +262,7 @@ Examples:
         best_score = 0
 
         for source in self.sources:
-            keywords = source.get('keywords', [])
+            keywords = source.get("keywords", [])
             matches = sum(1 for keyword in keywords if keyword.lower() in claim_lower)
 
             if matches > 0:
@@ -269,11 +275,13 @@ Examples:
                     best_match = source
 
         if best_match:
-            logger.info(f"Keyword-matched claim to source: {best_match.get('name')} (score: {best_score})")
+            logger.info(
+                f"Keyword-matched claim to source: {best_match.get('name')} (score: {best_score})"
+            )
             return {
-                'name': best_match.get('name'),
-                'url': best_match.get('url'),
-                'query_prompt': best_match.get('query_prompt')
+                "name": best_match.get("name"),
+                "url": best_match.get("url"),
+                "query_prompt": best_match.get("query_prompt"),
             }
 
         logger.info("No authoritative source match found for claim")

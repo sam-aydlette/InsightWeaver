@@ -2,13 +2,13 @@
 Unit tests for moderate_formatter module
 Tests actionability calculation, bias counting, and summary formatting
 """
-import pytest
+
 from src.trust.moderate_formatter import (
     calculate_actionability,
     count_high_severity_bias,
-    select_top_bias_issues,
+    format_compact_trust_summary,
     format_moderate_trust_summary,
-    format_compact_trust_summary
+    select_top_bias_issues,
 )
 
 
@@ -18,20 +18,9 @@ class TestActionabilityCalculation:
     def test_actionability_yes_high_verification(self):
         """Test YES rating for >=80% verified facts with no bias"""
         analysis = {
-            "facts": {
-                "verified_count": 8,
-                "contradicted_count": 0,
-                "total_claims": 10
-            },
-            "bias": {
-                "framing_issues": [],
-                "assumptions": [],
-                "omissions": [],
-                "loaded_terms": []
-            },
-            "intimacy": {
-                "high_severity_count": 0
-            }
+            "facts": {"verified_count": 8, "contradicted_count": 0, "total_claims": 10},
+            "bias": {"framing_issues": [], "assumptions": [], "omissions": [], "loaded_terms": []},
+            "intimacy": {"high_severity_count": 0},
         }
 
         rating, reason = calculate_actionability(analysis)
@@ -41,20 +30,9 @@ class TestActionabilityCalculation:
     def test_actionability_no_contradicted_facts(self):
         """Test NO rating for any contradicted facts"""
         analysis = {
-            "facts": {
-                "verified_count": 7,
-                "contradicted_count": 1,
-                "total_claims": 10
-            },
-            "bias": {
-                "framing_issues": [],
-                "assumptions": [],
-                "omissions": [],
-                "loaded_terms": []
-            },
-            "intimacy": {
-                "high_severity_count": 0
-            }
+            "facts": {"verified_count": 7, "contradicted_count": 1, "total_claims": 10},
+            "bias": {"framing_issues": [], "assumptions": [], "omissions": [], "loaded_terms": []},
+            "intimacy": {"high_severity_count": 0},
         }
 
         rating, reason = calculate_actionability(analysis)
@@ -64,20 +42,9 @@ class TestActionabilityCalculation:
     def test_actionability_no_high_intimacy(self):
         """Test NO rating for high-severity intimacy issues"""
         analysis = {
-            "facts": {
-                "verified_count": 9,
-                "contradicted_count": 0,
-                "total_claims": 10
-            },
-            "bias": {
-                "framing_issues": [],
-                "assumptions": [],
-                "omissions": [],
-                "loaded_terms": []
-            },
-            "intimacy": {
-                "high_severity_count": 2
-            }
+            "facts": {"verified_count": 9, "contradicted_count": 0, "total_claims": 10},
+            "bias": {"framing_issues": [], "assumptions": [], "omissions": [], "loaded_terms": []},
+            "intimacy": {"high_severity_count": 2},
         }
 
         rating, reason = calculate_actionability(analysis)
@@ -87,20 +54,9 @@ class TestActionabilityCalculation:
     def test_actionability_caution_low_verification(self):
         """Test CAUTION rating for <60% verified facts"""
         analysis = {
-            "facts": {
-                "verified_count": 5,
-                "contradicted_count": 0,
-                "total_claims": 10
-            },
-            "bias": {
-                "framing_issues": [],
-                "assumptions": [],
-                "omissions": [],
-                "loaded_terms": []
-            },
-            "intimacy": {
-                "high_severity_count": 0
-            }
+            "facts": {"verified_count": 5, "contradicted_count": 0, "total_claims": 10},
+            "bias": {"framing_issues": [], "assumptions": [], "omissions": [], "loaded_terms": []},
+            "intimacy": {"high_severity_count": 0},
         }
 
         rating, reason = calculate_actionability(analysis)
@@ -110,23 +66,17 @@ class TestActionabilityCalculation:
     def test_actionability_caution_high_bias(self):
         """Test CAUTION rating for >=2 high-severity bias issues"""
         analysis = {
-            "facts": {
-                "verified_count": 8,
-                "contradicted_count": 0,
-                "total_claims": 10
-            },
+            "facts": {"verified_count": 8, "contradicted_count": 0, "total_claims": 10},
             "bias": {
                 "framing_issues": [
                     {"frame_type": "crisis", "text": "t", "effect": "e", "alternative": "a"},
-                    {"frame_type": "urgency", "text": "t", "effect": "e", "alternative": "a"}
+                    {"frame_type": "urgency", "text": "t", "effect": "e", "alternative": "a"},
                 ],
                 "assumptions": [],
                 "omissions": [],
-                "loaded_terms": []
+                "loaded_terms": [],
             },
-            "intimacy": {
-                "high_severity_count": 0
-            }
+            "intimacy": {"high_severity_count": 0},
         }
 
         rating, reason = calculate_actionability(analysis)
@@ -136,20 +86,16 @@ class TestActionabilityCalculation:
     def test_actionability_caution_mixed(self):
         """Test CAUTION rating for mixed quality"""
         analysis = {
-            "facts": {
-                "verified_count": 7,
-                "contradicted_count": 0,
-                "total_claims": 10
-            },
+            "facts": {"verified_count": 7, "contradicted_count": 0, "total_claims": 10},
             "bias": {
                 "framing_issues": [],
-                "assumptions": [{"assumption": "test", "basis": "test", "impact": "significant impact"}],
+                "assumptions": [
+                    {"assumption": "test", "basis": "test", "impact": "significant impact"}
+                ],
                 "omissions": [],
-                "loaded_terms": []
+                "loaded_terms": [],
             },
-            "intimacy": {
-                "high_severity_count": 0
-            }
+            "intimacy": {"high_severity_count": 0},
         }
 
         rating, reason = calculate_actionability(analysis)
@@ -170,13 +116,10 @@ class TestHighSeverityBiasCounting:
     def test_count_high_severity_framing(self):
         """Test that all framing issues count as high-severity"""
         bias = {
-            "framing_issues": [
-                {"frame_type": "f1"},
-                {"frame_type": "f2"}
-            ],
+            "framing_issues": [{"frame_type": "f1"}, {"frame_type": "f2"}],
             "assumptions": [],
             "omissions": [],
-            "loaded_terms": []
+            "loaded_terms": [],
         }
 
         count = count_high_severity_bias(bias)
@@ -189,10 +132,10 @@ class TestHighSeverityBiasCounting:
             "assumptions": [
                 {"assumption": "a1", "basis": "b1", "impact": "significant impact"},
                 {"assumption": "a2", "basis": "b2", "impact": "major problem"},
-                {"assumption": "a3", "basis": "b3", "impact": "minor issue"}
+                {"assumption": "a3", "basis": "b3", "impact": "minor issue"},
             ],
             "omissions": [],
-            "loaded_terms": []
+            "loaded_terms": [],
         }
 
         count = count_high_severity_bias(bias)
@@ -204,11 +147,19 @@ class TestHighSeverityBiasCounting:
             "framing_issues": [],
             "assumptions": [],
             "omissions": [
-                {"missing_perspective": "m1", "relevance": "critical for decision", "suggestion": "s1"},
-                {"missing_perspective": "m2", "relevance": "important consideration", "suggestion": "s2"},
-                {"missing_perspective": "m3", "relevance": "nice to have", "suggestion": "s3"}
+                {
+                    "missing_perspective": "m1",
+                    "relevance": "critical for decision",
+                    "suggestion": "s1",
+                },
+                {
+                    "missing_perspective": "m2",
+                    "relevance": "important consideration",
+                    "suggestion": "s2",
+                },
+                {"missing_perspective": "m3", "relevance": "nice to have", "suggestion": "s3"},
             ],
-            "loaded_terms": []
+            "loaded_terms": [],
         }
 
         count = count_high_severity_bias(bias)
@@ -219,8 +170,10 @@ class TestHighSeverityBiasCounting:
         bias = {
             "framing_issues": [{"frame_type": "f1"}],
             "assumptions": [{"assumption": "a1", "basis": "b1", "impact": "significant impact"}],
-            "omissions": [{"missing_perspective": "m1", "relevance": "critical", "suggestion": "s1"}],
-            "loaded_terms": [{"term": "t1", "connotation": "c1", "neutral_alternative": "n1"}]
+            "omissions": [
+                {"missing_perspective": "m1", "relevance": "critical", "suggestion": "s1"}
+            ],
+            "loaded_terms": [{"term": "t1", "connotation": "c1", "neutral_alternative": "n1"}],
         }
 
         count = count_high_severity_bias(bias)
@@ -232,7 +185,7 @@ class TestHighSeverityBiasCounting:
             "framing_issues": [],
             "assumptions": [{"assumption": "a1", "basis": "b1", "impact": "minor"}],
             "omissions": [],
-            "loaded_terms": [{"term": "t1", "connotation": "c1", "neutral_alternative": "n1"}]
+            "loaded_terms": [{"term": "t1", "connotation": "c1", "neutral_alternative": "n1"}],
         }
 
         count = count_high_severity_bias(bias)
@@ -245,10 +198,12 @@ class TestTopBiasSelection:
     def test_select_top_bias_priority_order(self):
         """Test that framing > assumptions > omissions > loaded terms"""
         bias = {
-            "framing_issues": [{"frame_type": "f1", "text": "t1", "effect": "e1", "alternative": "a1"}],
+            "framing_issues": [
+                {"frame_type": "f1", "text": "t1", "effect": "e1", "alternative": "a1"}
+            ],
             "assumptions": [{"assumption": "a1", "basis": "b1", "impact": "i1"}],
             "omissions": [{"missing_perspective": "m1", "relevance": "r1", "suggestion": "s1"}],
-            "loaded_terms": [{"term": "t1", "connotation": "c1", "neutral_alternative": "n1"}]
+            "loaded_terms": [{"term": "t1", "connotation": "c1", "neutral_alternative": "n1"}],
         }
 
         issues = select_top_bias_issues(bias, max_count=2)
@@ -263,14 +218,14 @@ class TestTopBiasSelection:
         bias = {
             "framing_issues": [
                 {"frame_type": "f1", "text": "t1", "effect": "e1", "alternative": "a1"},
-                {"frame_type": "f2", "text": "t2", "effect": "e2", "alternative": "a2"}
+                {"frame_type": "f2", "text": "t2", "effect": "e2", "alternative": "a2"},
             ],
             "assumptions": [
                 {"assumption": "a1", "basis": "b1", "impact": "i1"},
-                {"assumption": "a2", "basis": "b2", "impact": "i2"}
+                {"assumption": "a2", "basis": "b2", "impact": "i2"},
             ],
             "omissions": [],
-            "loaded_terms": []
+            "loaded_terms": [],
         }
 
         issues = select_top_bias_issues(bias, max_count=3)
@@ -280,10 +235,12 @@ class TestTopBiasSelection:
         """Test truncation of long descriptions"""
         long_text = "This is a very long framing text that exceeds one hundred characters and should be truncated to keep the summary compact and readable for users"
         bias = {
-            "framing_issues": [{"frame_type": "test", "text": long_text, "effect": "effect", "alternative": "alt"}],
+            "framing_issues": [
+                {"frame_type": "test", "text": long_text, "effect": "effect", "alternative": "alt"}
+            ],
             "assumptions": [],
             "omissions": [],
-            "loaded_terms": []
+            "loaded_terms": [],
         }
 
         issues = select_top_bias_issues(bias, max_count=3)
@@ -295,12 +252,7 @@ class TestTopBiasSelection:
 
     def test_select_top_bias_empty(self):
         """Test handling when no bias issues exist"""
-        bias = {
-            "framing_issues": [],
-            "assumptions": [],
-            "omissions": [],
-            "loaded_terms": []
-        }
+        bias = {"framing_issues": [], "assumptions": [], "omissions": [], "loaded_terms": []}
 
         issues = select_top_bias_issues(bias, max_count=3)
         assert len(issues) == 0
@@ -326,20 +278,15 @@ class TestModerateSummaryFormatting:
                 "verified_count": 5,
                 "uncertain_count": 2,
                 "contradicted_count": 1,
-                "total_claims": 8
+                "total_claims": 8,
             },
-            "bias": {
-                "framing_issues": [],
-                "assumptions": [],
-                "omissions": [],
-                "loaded_terms": []
-            },
+            "bias": {"framing_issues": [], "assumptions": [], "omissions": [], "loaded_terms": []},
             "intimacy": {
                 "overall_tone": "PROFESSIONAL",
                 "high_severity_count": 0,
                 "medium_severity_count": 0,
-                "low_severity_count": 0
-            }
+                "low_severity_count": 0,
+            },
         }
 
         result = format_moderate_trust_summary(analysis)
@@ -355,21 +302,28 @@ class TestModerateSummaryFormatting:
                 "verified_count": 8,
                 "uncertain_count": 0,
                 "contradicted_count": 0,
-                "total_claims": 8
+                "total_claims": 8,
             },
             "bias": {
                 "analyzed": True,
-                "framing_issues": [{"frame_type": "crisis", "text": "Emergency!", "effect": "Creates urgency", "alternative": "Situation"}],
+                "framing_issues": [
+                    {
+                        "frame_type": "crisis",
+                        "text": "Emergency!",
+                        "effect": "Creates urgency",
+                        "alternative": "Situation",
+                    }
+                ],
                 "assumptions": [],
                 "omissions": [],
-                "loaded_terms": []
+                "loaded_terms": [],
             },
             "intimacy": {
                 "overall_tone": "PROFESSIONAL",
                 "high_severity_count": 0,
                 "medium_severity_count": 0,
-                "low_severity_count": 0
-            }
+                "low_severity_count": 0,
+            },
         }
 
         result = format_moderate_trust_summary(analysis)
@@ -384,21 +338,16 @@ class TestModerateSummaryFormatting:
                 "verified_count": 8,
                 "uncertain_count": 0,
                 "contradicted_count": 0,
-                "total_claims": 8
+                "total_claims": 8,
             },
-            "bias": {
-                "framing_issues": [],
-                "assumptions": [],
-                "omissions": [],
-                "loaded_terms": []
-            },
+            "bias": {"framing_issues": [], "assumptions": [], "omissions": [], "loaded_terms": []},
             "intimacy": {
                 "overall_tone": "FAMILIAR",
                 "high_severity_count": 1,
                 "medium_severity_count": 0,
                 "low_severity_count": 0,
-                "summary": "Contains emotion claims"
-            }
+                "summary": "Contains emotion claims",
+            },
         }
 
         result = format_moderate_trust_summary(analysis)
@@ -413,20 +362,15 @@ class TestModerateSummaryFormatting:
                 "verified_count": 9,
                 "uncertain_count": 0,
                 "contradicted_count": 0,
-                "total_claims": 10
+                "total_claims": 10,
             },
-            "bias": {
-                "framing_issues": [],
-                "assumptions": [],
-                "omissions": [],
-                "loaded_terms": []
-            },
+            "bias": {"framing_issues": [], "assumptions": [], "omissions": [], "loaded_terms": []},
             "intimacy": {
                 "overall_tone": "PROFESSIONAL",
                 "high_severity_count": 0,
                 "medium_severity_count": 0,
-                "low_severity_count": 0
-            }
+                "low_severity_count": 0,
+            },
         }
 
         result = format_moderate_trust_summary(analysis)
@@ -441,26 +385,21 @@ class TestModerateSummaryFormatting:
                 "verified_count": 8,
                 "uncertain_count": 0,
                 "contradicted_count": 0,
-                "total_claims": 8
+                "total_claims": 8,
             },
-            "bias": {
-                "framing_issues": [],
-                "assumptions": [],
-                "omissions": [],
-                "loaded_terms": []
-            },
+            "bias": {"framing_issues": [], "assumptions": [], "omissions": [], "loaded_terms": []},
             "intimacy": {
                 "overall_tone": "PROFESSIONAL",
                 "high_severity_count": 0,
                 "medium_severity_count": 0,
-                "low_severity_count": 0
-            }
+                "low_severity_count": 0,
+            },
         }
 
         result = format_moderate_trust_summary(analysis, max_width=80)
 
         # Lines should generally not exceed max_width (allowing for some flexibility)
-        lines = result.split('\n')
+        lines = result.split("\n")
         # Most lines should respect the width (some headers might be longer)
         assert all(len(line) <= 100 for line in lines)
 
@@ -471,22 +410,15 @@ class TestCompactSummary:
     def test_format_compact_one_liner(self):
         """Test single line format"""
         analysis = {
-            "facts": {
-                "verified_count": 8,
-                "contradicted_count": 0,
-                "total_claims": 10
-            },
+            "facts": {"verified_count": 8, "contradicted_count": 0, "total_claims": 10},
             "bias": {
                 "framing_issues": [],
                 "assumptions": [],
                 "omissions": [],
                 "loaded_terms": [],
-                "total_issues": 0
+                "total_issues": 0,
             },
-            "intimacy": {
-                "overall_tone": "PROFESSIONAL",
-                "total_issues": 0
-            }
+            "intimacy": {"overall_tone": "PROFESSIONAL", "total_issues": 0},
         }
 
         result = format_compact_trust_summary(analysis)
@@ -498,22 +430,15 @@ class TestCompactSummary:
     def test_format_compact_icons(self):
         """Test correct icon usage"""
         analysis_good = {
-            "facts": {
-                "verified_count": 9,
-                "contradicted_count": 0,
-                "total_claims": 10
-            },
+            "facts": {"verified_count": 9, "contradicted_count": 0, "total_claims": 10},
             "bias": {
                 "framing_issues": [],
                 "assumptions": [],
                 "omissions": [],
                 "loaded_terms": [],
-                "total_issues": 0
+                "total_issues": 0,
             },
-            "intimacy": {
-                "overall_tone": "PROFESSIONAL",
-                "total_issues": 0
-            }
+            "intimacy": {"overall_tone": "PROFESSIONAL", "total_issues": 0},
         }
 
         result = format_compact_trust_summary(analysis_good)
@@ -523,25 +448,20 @@ class TestCompactSummary:
 
         # Test with issues
         analysis_bad = {
-            "facts": {
-                "verified_count": 3,
-                "contradicted_count": 2,
-                "total_claims": 10
-            },
+            "facts": {"verified_count": 3, "contradicted_count": 2, "total_claims": 10},
             "bias": {
                 "framing_issues": [{"frame_type": "f"}],
                 "assumptions": [],
                 "omissions": [],
                 "loaded_terms": [],
-                "total_issues": 1
+                "total_issues": 1,
             },
-            "intimacy": {
-                "overall_tone": "INAPPROPRIATE",
-                "total_issues": 2
-            }
+            "intimacy": {"overall_tone": "INAPPROPRIATE", "total_issues": 2},
         }
 
         result_bad = format_compact_trust_summary(analysis_bad)
 
         # Should contain warning indicators
-        assert "✗" in result_bad or "⚠" in result_bad or "NO" in result_bad or "CAUTION" in result_bad
+        assert (
+            "✗" in result_bad or "⚠" in result_bad or "NO" in result_bad or "CAUTION" in result_bad
+        )

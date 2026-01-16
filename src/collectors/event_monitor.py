@@ -3,6 +3,7 @@ Event Monitor Collector
 Tracks concert tours and live music events for specified artists
 """
 
+import contextlib
 import logging
 from datetime import datetime
 from typing import Any
@@ -33,7 +34,7 @@ class EventMonitorCollector(BaseCollector):
         super().__init__(
             source_name="Bandsintown Events",
             source_type="events",
-            endpoint_url=self.BANDSINTOWN_API_URL
+            endpoint_url=self.BANDSINTOWN_API_URL,
         )
         self.artists = artists
         self.app_id = app_id
@@ -68,12 +69,12 @@ class EventMonitorCollector(BaseCollector):
             List of event dicts
         """
         # Clean artist name for URL
-        artist_encoded = artist.replace(' ', '%20')
+        artist_encoded = artist.replace(" ", "%20")
         url = self.BANDSINTOWN_API_URL.format(artist=artist_encoded)
 
         params = {
-            'app_id': self.app_id,
-            'date': 'upcoming'  # Only upcoming events
+            "app_id": self.app_id,
+            "date": "upcoming",  # Only upcoming events
         }
 
         try:
@@ -92,7 +93,7 @@ class EventMonitorCollector(BaseCollector):
             for event in events_data:
                 if self._is_local_event(event):
                     # Add artist name to event data
-                    event['artist_name'] = artist
+                    event["artist_name"] = artist
                     filtered_events.append(event)
 
             logger.info(f"Found {len(filtered_events)} local events for {artist}")
@@ -112,36 +113,43 @@ class EventMonitorCollector(BaseCollector):
         Returns:
             True if event is local
         """
-        venue = event.get('venue', {})
-        city = venue.get('city', '').lower()
-        region = venue.get('region', '').lower()
-        country = venue.get('country', '').lower()
+        venue = event.get("venue", {})
+        city = venue.get("city", "").lower()
+        region = venue.get("region", "").lower()
+        country = venue.get("country", "").lower()
 
         # Only US events
-        if country not in ['us', 'united states']:
+        if country not in ["us", "united states"]:
             return False
 
         # DC/NoVA cities
         local_cities = [
-            'washington', 'arlington', 'alexandria', 'fairfax',
-            'falls church', 'mclean', 'tysons', 'vienna',
-            'reston', 'herndon', 'sterling', 'leesburg',
-            'manassas', 'fredericksburg', 'baltimore'  # Include nearby metro areas
+            "washington",
+            "arlington",
+            "alexandria",
+            "fairfax",
+            "falls church",
+            "mclean",
+            "tysons",
+            "vienna",
+            "reston",
+            "herndon",
+            "sterling",
+            "leesburg",
+            "manassas",
+            "fredericksburg",
+            "baltimore",  # Include nearby metro areas
         ]
 
         # Virginia, DC, or Maryland
-        local_regions = ['va', 'virginia', 'dc', 'district of columbia', 'md', 'maryland']
+        local_regions = ["va", "virginia", "dc", "district of columbia", "md", "maryland"]
 
         # Check if city or region matches
         for local_city in local_cities:
             if local_city in city:
                 return True
 
-        for local_region in local_regions:
-            if local_region in region:
-                return True
-
-        return False
+        return any(local_region in region for local_region in local_regions)
 
     def parse_item(self, raw_item: dict[str, Any]) -> dict[str, Any]:
         """
@@ -154,41 +162,41 @@ class EventMonitorCollector(BaseCollector):
             Standardized data point dict
         """
         # Extract event details
-        artist = raw_item.get('artist_name', 'Unknown Artist')
-        venue = raw_item.get('venue', {})
-        venue_name = venue.get('name', 'Unknown Venue')
-        city = venue.get('city', '')
-        region = venue.get('region', '')
+        artist = raw_item.get("artist_name", "Unknown Artist")
+        venue = raw_item.get("venue", {})
+        venue_name = venue.get("name", "Unknown Venue")
+        city = venue.get("city", "")
+        region = venue.get("region", "")
 
         # Parse datetime
-        datetime_str = raw_item.get('datetime', '')
+        datetime_str = raw_item.get("datetime", "")
         try:
-            event_date = datetime.fromisoformat(datetime_str.replace('Z', '+00:00'))
-        except:
+            event_date = datetime.fromisoformat(datetime_str.replace("Z", "+00:00"))
+        except ValueError:
             event_date = None
 
         # Build title and description
         title = f"{artist} at {venue_name}"
-        location_str = f"{city}, {region}".strip(', ')
+        location_str = f"{city}, {region}".strip(", ")
         description = f"Concert: {artist}\nVenue: {venue_name}\nLocation: {location_str}"
 
         # Add lineup if available
-        lineup = raw_item.get('lineup', [])
+        lineup = raw_item.get("lineup", [])
         if lineup and len(lineup) > 1:
             description += f"\nLineup: {', '.join(lineup)}"
 
         # Generate unique ID
-        external_id = raw_item.get('id', f"{artist}_{datetime_str}")
+        external_id = raw_item.get("id", f"{artist}_{datetime_str}")
 
         return {
-            'data_type': 'concert_event',
-            'external_id': str(external_id),
-            'title': title,
-            'description': description,
-            'data_payload': raw_item,
-            'event_date': event_date,
-            'published_date': datetime.now(),
-            'expires_date': event_date if event_date else None
+            "data_type": "concert_event",
+            "external_id": str(external_id),
+            "title": title,
+            "description": description,
+            "data_payload": raw_item,
+            "event_date": event_date,
+            "published_date": datetime.now(),
+            "expires_date": event_date if event_date else None,
         }
 
 
@@ -212,7 +220,7 @@ class SongkickCollector(BaseCollector):
             source_name="Songkick Events",
             source_type="events",
             endpoint_url=self.SONGKICK_API_URL,
-            api_key=api_key
+            api_key=api_key,
         )
         self.artist_ids = artist_ids
 
@@ -223,17 +231,17 @@ class SongkickCollector(BaseCollector):
         for artist_name, artist_id in self.artist_ids.items():
             try:
                 url = self.SONGKICK_API_URL.format(artist_id=artist_id)
-                params = {'apikey': self.api_key}
+                params = {"apikey": self.api_key}
 
                 response = self.http_client.get(url, params=params)
                 response.raise_for_status()
 
                 data = response.json()
-                events = data.get('resultsPage', {}).get('results', {}).get('event', [])
+                events = data.get("resultsPage", {}).get("results", {}).get("event", [])
 
                 # Add artist name and filter for local events
                 for event in events:
-                    event['artist_name'] = artist_name
+                    event["artist_name"] = artist_name
                     if self._is_local_songkick_event(event):
                         all_events.append(event)
 
@@ -246,45 +254,44 @@ class SongkickCollector(BaseCollector):
 
     def _is_local_songkick_event(self, event: dict[str, Any]) -> bool:
         """Check if Songkick event is in DC/NoVA area"""
-        venue = event.get('venue', {})
-        location = venue.get('metroArea', {})
-        city = location.get('displayName', '').lower()
-        state = location.get('state', {}).get('displayName', '').lower()
+        venue = event.get("venue", {})
+        location = venue.get("metroArea", {})
+        city = location.get("displayName", "").lower()
+        state = location.get("state", {}).get("displayName", "").lower()
 
-        local_metros = ['washington', 'baltimore']
-        local_states = ['virginia', 'maryland', 'dc']
+        local_metros = ["washington", "baltimore"]
+        local_states = ["virginia", "maryland", "dc"]
 
-        return any(metro in city for metro in local_metros) or \
-               any(st in state for st in local_states)
+        return any(metro in city for metro in local_metros) or any(
+            st in state for st in local_states
+        )
 
     def parse_item(self, raw_item: dict[str, Any]) -> dict[str, Any]:
         """Parse Songkick event into standardized format"""
-        artist = raw_item.get('artist_name', 'Unknown Artist')
-        venue = raw_item.get('venue', {})
-        venue_name = venue.get('displayName', 'Unknown Venue')
+        artist = raw_item.get("artist_name", "Unknown Artist")
+        venue = raw_item.get("venue", {})
+        venue_name = venue.get("displayName", "Unknown Venue")
 
         # Parse date
-        start = raw_item.get('start', {})
-        date_str = start.get('datetime') or start.get('date')
+        start = raw_item.get("start", {})
+        date_str = start.get("datetime") or start.get("date")
         event_date = None
         if date_str:
-            try:
-                event_date = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
-            except:
-                pass
+            with contextlib.suppress(ValueError):
+                event_date = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
 
         title = f"{artist} at {venue_name}"
         description = f"Concert: {artist}\nVenue: {venue_name}"
 
-        external_id = str(raw_item.get('id', f"{artist}_{date_str}"))
+        external_id = str(raw_item.get("id", f"{artist}_{date_str}"))
 
         return {
-            'data_type': 'concert_event',
-            'external_id': external_id,
-            'title': title,
-            'description': description,
-            'data_payload': raw_item,
-            'event_date': event_date,
-            'published_date': datetime.now(),
-            'expires_date': event_date if event_date else None
+            "data_type": "concert_event",
+            "external_id": external_id,
+            "title": title,
+            "description": description,
+            "data_payload": raw_item,
+            "event_date": event_date,
+            "published_date": datetime.now(),
+            "expires_date": event_date if event_date else None,
         }

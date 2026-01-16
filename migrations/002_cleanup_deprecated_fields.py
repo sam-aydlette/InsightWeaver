@@ -61,7 +61,8 @@ def migrate_up():
 
         try:
             # Create new articles table without deprecated fields
-            session.execute(text("""
+            session.execute(
+                text("""
                 CREATE TABLE articles_new (
                     id INTEGER PRIMARY KEY,
                     feed_id INTEGER,
@@ -87,10 +88,12 @@ def migrate_up():
                     FOREIGN KEY (feed_id) REFERENCES rss_feeds(id),
                     UNIQUE(feed_id, guid)
                 )
-            """))
+            """)
+            )
 
             # Copy data
-            session.execute(text("""
+            session.execute(
+                text("""
                 INSERT INTO articles_new
                 SELECT
                     id, feed_id, guid, url, title, description, content,
@@ -99,25 +102,34 @@ def migrate_up():
                     relevance_score, last_included_in_synthesis, filtered,
                     filter_reason, fetched_at, created_at
                 FROM articles
-            """))
+            """)
+            )
 
             # Drop old table and rename
             session.execute(text("DROP TABLE articles"))
             session.execute(text("ALTER TABLE articles_new RENAME TO articles"))
 
             # Recreate indexes
-            session.execute(text("""
+            session.execute(
+                text("""
                 CREATE INDEX idx_published_date ON articles(published_date)
-            """))
-            session.execute(text("""
+            """)
+            )
+            session.execute(
+                text("""
                 CREATE INDEX idx_fetched_at ON articles(fetched_at)
-            """))
-            session.execute(text("""
+            """)
+            )
+            session.execute(
+                text("""
                 CREATE INDEX idx_relevance_score ON articles(relevance_score)
-            """))
-            session.execute(text("""
+            """)
+            )
+            session.execute(
+                text("""
                 CREATE INDEX idx_filtered ON articles(filtered)
-            """))
+            """)
+            )
 
             print("     ✓ Removed: priority_score, priority_metadata, trend_metadata")
 

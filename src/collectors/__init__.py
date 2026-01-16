@@ -9,9 +9,9 @@ from .fairfax_calendar import FairfaxCalendarCollector
 from .job_market import JobMarketCollector
 
 __all__ = [
-    'BaseCollector',
-    'CollectorError',
-    'FairfaxCalendarCollector',
-    'EventMonitorCollector',
-    'JobMarketCollector',
+    "BaseCollector",
+    "CollectorError",
+    "FairfaxCalendarCollector",
+    "EventMonitorCollector",
+    "JobMarketCollector",
 ]

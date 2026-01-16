@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome - InsightWeaver Setup</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+</head>
+<body>
+    <div class="setup-container">
+        <div class="setup-progress">
+            <div class="setup-step active">Welcome</div>
+            <div class="setup-step">API Key</div>
+            <div class="setup-step">Location</div>
+            <div class="setup-step">Profession</div>
+            <div class="setup-step">Interests</div>
+        </div>
+
+        <div class="card text-center">
+            <h1 class="page-title mb-2">Welcome to InsightWeaver</h1>
+            <p class="page-subtitle mb-3">
+                Your personal AI assistant for trustworthy information and insights.
+            </p>
+
+            <div style="text-align: left; margin: 30px 0;">
+                <h3 class="mb-2">What InsightWeaver does:</h3>
+                <ul style="list-style: disc; margin-left: 20px; line-height: 2;">
+                    <li><strong>Daily Briefs</strong> - Personalized news summaries based on your interests</li>
+                    <li><strong>Forecasts</strong> - Evidence-based predictions organized by certainty</li>
+                    <li><strong>Trust-Verified AI</strong> - AI responses with fact-checking and bias analysis</li>
+                </ul>
+            </div>
+
+            <p class="text-muted mb-3">
+                This setup will take about 2 minutes. You'll need your Anthropic API key.
+            </p>
+
+            <a href="{{ url_for('setup.api_key') }}" class="btn btn-primary btn-lg">
+                Get Started
+            </a>
+        </div>
+    </div>
+</body>
+</html>

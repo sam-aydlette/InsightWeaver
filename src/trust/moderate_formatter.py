@@ -122,7 +122,7 @@ def select_top_bias_issues(bias: dict[str, Any], max_count: int = 3) -> list[str
         # Format: "Frame type: text (effect)"
         formatted = f"{frame_type.capitalize()} framing"
         if text:
-            formatted += f": \"{text[:50]}...\""  if len(text) > 50 else f": \"{text}\""
+            formatted += f': "{text[:50]}..."' if len(text) > 50 else f': "{text}"'
         if effect:
             formatted += f" ({effect[:80]})" if len(effect) > 80 else f" ({effect})"
 
@@ -174,11 +174,11 @@ def select_top_bias_issues(bias: dict[str, Any], max_count: int = 3) -> list[str
         neutral = term.get("neutral_alternative", "")
 
         # Format: "Loaded term: X (connotation, neutral: Y)"
-        formatted = f"Loaded term: \"{term_text}\""
+        formatted = f'Loaded term: "{term_text}"'
         if connotation:
             formatted += f" ({connotation}"
             if neutral:
-                formatted += f", neutral: \"{neutral}\""
+                formatted += f', neutral: "{neutral}"'
             formatted += ")"
 
         selected_issues.append(formatted)
@@ -228,11 +228,7 @@ def format_moderate_trust_summary(analysis: dict[str, Any], max_width: int = 80)
             lines.append("  Top Bias/Framing Issues:")
             for issue in top_issues:
                 # Wrap long issue text
-                wrapped = textwrap.fill(
-                    f"  • {issue}",
-                    width=max_width,
-                    subsequent_indent="    "
-                )
+                wrapped = textwrap.fill(f"  • {issue}", width=max_width, subsequent_indent="    ")
                 lines.append(wrapped)
         else:
             lines.append("  Bias/Framing: None detected")
@@ -247,7 +243,9 @@ def format_moderate_trust_summary(analysis: dict[str, Any], max_width: int = 80)
         medium_severity = intimacy.get("medium_severity_count", 0)
 
         if high_severity > 0:
-            tone_line = f"  Tone: {overall_tone} - {high_severity} high-severity intimacy issue(s) detected"
+            tone_line = (
+                f"  Tone: {overall_tone} - {high_severity} high-severity intimacy issue(s) detected"
+            )
         elif medium_severity > 0:
             tone_line = f"  Tone: {overall_tone} - {medium_severity} medium-severity intimacy issue(s) detected"
         else:
@@ -305,10 +303,7 @@ def format_compact_trust_summary(analysis: dict[str, Any]) -> str:
     intimacy = analysis.get("intimacy", {})
     high_intimacy = intimacy.get("high_severity_count", 0)
 
-    if high_intimacy > 0:
-        tone_status = "✗ Tone"
-    else:
-        tone_status = "✓ Tone"
+    tone_status = "✗ Tone" if high_intimacy > 0 else "✓ Tone"
 
     # Actionability
     rating, _ = calculate_actionability(analysis)

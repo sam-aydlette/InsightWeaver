@@ -12,7 +12,6 @@ import json
 import logging
 import logging.handlers
 import sys
-from pathlib import Path
 from typing import Any
 
 from src.config.settings import settings
@@ -90,8 +89,7 @@ def setup_logging(json_output: bool = False) -> logging.Logger:
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(log_level)
     console_format = logging.Formatter(
-        fmt="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S"
+        fmt="%(asctime)s - %(name)s - %(levelname)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
     )
     console_handler.setFormatter(console_format)
     root_logger.addHandler(console_handler)
@@ -102,7 +100,7 @@ def setup_logging(json_output: bool = False) -> logging.Logger:
         filename=log_file,
         maxBytes=10 * 1024 * 1024,  # 10 MB
         backupCount=5,  # Keep 5 backup files
-        encoding="utf-8"
+        encoding="utf-8",
     )
     file_handler.setLevel(log_level)
 
@@ -120,7 +118,7 @@ def setup_logging(json_output: bool = False) -> logging.Logger:
         filename=json_log_file,
         maxBytes=10 * 1024 * 1024,  # 10 MB
         backupCount=5,
-        encoding="utf-8"
+        encoding="utf-8",
     )
     json_handler.setLevel(log_level)
     json_handler.setFormatter(JSONFormatter())
@@ -134,7 +132,9 @@ def setup_logging(json_output: bool = False) -> logging.Logger:
     logging.getLogger("anthropic").setLevel(logging.INFO)
 
     logger = logging.getLogger(__name__)
-    logger.info("Logging configured successfully", extra={"extra_fields": {"json_output": json_output}})
+    logger.info(
+        "Logging configured successfully", extra={"extra_fields": {"json_output": json_output}}
+    )
 
     return logger
 
@@ -178,15 +178,19 @@ def log_execution_time(func):
             elapsed = time.time() - start_time
             logger.info(
                 f"{func.__name__} completed",
-                extra_fields={"duration_seconds": elapsed, "function": func.__name__}
+                extra_fields={"duration_seconds": elapsed, "function": func.__name__},
             )
             return result
         except Exception as e:
             elapsed = time.time() - start_time
             logger.error(
                 f"{func.__name__} failed",
-                extra_fields={"duration_seconds": elapsed, "function": func.__name__, "error": str(e)},
-                exc_info=True
+                extra_fields={
+                    "duration_seconds": elapsed,
+                    "function": func.__name__,
+                    "error": str(e),
+                },
+                exc_info=True,
             )
             raise
 
@@ -199,20 +203,25 @@ def log_execution_time(func):
             elapsed = time.time() - start_time
             logger.info(
                 f"{func.__name__} completed",
-                extra_fields={"duration_seconds": elapsed, "function": func.__name__}
+                extra_fields={"duration_seconds": elapsed, "function": func.__name__},
             )
             return result
         except Exception as e:
             elapsed = time.time() - start_time
             logger.error(
                 f"{func.__name__} failed",
-                extra_fields={"duration_seconds": elapsed, "function": func.__name__, "error": str(e)},
-                exc_info=True
+                extra_fields={
+                    "duration_seconds": elapsed,
+                    "function": func.__name__,
+                    "error": str(e),
+                },
+                exc_info=True,
             )
             raise
 
     # Return appropriate wrapper based on whether function is async
     import asyncio
+
     if asyncio.iscoroutinefunction(func):
         return async_wrapper
     else:

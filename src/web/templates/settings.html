@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - InsightWeaver{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Settings</h1>
+    <p class="page-subtitle">View your configuration</p>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Profile</h3>
+    </div>
+    <div class="settings-item">
+        <span class="settings-label">Location:</span>
+        <span class="settings-value">{{ profile.geographic_context.primary_location or 'Not configured' }}</span>
+    </div>
+    <div class="settings-item">
+        <span class="settings-label">Industry:</span>
+        <span class="settings-value">{{ profile.professional_context.industry or 'Not configured' }}</span>
+    </div>
+    <div class="settings-item">
+        <span class="settings-label">Role:</span>
+        <span class="settings-value">{{ profile.professional_context.job_role or 'Not configured' }}</span>
+    </div>
+    {% if profile.professional_context.professional_domains %}
+    <div class="settings-item">
+        <span class="settings-label">Interests:</span>
+        <span class="settings-value">{{ profile.professional_context.professional_domains | join(', ') }}</span>
+    </div>
+    {% endif %}
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">API Key</h3>
+    </div>
+    <div class="settings-item">
+        <span class="settings-label">Status:</span>
+        <span class="settings-value">
+            {% if has_api_key %}
+            <span class="trust-badge verified">Configured</span>
+            {% else %}
+            <span class="trust-badge" style="background: #fee2e2; color: #991b1b;">Not configured</span>
+            {% endif %}
+        </span>
+    </div>
+    {% if has_api_key %}
+    <p class="text-muted">Your API key is securely stored in your .env file.</p>
+    {% else %}
+    <p class="text-muted">Run <code>insightweaver setup</code> to configure your API key.</p>
+    {% endif %}
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Configuration Files</h3>
+    </div>
+    <p class="text-muted">
+        To modify your settings, edit these files directly:
+    </p>
+    <ul class="settings-files">
+        <li><code>config/user_profile.json</code> - Your profile and interests</li>
+        <li><code>.env</code> - API key and environment variables</li>
+        <li><code>config/feeds/</code> - RSS feed configurations</li>
+    </ul>
+    <p class="text-muted mt-2">
+        Or run <code>insightweaver setup</code> to reconfigure from scratch.
+    </p>
+</div>
+{% endblock %}

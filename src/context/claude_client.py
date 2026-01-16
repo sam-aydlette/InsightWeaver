@@ -30,14 +30,14 @@ class ClaudeClient:
 
         self.client = AsyncAnthropic(api_key=self.api_key)
         self.model = "claude-sonnet-4-20250514"  # Latest Sonnet model
-        self.max_tokens = 4096
+        self.max_tokens = 16384  # Increased for complete synthesis JSON output
 
     async def analyze(
         self,
         system_prompt: str,
         user_message: str,
         temperature: float = 1.0,
-        max_tokens: int | None = None
+        max_tokens: int | None = None,
     ) -> str:
         """
         Send analysis request to Claude
@@ -57,10 +57,7 @@ class ClaudeClient:
                 max_tokens=max_tokens or self.max_tokens,
                 temperature=temperature,
                 system=system_prompt,
-                messages=[{
-                    "role": "user",
-                    "content": user_message
-                }]
+                messages=[{"role": "user", "content": user_message}],
             )
 
             return response.content[0].text
@@ -70,10 +67,7 @@ class ClaudeClient:
             raise
 
     async def analyze_with_context(
-        self,
-        context: dict[str, Any],
-        task: str,
-        temperature: float = 1.0
+        self, context: dict[str, Any], task: str, temperature: float = 1.0
     ) -> str:
         """
         Analyze using curated context
@@ -106,7 +100,9 @@ class ClaudeClient:
             profile = context["user_profile"]
             parts.append("## User Context")
             parts.append(f"Location: {profile.get('location', 'Unknown')}")
-            parts.append(f"Professional Domains: {', '.join(profile.get('professional_domains', []))}")
+            parts.append(
+                f"Professional Domains: {', '.join(profile.get('professional_domains', []))}"
+            )
             parts.append(f"Civic Interests: {', '.join(profile.get('civic_interests', []))}")
             parts.append("")
 
@@ -121,11 +117,11 @@ class ClaudeClient:
                 parts.append(f"\n### Article {i}")
                 parts.append(f"**Title:** {article.get('title', 'Untitled')}")
                 parts.append(f"**Source:** {article.get('source', 'Unknown')}")
-                if article.get('published_date'):
+                if article.get("published_date"):
                     parts.append(f"**Date:** {article['published_date']}")
-                if article.get('content'):
+                if article.get("content"):
                     parts.append(f"**Content:** {article['content'][:500]}...")
-                if article.get('entities'):
+                if article.get("entities"):
                     parts.append(f"**Entities:** {', '.join(article['entities'][:10])}")
             parts.append("")
 
