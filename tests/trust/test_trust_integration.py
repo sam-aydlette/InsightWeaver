@@ -363,7 +363,7 @@ class TestComponentIntegration:
             return_value=IntimacyAnalysis([], "PROFESSIONAL", "OK")
         )
 
-        result = await trust_pipeline.run_full_pipeline(
+        await trust_pipeline.run_full_pipeline(
             user_query="Test query", verify_response=True
         )
 

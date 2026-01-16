@@ -849,11 +849,19 @@ class PersonalizedNarrativeTemplate(NewsletterTemplate):
         """
 
         for event in events:
-            impact = event.get("impact_level", "MEDIUM")
-            event_name = convert(event.get("event", ""), citation_map)
-            when = convert(event.get("when", ""), citation_map)
-            why_matters = convert(event.get("why_matters", ""), citation_map)
-            action = convert(event.get("recommended_action", ""), citation_map)
+            # Handle both dict and string formats (Claude sometimes returns strings)
+            if isinstance(event, dict):
+                impact = event.get("impact_level", "MEDIUM")
+                event_name = convert(event.get("event", ""), citation_map)
+                when = convert(event.get("when", ""), citation_map)
+                why_matters = convert(event.get("why_matters", ""), citation_map)
+                action = convert(event.get("recommended_action", ""), citation_map)
+            else:
+                impact = "MEDIUM"
+                event_name = convert(str(event), citation_map)
+                when = ""
+                why_matters = ""
+                action = ""
 
             html += f"""
                 <tr class="event-row impact-{impact.lower()}">
@@ -960,7 +968,11 @@ class PersonalizedNarrativeTemplate(NewsletterTemplate):
 
         civic_events = []
         for event in events:
-            event_text = f"{event.get('event', '')} {event.get('why_matters', '')} {event.get('recommended_action', '')}".lower()
+            # Handle both dict and string formats (Claude sometimes returns strings)
+            if isinstance(event, dict):
+                event_text = f"{event.get('event', '')} {event.get('why_matters', '')} {event.get('recommended_action', '')}".lower()
+            else:
+                event_text = str(event).lower()
             if any(keyword in event_text for keyword in civic_keywords):
                 civic_events.append(event)
 
@@ -976,10 +988,17 @@ class PersonalizedNarrativeTemplate(NewsletterTemplate):
         """
 
         for event in civic_events:
-            event_name = convert(event.get("event", ""), citation_map)
-            when = convert(event.get("when", ""), citation_map)
-            why_matters = convert(event.get("why_matters", ""), citation_map)
-            action = convert(event.get("recommended_action", ""), citation_map)
+            # Handle both dict and string formats (Claude sometimes returns strings)
+            if isinstance(event, dict):
+                event_name = convert(event.get("event", ""), citation_map)
+                when = convert(event.get("when", ""), citation_map)
+                why_matters = convert(event.get("why_matters", ""), citation_map)
+                action = convert(event.get("recommended_action", ""), citation_map)
+            else:
+                event_name = convert(str(event), citation_map)
+                when = ""
+                why_matters = ""
+                action = ""
 
             html += f"""
             <div class="civic-event">

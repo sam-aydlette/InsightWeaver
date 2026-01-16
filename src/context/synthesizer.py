@@ -138,8 +138,8 @@ class NarrativeSynthesizer:
 
                 with profile(f"SYNTHESIS_ATTEMPT_{attempt}"):
                     try:
-                        # Build citation-enhanced task
-                        task = self._build_synthesis_task_with_citations(
+                        # Build citation-enhanced task and get authoritative citation_map
+                        task, authoritative_citation_map = self._build_synthesis_task_with_citations(
                             context["articles"], len(context["articles"])
                         )
 
@@ -164,6 +164,12 @@ class NarrativeSynthesizer:
 
                         # Parse synthesis
                         synthesis_data = self._parse_synthesis_response(response)
+
+                        # Inject our authoritative citation_map (not Claude's returned version)
+                        # This ensures the citation_map matches the articles we sent Claude
+                        if "metadata" not in synthesis_data:
+                            synthesis_data["metadata"] = {}
+                        synthesis_data["metadata"]["citation_map"] = authoritative_citation_map
 
                         # Extract narrative text for verification
                         narrative_text = self._extract_narrative_for_verification(synthesis_data)
@@ -614,7 +620,9 @@ Return ONLY valid JSON with this exact structure:
 Note: Use "niche_field" for the user's professional domain (from context).
 Return ONLY valid JSON, no markdown formatting or additional text."""
 
-    def _build_synthesis_task_with_citations(self, articles: list, article_count: int) -> str:
+    def _build_synthesis_task_with_citations(
+        self, articles: list, article_count: int
+    ) -> tuple[str, dict]:
         """
         Build synthesis task prompt with citation requirements
 
@@ -623,7 +631,7 @@ Return ONLY valid JSON, no markdown formatting or additional text."""
             article_count: Number of articles
 
         Returns:
-            Enhanced synthesis task prompt requiring inline citations
+            Tuple of (task prompt, citation_map dict)
         """
         # Create numbered article reference list
         article_refs = []
@@ -648,7 +656,7 @@ Return ONLY valid JSON, no markdown formatting or additional text."""
         # Properly JSON-encode the citation map with indentation
         citation_map_json = json.dumps(citation_map, indent=8)[1:-1].strip()  # Remove outer braces
 
-        return f"""Analyze the {article_count} articles and generate a structured intelligence brief WITH INLINE CITATIONS.
+        task = f"""Analyze the {article_count} articles and generate a structured intelligence brief WITH INLINE CITATIONS.
 
 ## CRITICAL REQUIREMENT: Citation Discipline
 
@@ -776,6 +784,8 @@ IMPORTANT:
 Note: Use "niche_field" for the user's professional domain (from context).
 Return ONLY valid JSON, no markdown formatting or additional text."""
 
+        return (task, citation_map)
+
     def _add_trust_constraints(self, task: str, verification_history: list) -> str:
         """
         Add stricter constraints to synthesis task based on previous verification failures
@@ -895,12 +905,16 @@ Return ONLY valid JSON, no markdown formatting or additional text."""
 
         # Extract priority events (top 5)
         for event in synthesis_data.get("priority_events", [])[:5]:
-            event_text = f"{event.get('event', '')} "
-            if why_matters := event.get("why_matters"):
-                event_text += f"{why_matters} "
-            if action := event.get("recommended_action"):
-                event_text += action
-            parts.append(event_text.strip())
+            # Handle both dict and string formats (Claude sometimes returns strings)
+            if isinstance(event, dict):
+                event_text = f"{event.get('event', '')} "
+                if why_matters := event.get("why_matters"):
+                    event_text += f"{why_matters} "
+                if action := event.get("recommended_action"):
+                    event_text += action
+                parts.append(event_text.strip())
+            elif event:
+                parts.append(str(event).strip())
 
         # Sample predictions (2 per category)
         predictions = synthesis_data.get("predictions_scenarios", {})

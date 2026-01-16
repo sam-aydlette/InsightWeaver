@@ -67,7 +67,7 @@ async def _process_query(query: str) -> dict:
         verify_facts=True,
         check_bias=True,
         check_intimacy=True,
-        temperature=1.0,
+        temperature=0.3,  # Low temperature for factual accuracy over engagement
     )
 
     # Save report to central reports directory (matches CLI behavior)

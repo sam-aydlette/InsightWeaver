@@ -27,6 +27,9 @@ class TestSourceLoading:
 
     def test_load_sources_file_not_found(self, mocker, caplog):
         """Test handling when config file doesn't exist"""
+        import logging
+
+        caplog.set_level(logging.WARNING)
         mocker.patch("builtins.open", side_effect=FileNotFoundError)
 
         matcher = AuthoritativeSourceMatcher(config_path="/nonexistent/path.yaml")
@@ -37,6 +40,9 @@ class TestSourceLoading:
 
     def test_load_sources_parse_error(self, mocker, caplog):
         """Test handling of YAML parse errors"""
+        import logging
+
+        caplog.set_level(logging.ERROR)
         mock_open = mocker.mock_open(read_data="invalid: yaml: content:")
         mocker.patch("builtins.open", mock_open)
         mocker.patch("yaml.safe_load", side_effect=Exception("Parse error"))

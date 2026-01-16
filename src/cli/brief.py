@@ -495,8 +495,13 @@ def brief_group(
 
                         # Show top 2 priority events
                         for event in priority_events[:2]:
-                            event_title = clean_citations(event.get("event", "Unknown"))
-                            priority = event.get("priority", "MEDIUM")
+                            # Handle both dict and string formats (Claude sometimes returns strings)
+                            if isinstance(event, dict):
+                                event_title = clean_citations(event.get("event", "Unknown"))
+                                priority = event.get("priority", "MEDIUM")
+                            else:
+                                event_title = clean_citations(str(event))
+                                priority = "MEDIUM"
                             if len(event_title) > 70:
                                 event_title = event_title[:67] + "..."
                             click.echo(

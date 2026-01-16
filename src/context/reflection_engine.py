@@ -240,13 +240,17 @@ Focus on QUALITY over QUANTITY - every statement should provide insight, not jus
         if "priority_events" in synthesis_data:
             events = synthesis_data["priority_events"]
             if events:
-                event_text = "\n".join(
-                    [
-                        f"- [{e.get('impact_level', '')}] {e.get('event', '')}: {e.get('why_matters', '')}"
-                        for e in events
-                    ]
-                )
-                sections.append(f"PRIORITY EVENTS\n{event_text}")
+                event_lines = []
+                for e in events:
+                    # Handle both dict and string formats (Claude sometimes returns strings)
+                    if isinstance(e, dict):
+                        event_lines.append(
+                            f"- [{e.get('impact_level', '')}] {e.get('event', '')}: {e.get('why_matters', '')}"
+                        )
+                    elif e:
+                        event_lines.append(f"- {e}")
+                if event_lines:
+                    sections.append("PRIORITY EVENTS\n" + "\n".join(event_lines))
 
         # Predictions
         if "predictions_scenarios" in synthesis_data:

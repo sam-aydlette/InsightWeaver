@@ -55,11 +55,20 @@ AI can generate plausible-sounding text that's factually wrong. InsightWeaver ad
 
 You get AI's analytical power with safeguards against its weaknesses.
 
-### Privacy by Design
+### Privacy Considerations
 
-Your reading habits, questions, and interests are valuable data. Most news platforms monetize this information.
+Your reading habits, questions, and interests are valuable data. Most news platforms monetize this information. InsightWeaver does not.
 
-InsightWeaver runs entirely on your computer. Your data never leaves your machine except for API calls to generate analysis. There's no account, no tracking, no advertising. You own your information.
+InsightWeaver stores your data locally. There's no account, no tracking, no advertising.
+
+However, using InsightWeaver involves external data flows:
+
+- **Anthropic API**: Your location, profession, interests, and curated article content are sent to generate analysis
+- **RSS Publishers**: Standard HTTP requests reveal which feeds you follow
+- **Fact-checking sources**: Government and institutional sites log verification requests
+- **Email (optional)**: If configured, full reports pass through your email provider
+
+Your data is not sold, but it does leave your machine for analysis.
 
 ---
 
@@ -153,5 +162,3 @@ See [LICENSE](LICENSE) for details.
 ## Acknowledgments
 
 InsightWeaver is built on the insight that AI's strength lies in analysis and synthesis, not information retrieval. By combining high-quality RSS sources with Claude's analytical capabilities and rigorous trust verification, we can transform the overwhelming flow of information into something genuinely useful.
-
-The goal is not just aggregation, but understanding. Not just information, but intelligence.

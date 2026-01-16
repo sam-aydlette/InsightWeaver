@@ -517,14 +517,22 @@ class ContextCurator:
         # Extract user-specific data for framework injection
         if self.user_profile:
             location = self.user_profile.get_primary_location()
+            geo_context = self.user_profile.get_geographic_context()
             professional = self.user_profile.get_professional_context()
             civic = self.user_profile.get_civic_interests()
 
-            # Prepare replacement values
-            city = location.get("city", "your city")
-            state = location.get("state", "your state")
-            region = location.get("region", location.get("city", "your region"))
-            country = location.get("country", "United States")
+            # Prepare replacement values - handle both string and dict formats
+            if isinstance(location, dict):
+                city = location.get("city", "your city")
+                state = location.get("state", geo_context.get("state", "your state"))
+                region = location.get("region", city)
+                country = location.get("country", "United States")
+            else:
+                # Location is a string like "Fairfax, Virginia"
+                city = str(location) if location else "your city"
+                state = geo_context.get("state", "your state")
+                region = city
+                country = "United States"
 
             professional_domains = ", ".join(
                 professional.get("professional_domains", ["your profession"])

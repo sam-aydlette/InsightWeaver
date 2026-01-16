@@ -35,8 +35,8 @@ class TestCitationPromptGeneration:
             },
         ]
 
-        # Generate citation prompt
-        prompt = synthesizer._build_synthesis_task_with_citations(articles, len(articles))
+        # Generate citation prompt (returns tuple of task, citation_map)
+        prompt, citation_map = synthesizer._build_synthesis_task_with_citations(articles, len(articles))
 
         # Verify prompt contains citation instructions
         assert "CRITICAL REQUIREMENT: Citation Discipline" in prompt
@@ -50,6 +50,12 @@ class TestCitationPromptGeneration:
         # Verify citation map structure is in prompt
         assert "citation_map" in prompt
         assert "article_id" in prompt
+
+        # Verify returned citation_map
+        assert "1" in citation_map
+        assert "2" in citation_map
+        assert citation_map["1"]["title"] == "Cybersecurity Spending Increases"
+        assert citation_map["2"]["url"] == "https://example.com/article2"
 
     def test_citation_map_json_escaping(self):
         """Test that citation map properly escapes special characters"""
@@ -66,13 +72,15 @@ class TestCitationPromptGeneration:
             }
         ]
 
-        prompt = synthesizer._build_synthesis_task_with_citations(articles, len(articles))
+        prompt, citation_map = synthesizer._build_synthesis_task_with_citations(articles, len(articles))
 
         # Extract the citation_map section from the prompt
         # The prompt should contain properly escaped JSON
         assert "citation_map" in prompt
         # Verify the special characters are handled (quotes should be escaped in JSON)
         assert "News & Analysis" in prompt or "News \\u0026 Analysis" in prompt
+        # Verify returned citation_map preserves special characters
+        assert citation_map["1"]["source"] == "News & Analysis"
 
     def test_citation_prompt_includes_examples(self):
         """Test that citation prompt includes clear examples"""
@@ -88,7 +96,7 @@ class TestCitationPromptGeneration:
             }
         ]
 
-        prompt = synthesizer._build_synthesis_task_with_citations(articles, len(articles))
+        prompt, citation_map = synthesizer._build_synthesis_task_with_citations(articles, len(articles))
 
         # Verify citation examples are present
         assert "Federal cybersecurity spending increased 15%^[1,3]" in prompt
@@ -106,12 +114,14 @@ class TestCitationPromptGeneration:
 
         articles = []
 
-        prompt = synthesizer._build_synthesis_task_with_citations(articles, 0)
+        prompt, citation_map = synthesizer._build_synthesis_task_with_citations(articles, 0)
 
         # Should still generate valid prompt structure
         assert "CRITICAL REQUIREMENT: Citation Discipline" in prompt
         assert "Article Reference List" in prompt
         assert "citation_map" in prompt
+        # Empty citation_map for empty articles
+        assert citation_map == {}
 
     def test_missing_optional_fields(self):
         """Test prompt generation when articles have missing optional fields"""
@@ -123,12 +133,15 @@ class TestCitationPromptGeneration:
             {"id": 2, "title": "Test"},  # Missing other fields
         ]
 
-        prompt = synthesizer._build_synthesis_task_with_citations(articles, len(articles))
+        prompt, citation_map = synthesizer._build_synthesis_task_with_citations(articles, len(articles))
 
         # Should use default values
         assert "[1] Untitled - Unknown" in prompt
         assert "[2] Test - Unknown" in prompt
         assert "No date" in prompt
+        # Citation map should use defaults too
+        assert citation_map["1"]["title"] == "Untitled"
+        assert citation_map["2"]["source"] == "Unknown"
 
 
 class TestCitationParsing:

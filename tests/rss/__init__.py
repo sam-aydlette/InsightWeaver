@@ -1,0 +1,1 @@
+"""RSS tests package"""

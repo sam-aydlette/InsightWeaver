@@ -76,7 +76,8 @@ def trust_command(
         click.echo(header("InsightWeaver Trust Mode"))
         click.echo(header("=" * 70))
         click.echo(muted("\nQuery Claude with trust verification enabled."))
-        click.echo(muted("Responses are analyzed for fact accuracy, bias, and tone.\n"))
+        click.echo(muted("Responses are analyzed for fact accuracy, bias, and tone."))
+        click.echo(muted("Press Ctrl+C to exit.\n"))
 
         try:
             query = click.prompt("Enter your query", type=str)
@@ -155,7 +156,7 @@ async def _run_trust_pipeline(
             verify_facts=verify_facts,
             check_bias=check_bias,
             check_intimacy=check_intimacy,
-            temperature=1.0,
+            temperature=0.3,  # Low temperature for factual accuracy over engagement
         )
 
         # Display response
