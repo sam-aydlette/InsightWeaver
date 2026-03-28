@@ -23,7 +23,6 @@ class TestPipelineOrchestratorInit:
         assert orchestrator.prioritize_hours == 48
         assert orchestrator.prioritize_limit is None
         assert orchestrator.topic_filters == {}
-        assert orchestrator.verify_trust is True
         assert orchestrator.content_filter is None
 
     def test_init_with_custom_values(self):
@@ -35,7 +34,6 @@ class TestPipelineOrchestratorInit:
             prioritize_hours=24,
             prioritize_limit=100,
             topic_filters={"topics": ["cybersecurity"]},
-            verify_trust=False,
         )
 
         assert orchestrator.max_concurrent_feeds == 5
@@ -44,7 +42,6 @@ class TestPipelineOrchestratorInit:
         assert orchestrator.prioritize_hours == 24
         assert orchestrator.prioritize_limit == 100
         assert orchestrator.topic_filters == {"topics": ["cybersecurity"]}
-        assert orchestrator.verify_trust is False
 
 
 class TestShouldSkipRssFetch:
@@ -62,9 +59,7 @@ class TestShouldSkipRssFetch:
 
         # Mock recent article (30 minutes old)
         recent_time = datetime.now(UTC) - timedelta(minutes=30)
-        mock_session.query.return_value.order_by.return_value.first.return_value = (
-            recent_time,
-        )
+        mock_session.query.return_value.order_by.return_value.first.return_value = (recent_time,)
 
         should_skip, most_recent = orchestrator._should_skip_rss_fetch(max_age_minutes=60)
 
@@ -83,9 +78,7 @@ class TestShouldSkipRssFetch:
 
         # Mock old article (2 hours old)
         old_time = datetime.now(UTC) - timedelta(hours=2)
-        mock_session.query.return_value.order_by.return_value.first.return_value = (
-            old_time,
-        )
+        mock_session.query.return_value.order_by.return_value.first.return_value = (old_time,)
 
         should_skip, most_recent = orchestrator._should_skip_rss_fetch(max_age_minutes=60)
 
@@ -114,9 +107,7 @@ class TestShouldSkipRssFetch:
         orchestrator = PipelineOrchestrator()
 
         # Mock database error
-        mock_get_db.return_value.__enter__ = MagicMock(
-            side_effect=Exception("DB error")
-        )
+        mock_get_db.return_value.__enter__ = MagicMock(side_effect=Exception("DB error"))
 
         should_skip, most_recent = orchestrator._should_skip_rss_fetch()
 
@@ -130,9 +121,7 @@ class TestRunFullPipeline:
     @pytest.mark.asyncio
     @patch("src.pipeline.orchestrator.get_profiler")
     @patch("src.pipeline.orchestrator.profile")
-    async def test_pipeline_runs_all_stages(
-        self, mock_profile, mock_get_profiler, mock_settings
-    ):
+    async def test_pipeline_runs_all_stages(self, mock_profile, mock_get_profiler, mock_settings):
         """Should run all pipeline stages"""
         orchestrator = PipelineOrchestrator()
 
@@ -147,9 +136,7 @@ class TestRunFullPipeline:
         orchestrator._fetch_feeds = AsyncMock(
             return_value={"total_feeds": 10, "successful_feeds": 10, "total_articles": 50}
         )
-        orchestrator._deduplicate_articles = AsyncMock(
-            return_value={"total_duplicates": 5}
-        )
+        orchestrator._deduplicate_articles = AsyncMock(return_value={"total_duplicates": 5})
         orchestrator._filter_content = AsyncMock(
             return_value={"filtered_count": 10, "kept_count": 40}
         )
@@ -218,9 +205,7 @@ class TestRunFullPipeline:
         orchestrator._fetch_feeds = AsyncMock(
             return_value={"total_feeds": 10, "successful_feeds": 10, "total_articles": 50}
         )
-        orchestrator._deduplicate_articles = AsyncMock(
-            return_value={"total_duplicates": 5}
-        )
+        orchestrator._deduplicate_articles = AsyncMock(return_value={"total_duplicates": 5})
         orchestrator._filter_content = AsyncMock(
             return_value={"filtered_count": 10, "kept_count": 40}
         )
@@ -322,35 +307,9 @@ class TestSynthesizeNarrative:
 
     @pytest.mark.asyncio
     @patch("src.pipeline.orchestrator.NarrativeSynthesizer")
-    @patch("src.pipeline.orchestrator.settings")
-    async def test_synthesize_with_trust_verification(
-        self, mock_settings, mock_synthesizer_class
-    ):
-        """Should use trust-verified synthesis by default"""
-        mock_settings.enable_trust_verification = True
-
-        orchestrator = PipelineOrchestrator(verify_trust=True)
-
-        mock_synthesizer = MagicMock()
-        mock_synthesizer_class.return_value = mock_synthesizer
-        mock_synthesizer.synthesize_with_trust_verification = AsyncMock(
-            return_value={"synthesis_id": 1}
-        )
-
-        await orchestrator._synthesize_narrative()
-
-        mock_synthesizer.synthesize_with_trust_verification.assert_called_once()
-
-    @pytest.mark.asyncio
-    @patch("src.pipeline.orchestrator.NarrativeSynthesizer")
-    @patch("src.pipeline.orchestrator.settings")
-    async def test_synthesize_without_trust_verification(
-        self, mock_settings, mock_synthesizer_class
-    ):
-        """Should use basic synthesis when trust verification disabled"""
-        mock_settings.enable_trust_verification = False
-
-        orchestrator = PipelineOrchestrator(verify_trust=False)
+    async def test_synthesize_calls_two_pass_synthesize(self, mock_synthesizer_class):
+        """Should call the two-pass synthesize method"""
+        orchestrator = PipelineOrchestrator()
 
         mock_synthesizer = MagicMock()
         mock_synthesizer_class.return_value = mock_synthesizer
@@ -415,7 +374,6 @@ class TestRunPipelineFunction:
             dedup_hours=12,
             prioritize_hours=24,
             topic_filters={"topics": ["cybersecurity"]},
-            verify_trust=False,
         )
 
         mock_run.assert_called_once()

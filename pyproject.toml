@@ -38,9 +38,6 @@ dependencies = [
     "textblob>=0.15.0",
     "pydantic-settings>=2.0.0",
     "markdownify>=0.11.0",
-    # Web UI
-    "flask>=3.0.0",
-    "flask-cors>=4.0.0",
 ]
 
 [project.optional-dependencies]
@@ -165,7 +162,6 @@ warn_unused_ignores = false
 warn_no_return = false
 strict_equality = true
 ignore_missing_imports = true
-plugins = ["sqlalchemy.ext.mypy.plugin"]
 
 [[tool.mypy.overrides]]
 module = "tests.*"
@@ -183,14 +179,10 @@ ignore_errors = true
 module = [
     "src.processors.*",
     "src.rss.*",
-    "src.collectors.*",
     "src.context.*",
     "src.forecast.*",
-    "src.trust.*",
     "src.pipeline.*",
-    "src.newsletter.*",
-    "src.maintenance.*",
-    "src.monitoring.*",
+    "src.prompts.*",
     "src.feed_manager",
 ]
 ignore_errors = true
@@ -198,7 +190,6 @@ ignore_errors = true
 [[tool.mypy.overrides]]
 module = [
     "src.cli.*",
-    "src.web.*",
     "src.utils.*",
     "src.config.*",
     "src.__main__",

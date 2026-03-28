@@ -93,6 +93,10 @@ async def _run_forecast(
         quiet: If True, suppress ASCII art
         topic_filters: Topic/scope filters dict
     """
+    # Overall timeout for entire forecast operation (context curation + API call)
+    # Context curation can be slow with 12 months of data
+    FORECAST_TIMEOUT_SECONDS = 600  # 10 minutes
+
     try:
         # Initialize orchestrator
         user_profile = get_user_profile()
@@ -101,8 +105,17 @@ async def _run_forecast(
         if is_debug_mode():
             click.echo(muted(f"Initialized orchestrator with filters: {topic_filters}"))
 
-        # Run forecast
-        result = await orchestrator.run_forecast()
+        # Run forecast with overall timeout
+        try:
+            result = await asyncio.wait_for(
+                orchestrator.run_forecast(),
+                timeout=FORECAST_TIMEOUT_SECONDS,
+            )
+        except TimeoutError:
+            raise TimeoutError(
+                f"Forecast generation timed out after {FORECAST_TIMEOUT_SECONDS} seconds. "
+                "This may indicate database or API issues."
+            )
 
         # Save reports (HTML and JSON)
         from ..forecast.formatter import ForecastFormatter

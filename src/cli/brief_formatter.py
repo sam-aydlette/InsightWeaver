@@ -1,278 +1,184 @@
 """
 Brief Report Terminal Formatter
-Format intelligence reports for terminal display
+Renders situation-based synthesis output for terminal display.
 """
 
 import re
 from typing import Any
 
 from ..utils.base_formatter import BaseTerminalFormatter
-from .colors import colorize_priority, header, muted
+from .colors import accent, header, muted, warning
 
 
 def clean_citations(text: str) -> str:
-    """
-    Convert citation markers from ^[N,M] to [N,M] for cleaner terminal display.
-
-    Args:
-        text: Text containing citation markers
-
-    Returns:
-        Text with cleaned citation format
-    """
+    """Convert ^[N,M] citation markers to [N,M] for terminal display."""
     if not text:
         return text
-    # Convert ^[N] or ^[N,M,O] to [N] or [N,M,O]
     return re.sub(r"\^\[([0-9,\s]+)\]", r"[\1]", text)
 
 
 class BriefFormatter(BaseTerminalFormatter):
-    """Format intelligence brief reports for terminal display"""
+    """Format situation-based intelligence briefs for terminal display."""
 
     def __init__(self, max_width: int = 80):
         super().__init__(max_width)
 
     def format_report(self, report_data: dict[str, Any]) -> str:
-        """
-        Format complete intelligence report for terminal
+        """Format a complete briefing for terminal output."""
+        synthesis_data = report_data.get("synthesis_data", {})
+        situations = synthesis_data.get("situations", [])
+        thin_coverage = synthesis_data.get("thin_coverage", [])
+        metadata = synthesis_data.get("metadata", {})
 
-        Args:
-            report_data: Report data from NewsletterSystem
-
-        Returns:
-            Formatted report string
-        """
         lines = []
 
         # Header
-        lines.append("\n" + header("=" * self.max_width))
+        lines.append("")
+        lines.append(header("=" * self.max_width))
         lines.append(header("INTELLIGENCE BRIEF"))
         lines.append(header("=" * self.max_width))
+        lines.append("")
 
-        # Time window
-        start = report_data.get("start_date")
-        end = report_data.get("end_date")
-        duration = report_data.get("duration_hours", 0)
+        # Metadata
+        articles = metadata.get("articles_analyzed", 0)
+        clusters_analyzed = metadata.get("clusters_analyzed", 0)
+        clusters_thin = metadata.get("clusters_thin", 0)
+        threshold = metadata.get("analysis_threshold", "3+ articles")
 
-        if start and end:
-            lines.append(
-                muted(
-                    f"\nTime Window: {start.strftime('%Y-%m-%d %H:%M')} to {end.strftime('%Y-%m-%d %H:%M')} ({duration:.1f}h)"
-                )
+        lines.append(
+            muted(
+                f"Articles: {articles} | "
+                f"Situations: {clusters_analyzed} analyzed, {clusters_thin} thin coverage | "
+                f"Threshold: {threshold}"
             )
-
-        lines.append(muted(f"Articles Analyzed: {report_data.get('articles_analyzed', 0)}"))
-        lines.append(muted(f"Report Type: {report_data.get('report_type', 'custom').upper()}"))
+        )
         lines.append("")
 
-        # Executive Summary
-        exec_summary = report_data.get("executive_summary", "")
-        if (
-            exec_summary
-            and isinstance(exec_summary, str)
-            and exec_summary != "No articles found in the specified time window."
-        ):
-            lines.append(header("-" * self.max_width))
-            lines.append(header("EXECUTIVE SUMMARY"))
-            lines.append(header("-" * self.max_width))
-            lines.append("")
-            lines.append(self.wrap_text(clean_citations(exec_summary)))
+        # Situations
+        if situations:
+            for i, situation in enumerate(situations, 1):
+                lines.append(self._format_situation(situation, i))
+                lines.append("")
+        else:
+            lines.append(muted("No situations met the analysis threshold."))
             lines.append("")
 
-        # Synthesis Data
-        synthesis_data = report_data.get("synthesis_data", {})
+        # Thin coverage
+        if thin_coverage:
+            lines.append(header("-" * self.max_width))
+            lines.append(header("THIN COVERAGE"))
+            lines.append(muted("Topics with 1-2 articles. Listed but not fully analyzed."))
+            lines.append(header("-" * self.max_width))
+            lines.append("")
 
-        if synthesis_data:
-            # Bottom Line - can be dict with 'summary' key or string
-            bottom_line_data = synthesis_data.get("bottom_line", "")
-            if isinstance(bottom_line_data, dict):
-                bottom_line = bottom_line_data.get("summary", "")
-            else:
-                bottom_line = bottom_line_data
+            for item in thin_coverage:
+                title = item.get("title", "Unknown topic")
+                count = item.get("article_count", 0)
+                sources = ", ".join(item.get("sources", []))
+                note = item.get("note", "")
 
-            if bottom_line and isinstance(bottom_line, str):
-                lines.append(header("-" * self.max_width))
-                lines.append(header("BOTTOM LINE"))
-                lines.append(header("-" * self.max_width))
+                lines.append(f"  {accent(title)}")
+                lines.append(f"    {muted(f'{count} article(s) | {sources}')}")
+                if note:
+                    lines.append(f"    {note}")
                 lines.append("")
-                lines.append(self.wrap_text(clean_citations(bottom_line)))
-                lines.append("")
 
-            # Trends and Patterns
-            lines.extend(self._format_trends(synthesis_data.get("trends_and_patterns", [])))
-
-            # Priority Events
-            lines.extend(self._format_events(synthesis_data.get("priority_events", [])))
-
-            # Predictions and Scenarios
-            lines.extend(self._format_predictions(synthesis_data.get("predictions_scenarios", [])))
-
-        # Footer
         lines.append(header("=" * self.max_width))
-        lines.append(header("End of Intelligence Brief"))
-        lines.append(header("=" * self.max_width))
-        lines.append("")
 
         return "\n".join(lines)
 
-    def _format_trends(self, trends: list) -> list[str]:
-        """Format trends and patterns section"""
-        if not trends or not isinstance(trends, list):
-            return []
+    def _format_situation(self, situation: dict, index: int) -> str:
+        """Format a single situation for terminal display."""
+        lines = []
 
-        lines = [
-            header("-" * self.max_width),
-            header("KEY TRENDS & PATTERNS"),
-            header("-" * self.max_width),
-            "",
-        ]
+        title = clean_citations(situation.get("title", "Untitled situation"))
+        lines.append(header(f"SITUATION {index}: {title}"))
+        lines.append(header("-" * self.max_width))
 
-        for i, trend in enumerate(trends, 1):
-            if not isinstance(trend, dict):
-                continue
-
-            # Trend header
-            trend_title = trend.get("trend", "Unknown Trend")
-            if isinstance(trend_title, str):
-                lines.append(f"{i}. {clean_citations(trend_title)}")
+        # Narrative
+        narrative = situation.get("narrative", "")
+        if narrative:
+            lines.append("")
+            for paragraph in clean_citations(narrative).split("\n\n"):
+                lines.append(self.wrap_text(paragraph.strip()))
                 lines.append("")
 
-            # Description
-            description = trend.get("description", "")
-            if description and isinstance(description, str):
-                lines.append(self.wrap_text(clean_citations(description), indent=3))
-                lines.append("")
+        # Actors
+        actors = situation.get("actors", [])
+        if actors:
+            lines.append(accent("  ACTORS:"))
+            for actor in actors:
+                name = actor.get("name", "Unknown")
+                role = actor.get("role", "")
+                interests = actor.get("interests", "")
+                status = actor.get("epistemic_status", "")
+                status_tag = f" [{status}]" if status else ""
 
-            # Evidence
-            evidence = trend.get("evidence", [])
-            if evidence and isinstance(evidence, list):
-                lines.append("   Evidence:")
-                for item in evidence:
-                    if isinstance(item, str):
-                        lines.append(
-                            self.wrap_text(
-                                f"* {clean_citations(item)}", indent=5, subsequent_indent=7
-                            )
-                        )
-                lines.append("")
+                lines.append(f"    {name}{muted(status_tag)}")
+                if role:
+                    lines.append(f"      Role: {role}")
+                if interests:
+                    lines.append(f"      Interests: {interests}")
+            lines.append("")
 
-            # Significance
-            significance = trend.get("significance", "")
-            if significance and isinstance(significance, str):
-                lines.append(
-                    self.wrap_text(f"Significance: {clean_citations(significance)}", indent=3)
-                )
-                lines.append("")
+        # Power dynamics
+        power = situation.get("power_dynamics", {})
+        if power:
+            lines.append(accent("  POWER DYNAMICS:"))
+            if power.get("who_benefits"):
+                lines.append(f"    Benefits: {clean_citations(power['who_benefits'])}")
+            if power.get("who_is_harmed"):
+                lines.append(f"    Harmed: {clean_citations(power['who_is_harmed'])}")
+            if power.get("who_decides"):
+                lines.append(f"    Decides: {clean_citations(power['who_decides'])}")
+            lines.append("")
 
-        return lines
+        # Coverage frame
+        frame = situation.get("coverage_frame", {})
+        if frame:
+            lines.append(accent("  COVERAGE FRAME:"))
+            if frame.get("dominant_frame"):
+                lines.append(f"    Frame: {frame['dominant_frame']}")
+            if frame.get("assumed_premise"):
+                lines.append(f"    Assumes: {muted(frame['assumed_premise'])}")
+            if frame.get("de_emphasized"):
+                lines.append(f"    De-emphasized: {muted(frame['de_emphasized'])}")
+            lines.append("")
 
-    def _format_events(self, events: list) -> list[str]:
-        """Format priority events section"""
-        if not events or not isinstance(events, list):
-            return []
+        # Causal structure
+        causal = situation.get("causal_structure", {})
+        if causal:
+            lines.append(accent("  CAUSAL STRUCTURE:"))
+            if causal.get("forces"):
+                lines.append(f"    Forces: {clean_citations(causal['forces'])}")
+            if causal.get("constraints"):
+                lines.append(f"    Constraints: {clean_citations(causal['constraints'])}")
+            if causal.get("dependencies"):
+                lines.append(f"    Dependencies: {clean_citations(causal['dependencies'])}")
+            lines.append("")
 
-        lines = [
-            header("-" * self.max_width),
-            header("PRIORITY EVENTS"),
-            header("-" * self.max_width),
-            "",
-        ]
+        # Information gaps
+        gaps = situation.get("information_gaps", [])
+        if gaps:
+            lines.append(accent("  INFORMATION GAPS:"))
+            for gap in gaps:
+                missing = gap.get("what_is_missing", "")
+                why = gap.get("why_it_matters", "")
+                feed = gap.get("feed_recommendation", "")
 
-        for i, event in enumerate(events, 1):
-            if not isinstance(event, dict):
-                continue
+                lines.append(f"    {warning('GAP')}: {missing}")
+                if why:
+                    lines.append(f"      Why it matters: {muted(why)}")
+                if feed:
+                    lines.append(f"      Suggested source: {muted(feed)}")
+            lines.append("")
 
-            # Event header with colorized priority
-            event_title = event.get("event", "Unknown Event")
-            priority = event.get("priority", "MEDIUM")
-            if isinstance(event_title, str) and isinstance(priority, str):
-                lines.append(f"{i}. {colorize_priority(priority)} {clean_citations(event_title)}")
-                lines.append("")
+        return "\n".join(lines)
 
-            # Summary
-            summary = event.get("summary", "")
-            if summary and isinstance(summary, str):
-                lines.append(self.wrap_text(clean_citations(summary), indent=3))
-                lines.append("")
+    def format_one_line_summary(self, report_data: dict[str, Any]) -> str:
+        """One-line summary for the command refresher."""
+        synthesis_data = report_data.get("synthesis_data", {})
+        situations = synthesis_data.get("situations", [])
+        articles = synthesis_data.get("metadata", {}).get("articles_analyzed", 0)
 
-            # Why it matters
-            why_matters = event.get("why_it_matters", "")
-            if why_matters and isinstance(why_matters, str):
-                lines.append(
-                    self.wrap_text(f"Why it matters: {clean_citations(why_matters)}", indent=3)
-                )
-                lines.append("")
-
-            # Context
-            context = event.get("context", "")
-            if context and isinstance(context, str):
-                lines.append(self.wrap_text(f"Context: {clean_citations(context)}", indent=3))
-                lines.append("")
-
-        return lines
-
-    def _format_predictions(self, predictions: list) -> list[str]:
-        """Format predictions and scenarios section"""
-        if not predictions or not isinstance(predictions, list):
-            return []
-
-        lines = [
-            header("-" * self.max_width),
-            header("PREDICTIONS & SCENARIOS"),
-            header("-" * self.max_width),
-            "",
-        ]
-
-        for i, prediction in enumerate(predictions, 1):
-            if not isinstance(prediction, dict):
-                continue
-
-            # Prediction header
-            pred_title = prediction.get("scenario", "Unknown Scenario")
-            timeframe = prediction.get("timeframe", "Unknown")
-            if isinstance(pred_title, str) and isinstance(timeframe, str):
-                lines.append(f"{i}. {clean_citations(pred_title)} ({timeframe})")
-                lines.append("")
-
-            # Prediction text
-            pred_text = prediction.get("prediction", "")
-            if pred_text and isinstance(pred_text, str):
-                lines.append(self.wrap_text(clean_citations(pred_text), indent=3))
-                lines.append("")
-
-            # Likelihood
-            likelihood = prediction.get("likelihood", "")
-            if likelihood and isinstance(likelihood, str):
-                lines.append(self.wrap_text(f"Likelihood: {clean_citations(likelihood)}", indent=3))
-                lines.append("")
-
-            # Indicators to watch
-            indicators = prediction.get("indicators_to_watch", [])
-            if indicators and isinstance(indicators, list):
-                lines.append("   Indicators to watch:")
-                for indicator in indicators:
-                    if isinstance(indicator, str):
-                        lines.append(
-                            self.wrap_text(
-                                f"* {clean_citations(indicator)}", indent=5, subsequent_indent=7
-                            )
-                        )
-                lines.append("")
-
-        return lines
-
-    def format_compact_summary(self, report_data: dict[str, Any]) -> str:
-        """
-        Format compact one-line summary of report
-
-        Args:
-            report_data: Report data from NewsletterSystem
-
-        Returns:
-            One-line summary string
-        """
-        duration = report_data.get("duration_hours", 0)
-        articles = report_data.get("articles_analyzed", 0)
-        report_type = report_data.get("report_type", "custom")
-
-        return f"{report_type.upper()} BRIEF: {articles} articles analyzed over {duration:.1f}h"
+        return f"BRIEF: {articles} articles, {len(situations)} situations analyzed"

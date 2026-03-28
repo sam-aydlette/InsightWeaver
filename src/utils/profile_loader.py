@@ -145,6 +145,146 @@ class UserProfile:
         """Get preferred content complexity level"""
         return self.get_content_preferences().get("complexity_level", "balanced")
 
+    def get_voting_context(self) -> dict:
+        """
+        Get voting context (districts, precinct, address)
+
+        Returns dict with keys:
+        - registered_state: Two-letter state code (e.g., "VA")
+        - county_fips: FIPS code for county
+        - congressional_district: e.g., "VA-11"
+        - state_senate_district: State senate district number
+        - state_house_district: State house/delegate district number
+        - school_district: School district name
+        - address: Dict with street, city, state, zip
+        """
+        return self.profile.get("voting_context", {})
+
+    def get_civic_preferences(self) -> dict:
+        """
+        Get civic tracking preferences
+
+        Returns dict with keys:
+        - track_elections: bool
+        - track_meetings: bool
+        - track_public_comments: bool
+        - track_budget_hearings: bool
+        - track_zoning: bool
+        - advance_notice_days: int (default 7)
+        """
+        return self.profile.get("civic_preferences", {})
+
+    def get_active_decisions(self) -> list[dict]:
+        """
+        Get list of active decisions in structured format
+
+        Supports both old format (list of strings) and new format (list of dicts).
+        Old format is converted to new format for consistency.
+
+        Returns list of dicts with keys:
+        - name: Decision name/description
+        - key_factors: List of factors to track
+        - decision_type: Type (career, housing, education, financial, civic)
+        - created_at: When the decision was added
+        """
+        priorities = self.get_personal_priorities()
+        decisions = priorities.get("active_decisions", [])
+
+        # Normalize to structured format
+        normalized = []
+        for decision in decisions:
+            if isinstance(decision, str):
+                # Old format: convert string to dict
+                normalized.append(
+                    {
+                        "name": decision,
+                        "key_factors": [],
+                        "decision_type": self._infer_decision_type(decision),
+                        "created_at": None,
+                    }
+                )
+            elif isinstance(decision, dict):
+                # New format: ensure all fields present
+                normalized.append(
+                    {
+                        "name": decision.get("name", "Unknown"),
+                        "key_factors": decision.get("key_factors", []),
+                        "decision_type": decision.get(
+                            "decision_type", self._infer_decision_type(decision.get("name", ""))
+                        ),
+                        "created_at": decision.get("created_at"),
+                    }
+                )
+
+        return normalized
+
+    def _infer_decision_type(self, name: str) -> str:
+        """Infer decision type from name if not specified."""
+        name_lower = name.lower()
+        if any(kw in name_lower for kw in ["career", "job", "work", "salary", "role"]):
+            return "career"
+        elif any(kw in name_lower for kw in ["housing", "home", "apartment", "rent", "mortgage"]):
+            return "housing"
+        elif any(kw in name_lower for kw in ["school", "education", "learning", "degree"]):
+            return "education"
+        elif any(kw in name_lower for kw in ["money", "invest", "financial", "savings"]):
+            return "financial"
+        elif any(kw in name_lower for kw in ["vote", "election", "policy", "civic"]):
+            return "civic"
+        return "other"
+
+    def get_source_calibration(self) -> dict:
+        """
+        Get source calibration settings
+
+        Returns dict with keys:
+        - trust_overrides: Dict of source_name -> override_value
+        - calibration_alerts_enabled: bool
+        - alert_threshold_deviation: float (how far from tracked trust to trigger alert)
+        """
+        return self.profile.get(
+            "source_calibration",
+            {
+                "trust_overrides": {},
+                "calibration_alerts_enabled": True,
+                "alert_threshold_deviation": 0.2,
+            },
+        )
+
+    def get_source_trust_override(self, source_name: str) -> float | None:
+        """
+        Get user's trust override for a specific source
+
+        Args:
+            source_name: Name of the source
+
+        Returns:
+            Override trust value (0.0-1.0) or None if no override set
+        """
+        calibration = self.get_source_calibration()
+        return calibration.get("trust_overrides", {}).get(source_name)
+
+    def get_districts(self) -> list[str]:
+        """
+        Get list of all electoral districts for the user
+
+        Returns list like ["VA-11", "SD-32", "HD-36"]
+        """
+        voting = self.get_voting_context()
+        districts = []
+        if cd := voting.get("congressional_district"):
+            districts.append(cd)
+        if sd := voting.get("state_senate_district"):
+            districts.append(f"SD-{sd}")
+        if hd := voting.get("state_house_district"):
+            districts.append(f"HD-{hd}")
+        return districts
+
+    def has_voting_context(self) -> bool:
+        """Check if user has configured voting context"""
+        voting = self.get_voting_context()
+        return bool(voting.get("registered_state") or voting.get("address"))
+
     def format_for_agent_context(self) -> str:
         """
         Format profile as contextual string for agent system prompts

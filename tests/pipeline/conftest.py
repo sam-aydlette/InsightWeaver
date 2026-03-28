@@ -12,15 +12,8 @@ import pytest
 def mock_settings(monkeypatch):
     """Mock settings for pipeline tests"""
     monkeypatch.setattr("src.pipeline.orchestrator.settings.anthropic_api_key", "test-key")
-    monkeypatch.setattr(
-        "src.pipeline.orchestrator.settings.enable_smart_rss_fetch", True
-    )
-    monkeypatch.setattr(
-        "src.pipeline.orchestrator.settings.smart_rss_fetch_threshold_minutes", 60
-    )
-    monkeypatch.setattr(
-        "src.pipeline.orchestrator.settings.enable_trust_verification", True
-    )
+    monkeypatch.setattr("src.pipeline.orchestrator.settings.enable_smart_rss_fetch", True)
+    monkeypatch.setattr("src.pipeline.orchestrator.settings.smart_rss_fetch_threshold_minutes", 60)
 
 
 @pytest.fixture

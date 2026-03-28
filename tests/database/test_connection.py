@@ -161,15 +161,16 @@ class TestCreateTables:
             "analysis_runs",
             "narrative_syntheses",
             "context_snapshots",
-            "api_data_sources",
-            "api_data_points",
-            "monitored_pages",
-            "page_changes",
             "memory_facts",
             "forecast_runs",
             "long_term_forecasts",
             "forecast_scenarios",
             "causal_chains",
+            "provenance_records",
+            "topic_clusters",
+            "narrative_frames",
+            "article_frames",
+            "frame_gaps",
         ]
 
         for table in expected_tables:

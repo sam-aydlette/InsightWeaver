@@ -180,151 +180,6 @@ class ContextSnapshot(Base):
     __table_args__ = (Index("idx_context_created_at", "created_at"),)
 
 
-# Models for enhanced data collection
-
-
-class APIDataSource(Base):
-    """
-    Configuration for API-based data sources (Tier 1 + Tier 4)
-    Examples: Government calendars, job boards, event APIs, economic data
-    """
-
-    __tablename__ = "api_data_sources"
-
-    id = Column(Integer, primary_key=True)
-    name = Column(String(200), nullable=False)
-    source_type = Column(
-        String(50), nullable=False
-    )  # 'calendar', 'job_market', 'events', 'economic', etc.
-    endpoint_url = Column(String(500))
-    api_key_required = Column(Boolean, default=False)
-    refresh_frequency_hours = Column(Integer, default=24)  # How often to fetch
-    is_active = Column(Boolean, default=True)
-    last_fetched = Column(DateTime)
-    last_error = Column(Text)
-    error_count = Column(Integer, default=0)
-    config_metadata = Column(JSON)  # API-specific config (headers, params, etc.)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-    __table_args__ = (
-        Index("idx_source_type", "source_type"),
-        Index("idx_last_fetched", "last_fetched"),
-    )
-
-
-class APIDataPoint(Base):
-    """
-    Individual data points collected from API sources
-    Flexible schema to handle different data types (events, jobs, metrics)
-    """
-
-    __tablename__ = "api_data_points"
-
-    id = Column(Integer, primary_key=True)
-    source_id = Column(Integer, ForeignKey("api_data_sources.id"), nullable=False)
-    data_type = Column(String(50), nullable=False)  # 'event', 'job_posting', 'metric', etc.
-    external_id = Column(String(200))  # ID from the external system
-    title = Column(String(500))
-    description = Column(Text)
-    data_payload = Column(JSON)  # Full structured data from API
-
-    # Time-based fields
-    event_date = Column(DateTime)  # For events/meetings
-    published_date = Column(DateTime)
-    expires_date = Column(DateTime)  # For job postings, events
-
-    # Relevance scoring
-    relevance_score = Column(Float)  # Score against user decisions
-    decision_ids = Column(JSON)  # Which decision_context items this relates to
-
-    # Context inclusion tracking
-    last_included_in_synthesis = Column(DateTime)
-    included_count = Column(Integer, default=0)
-
-    # Metadata
-    fetched_at = Column(DateTime, default=datetime.utcnow)
-    created_at = Column(DateTime, default=datetime.utcnow)
-
-    __table_args__ = (
-        Index("idx_api_data_type", "data_type"),
-        Index("idx_api_event_date", "event_date"),
-        Index("idx_api_relevance_score", "relevance_score"),
-        UniqueConstraint("source_id", "external_id", name="_source_external_id_uc"),
-    )
-
-
-class MonitoredPage(Base):
-    """
-    Configuration for website change monitoring (Tier 2)
-    Tracks specific pages for changes relevant to user decisions
-    """
-
-    __tablename__ = "monitored_pages"
-
-    id = Column(Integer, primary_key=True)
-    url = Column(String(500), nullable=False, unique=True)
-    name = Column(String(200), nullable=False)
-    page_type = Column(String(50))  # 'policy', 'job_board', 'event_page', etc.
-    selector = Column(String(200))  # CSS selector for content to monitor
-    check_frequency_hours = Column(Integer, default=24)
-    decision_ids = Column(JSON)  # Which decisions this page relates to
-
-    # Monitoring state
-    is_active = Column(Boolean, default=True)
-    last_checked = Column(DateTime)
-    last_changed = Column(DateTime)
-    last_content_hash = Column(String(64))  # Hash of monitored content
-    last_error = Column(Text)
-    error_count = Column(Integer, default=0)
-
-    # Metadata
-    config_metadata = Column(JSON)  # Page-specific config
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-    __table_args__ = (
-        Index("idx_page_type", "page_type"),
-        Index("idx_last_checked", "last_checked"),
-    )
-
-
-class PageChange(Base):
-    """
-    Detected changes from monitored pages
-    Stored as context for Claude analysis
-    """
-
-    __tablename__ = "page_changes"
-
-    id = Column(Integer, primary_key=True)
-    monitored_page_id = Column(Integer, ForeignKey("monitored_pages.id"), nullable=False)
-    change_type = Column(String(50))  # 'content_added', 'content_removed', 'content_modified'
-
-    # Change details
-    old_content = Column(Text)
-    new_content = Column(Text)
-    diff_summary = Column(Text)  # Human-readable summary of changes
-    content_hash = Column(String(64))
-
-    # Relevance
-    relevance_score = Column(Float)
-    decision_ids = Column(JSON)  # Which decisions this change relates to
-
-    # Context inclusion tracking
-    last_included_in_synthesis = Column(DateTime)
-    included_count = Column(Integer, default=0)
-
-    # Timestamps
-    detected_at = Column(DateTime, default=datetime.utcnow)
-    created_at = Column(DateTime, default=datetime.utcnow)
-
-    __table_args__ = (
-        Index("idx_page_change_detected_at", "detected_at"),
-        Index("idx_page_change_relevance_score", "relevance_score"),
-    )
-
-
 class MemoryFact(Base):
     """
     Persistent semantic facts extracted from narrative syntheses
@@ -498,4 +353,131 @@ class CausalChain(Base):
     __table_args__ = (
         Index("idx_causal_forecast", "forecast_id"),
         Index("idx_causal_confidence", "confidence"),
+    )
+
+
+class ProvenanceRecord(Base):
+    """
+    Provenance chain for a synthesis claim
+    Shows the reasoning path from sources to conclusions
+    """
+
+    __tablename__ = "provenance_records"
+
+    id = Column(Integer, primary_key=True)
+    synthesis_id = Column(Integer, ForeignKey("narrative_syntheses.id"), nullable=False)
+
+    # Claim being traced
+    claim_text = Column(Text, nullable=False)
+    claim_location = Column(String(100))
+
+    # Source attribution
+    contributing_sources = Column(JSON, nullable=False)
+    confidence_breakdown = Column(JSON)
+    alternative_interpretations = Column(JSON, default=list)
+    reasoning_chain = Column(JSON)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index("idx_provenance_synthesis", "synthesis_id"),
+        Index("idx_provenance_created", "created_at"),
+    )
+
+
+# ============================================================================
+# Narrative Frame Glossary
+# Emergent frame discovery from corpus behavior
+# ============================================================================
+
+
+class TopicCluster(Base):
+    """
+    A cluster of articles about a related topic.
+    Frames are discovered and tracked per cluster.
+    """
+
+    __tablename__ = "topic_clusters"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(200), nullable=False)
+    keywords = Column(JSON, nullable=False)  # List of keywords identifying this cluster
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    frames = relationship("NarrativeFrame", back_populates="topic_cluster")
+    gaps = relationship("FrameGap", back_populates="topic_cluster")
+
+    __table_args__ = (Index("idx_topic_cluster_name", "name"),)
+
+
+class NarrativeFrame(Base):
+    """
+    A distinct way of understanding a topic: what it emphasizes,
+    what it de-emphasizes, and what assumption it takes for granted.
+    Discovered emergently from the article corpus, validated by the user.
+    """
+
+    __tablename__ = "narrative_frames"
+
+    id = Column(Integer, primary_key=True)
+    topic_cluster_id = Column(Integer, ForeignKey("topic_clusters.id"), nullable=False)
+    label = Column(String(200), nullable=False)
+    description = Column(Text)
+    assumptions = Column(Text)  # What this frame takes for granted
+    first_seen = Column(DateTime, default=datetime.utcnow)
+    validated = Column(Boolean, default=False)  # User has reviewed and accepted
+
+    topic_cluster = relationship("TopicCluster", back_populates="frames")
+    article_frames = relationship("ArticleFrame", back_populates="frame")
+
+    __table_args__ = (
+        Index("idx_narrative_frame_cluster", "topic_cluster_id"),
+        Index("idx_narrative_frame_validated", "validated"),
+    )
+
+
+class ArticleFrame(Base):
+    """
+    Maps an article to a narrative frame with a confidence score.
+    Populated during synthesis when known frames exist for a topic.
+    """
+
+    __tablename__ = "article_frames"
+
+    id = Column(Integer, primary_key=True)
+    article_id = Column(Integer, ForeignKey("articles.id"), nullable=False)
+    frame_id = Column(Integer, ForeignKey("narrative_frames.id"), nullable=False)
+    confidence = Column(Float, nullable=False)  # 0.0-1.0
+    run_date = Column(DateTime, default=datetime.utcnow)
+
+    frame = relationship("NarrativeFrame", back_populates="article_frames")
+
+    __table_args__ = (
+        Index("idx_article_frame_article", "article_id"),
+        Index("idx_article_frame_frame", "frame_id"),
+        Index("idx_article_frame_run_date", "run_date"),
+    )
+
+
+class FrameGap(Base):
+    """
+    A recurring absence of a known frame from daily coverage.
+    Gaps are a feed curation signal: if a frame is consistently absent,
+    the user may want to add a source that carries that perspective.
+    """
+
+    __tablename__ = "frame_gaps"
+
+    id = Column(Integer, primary_key=True)
+    topic_cluster_id = Column(Integer, ForeignKey("topic_clusters.id"), nullable=False)
+    frame_label = Column(String(200), nullable=False)  # May reference a NarrativeFrame or be novel
+    first_detected = Column(DateTime, default=datetime.utcnow)
+    occurrences = Column(Integer, default=1)
+    feed_suggestion = Column(Text)  # Suggested feed type to fill this gap
+
+    topic_cluster = relationship("TopicCluster", back_populates="gaps")
+
+    __table_args__ = (
+        Index("idx_frame_gap_cluster", "topic_cluster_id"),
+        Index("idx_frame_gap_occurrences", "occurrences"),
     )

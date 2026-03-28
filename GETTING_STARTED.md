@@ -107,86 +107,79 @@ pip install -e .
 
 ---
 
-## Step 5: Run the Setup Wizard
+## Step 5: Configure Your Profile
+
+Edit `config/user_profile.example.json` with your location, profession, and interests, then copy it to `~/.insightweaver/user_profile.json`:
 
 ```
-insightweaver setup
+mkdir -p ~/.insightweaver
+cp config/user_profile.example.json ~/.insightweaver/user_profile.json
 ```
 
-This opens a web page in your browser where you can:
-- Enter your location (city and state)
-- Select your profession/industry
-- Choose topics you care about
-
-Follow the on-screen instructions to complete setup.
+Edit the file to match your situation -- your location, professional domain, and the topics you want to track.
 
 ---
 
-## Step 6: Start InsightWeaver
+## Step 6: Generate Your First Briefing
 
 ```
-insightweaver start
+insightweaver brief
 ```
 
-This opens the InsightWeaver dashboard in your web browser at `http://localhost:5000`.
+InsightWeaver will:
+1. Fetch the latest news from your configured RSS feeds
+2. Deduplicate and filter articles relevant to your profile
+3. Synthesize a briefing with inline citations, epistemic labeling, and frame analysis
+4. Save the report locally
+
+This takes 2-5 minutes. Reports are saved to `reports/briefings/`.
 
 ---
 
 ## Using InsightWeaver
 
-### The Dashboard
+InsightWeaver is a CLI application. Run `insightweaver` to enter interactive mode, or run commands directly:
 
-When you start InsightWeaver, you'll see a dashboard with three main features:
+```
+insightweaver brief              # Generate a daily briefing
+insightweaver brief --hours 48   # Look back 48 hours
+insightweaver brief -cs -n       # National cybersecurity news only
+insightweaver forecast           # Generate trend forecasts
+insightweaver frames list        # View narrative frame glossary
+insightweaver frames gaps        # View perspective gaps in your feeds
+```
 
-#### Generate Daily Brief
-Click this to create a personalized news briefing. InsightWeaver will:
-1. Fetch the latest news from hundreds of sources
-2. Analyze what's relevant to your location and interests
-3. Generate a summary report
-
-This takes 2-5 minutes. When complete, click "View Full Report" to read your briefing.
-
-#### Generate Forecast
-Click this to get predictions about trends that may affect you. The forecast organizes predictions by confidence level:
-- **Certain**: Things that are very likely to happen
-- **Likely**: Evidence-based projections
-- **Possible**: Weak signals worth watching
-
-#### Ask AI
-Type a question and get a fact-checked answer. InsightWeaver verifies the response against authoritative sources and checks for bias.
+Run `insightweaver --help` or type `help` in interactive mode for the full command list.
 
 ### Viewing Reports
 
-All generated reports are saved automatically. You can find them in:
-- `reports/briefings/` - Your daily briefings
-- `reports/forecasts/` - Your forecasts
-- `reports/trust/` - Your Q&A history
+All generated reports are saved automatically:
+- `reports/briefings/` - Your daily briefings (HTML and JSON)
+- `reports/forecasts/` - Your trend forecasts
 
 Reports are saved as HTML files you can open in any web browser.
 
 ---
 
-## Starting InsightWeaver Each Day
+## Running InsightWeaver Each Day
 
 After the initial setup, you only need two steps:
 
 1. **Open a terminal** and navigate to your InsightWeaver folder
 
-2. **Activate and start:**
+2. **Activate and run:**
 
    Windows:
    ```
    venv\Scripts\activate
-   insightweaver start
+   insightweaver brief
    ```
 
    Mac/Linux:
    ```
    source venv/bin/activate
-   insightweaver start
+   insightweaver brief
    ```
-
-Your browser will open to the dashboard automatically.
 
 ---
 
@@ -213,15 +206,11 @@ pip install -e .
 2. Make sure there are no extra spaces around the `=` sign
 3. Verify your API key is valid at [console.anthropic.com](https://console.anthropic.com/)
 
-### Browser doesn't open automatically
-
-Manually open your web browser and go to: `http://localhost:5000`
-
 ### Reports are empty or have errors
 
 1. Check your internet connection
 2. Make sure your API key has available credits
-3. Try running `insightweaver brief health` to check system status
+3. Try running with `--debug` flag: `insightweaver brief --debug`
 
 ---
 
@@ -229,7 +218,7 @@ Manually open your web browser and go to: `http://localhost:5000`
 
 ### User Profile
 
-Your preferences are stored in `config/user_profile.json`. You can edit this file directly or use the setup wizard (`insightweaver setup`).
+Your preferences are stored in `~/.insightweaver/user_profile.json`. Edit this file directly to change your location, professional domain, or topic interests.
 
 ### Email Reports (Optional)
 
@@ -254,7 +243,7 @@ News sources are configured in the `config/feeds/` folder. Each JSON file contai
 
 - All data is stored locally on your computer
 - News articles are fetched directly from public RSS feeds
-- Your questions and briefings are processed through the Anthropic API
+- Your briefings are processed through the Anthropic API
 - No data is shared with third parties
 - You can delete all data by removing the `data/` folder
 
@@ -266,16 +255,6 @@ News sources are configured in the `config/feeds/` folder. Each JSON file contai
 - **Disk Space**: ~100MB for database and reports
 - **Internet**: Required for fetching news and AI analysis
 - **API Credits**: Anthropic API key with available credits (~$0.10-0.50 per briefing)
-
----
-
-## Getting Help
-
-If you run into problems:
-
-1. Check the Troubleshooting section above
-2. Run `insightweaver brief health` to diagnose issues
-3. Report issues at: https://github.com/anthropics/claude-code/issues
 
 ---
 

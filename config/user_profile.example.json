@@ -51,9 +51,24 @@
   "personal_priorities": {
     "life_stage": "mid-career professional, family considerations",
     "active_decisions": [
-      "career advancement opportunities",
-      "housing market monitoring",
-      "education system quality"
+      {
+        "name": "career advancement opportunities",
+        "key_factors": ["salary range", "work-life balance", "growth potential", "remote work options"],
+        "decision_type": "career",
+        "created_at": "2025-01-15"
+      },
+      {
+        "name": "housing market monitoring",
+        "key_factors": ["price trends", "interest rates", "neighborhood quality", "commute time"],
+        "decision_type": "housing",
+        "created_at": "2025-01-15"
+      },
+      {
+        "name": "education system quality",
+        "key_factors": ["test scores", "teacher retention", "programs offered", "class sizes"],
+        "decision_type": "education",
+        "created_at": "2025-01-15"
+      }
     ],
     "priority_topics": [
       "economic trends",
@@ -63,6 +78,11 @@
       "public safety",
       "education quality"
     ]
+  },
+  "source_calibration": {
+    "trust_overrides": {},
+    "calibration_alerts_enabled": true,
+    "alert_threshold_deviation": 0.2
   },
   "content_preferences": {
     "excluded_topics": [
@@ -105,5 +125,27 @@
       "sports",
       "entertainment"
     ]
+  },
+  "voting_context": {
+    "registered_state": "VA",
+    "county_fips": "51013",
+    "congressional_district": "VA-11",
+    "state_senate_district": "32",
+    "state_house_district": "36",
+    "school_district": "Arlington Public Schools",
+    "address": {
+      "street": "1234 Example St",
+      "city": "Arlington",
+      "state": "VA",
+      "zip": "22201"
+    }
+  },
+  "civic_preferences": {
+    "track_elections": true,
+    "track_meetings": true,
+    "track_public_comments": true,
+    "track_budget_hearings": true,
+    "track_zoning": true,
+    "advance_notice_days": 7
   }
 }

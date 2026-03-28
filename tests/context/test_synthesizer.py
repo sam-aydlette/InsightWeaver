@@ -1,5 +1,5 @@
 """
-Tests for Narrative Synthesizer
+Tests for Two-Pass Narrative Synthesizer
 """
 
 import json
@@ -10,29 +10,14 @@ import pytest
 from src.context.synthesizer import NarrativeSynthesizer
 
 
-class TestNarrativeSynthesizerInit:
-    """Tests for NarrativeSynthesizer initialization"""
+class TestSynthesizerConfiguration:
+    """Tests for synthesizer configuration behavior"""
 
+    @patch("src.context.synthesizer.FrameManager")
     @patch("src.context.synthesizer.ContextCurator")
     @patch("src.context.synthesizer.ClaudeClient")
-    @patch("src.context.synthesizer.ReflectionEngine")
-    def test_init_creates_components(
-        self, mock_reflection, mock_client, mock_curator
-    ):
-        """Should create curator, client, and reflection engine"""
-        NarrativeSynthesizer()
-
-        mock_curator.assert_called_once()
-        mock_client.assert_called_once()
-        mock_reflection.assert_called_once()
-
-    @patch("src.context.synthesizer.ContextCurator")
-    @patch("src.context.synthesizer.ClaudeClient")
-    @patch("src.context.synthesizer.ReflectionEngine")
-    def test_init_with_topic_filters(
-        self, mock_reflection, mock_client, mock_curator
-    ):
-        """Should pass topic filters to curator"""
+    def test_topic_filters_are_applied_to_curation(self, mock_client, mock_curator, mock_frame_mgr):
+        """Topic filters should affect which articles are included in synthesis"""
         filters = {"topics": ["cybersecurity"]}
 
         NarrativeSynthesizer(topic_filters=filters)
@@ -40,382 +25,74 @@ class TestNarrativeSynthesizerInit:
         mock_curator.assert_called_with(topic_filters=filters)
 
 
-class TestBuildSynthesisTask:
-    """Tests for synthesis task building"""
+class TestJsonParsing:
+    """Tests for Claude JSON response parsing"""
 
+    @patch("src.context.synthesizer.FrameManager")
     @patch("src.context.synthesizer.ContextCurator")
     @patch("src.context.synthesizer.ClaudeClient")
-    @patch("src.context.synthesizer.ReflectionEngine")
-    def test_build_synthesis_task_includes_article_count(
-        self, mock_reflection, mock_client, mock_curator
-    ):
-        """Should include article count in task prompt"""
+    def test_parses_valid_json(self, mock_client, mock_curator, mock_frame_mgr):
+        """Valid JSON should be parsed correctly"""
+        synthesizer = NarrativeSynthesizer()
+        response = json.dumps({"clusters": [{"title": "Test", "article_ids": [1]}]})
+
+        result = synthesizer._parse_json_response(response)
+
+        assert result["clusters"][0]["title"] == "Test"
+
+    @patch("src.context.synthesizer.FrameManager")
+    @patch("src.context.synthesizer.ContextCurator")
+    @patch("src.context.synthesizer.ClaudeClient")
+    def test_strips_markdown_fences(self, mock_client, mock_curator, mock_frame_mgr):
+        """Should handle JSON wrapped in markdown code blocks"""
+        synthesizer = NarrativeSynthesizer()
+        response = '```json\n{"key": "value"}\n```'
+
+        result = synthesizer._parse_json_response(response)
+
+        assert result["key"] == "value"
+
+    @patch("src.context.synthesizer.FrameManager")
+    @patch("src.context.synthesizer.ContextCurator")
+    @patch("src.context.synthesizer.ClaudeClient")
+    def test_returns_empty_dict_on_invalid_json(self, mock_client, mock_curator, mock_frame_mgr):
+        """Invalid JSON should return empty dict, not crash"""
         synthesizer = NarrativeSynthesizer()
 
-        task = synthesizer._build_synthesis_task(25)
+        result = synthesizer._parse_json_response("This is not JSON")
 
-        assert "25" in task
-        assert "articles" in task.lower()
+        assert result == {}
 
+
+class TestCitationMap:
+    """Tests for citation map building"""
+
+    @patch("src.context.synthesizer.FrameManager")
     @patch("src.context.synthesizer.ContextCurator")
     @patch("src.context.synthesizer.ClaudeClient")
-    @patch("src.context.synthesizer.ReflectionEngine")
-    def test_build_synthesis_task_includes_json_structure(
-        self, mock_reflection, mock_client, mock_curator
-    ):
-        """Should include expected JSON structure"""
-        synthesizer = NarrativeSynthesizer()
-
-        task = synthesizer._build_synthesis_task(10)
-
-        assert "bottom_line" in task
-        assert "trends_and_patterns" in task
-        assert "priority_events" in task
-        assert "predictions_scenarios" in task
-
-
-class TestBuildSynthesisTaskWithCitations:
-    """Tests for citation-enhanced synthesis task"""
-
-    @patch("src.context.synthesizer.ContextCurator")
-    @patch("src.context.synthesizer.ClaudeClient")
-    @patch("src.context.synthesizer.ReflectionEngine")
-    def test_build_task_with_citations_includes_article_refs(
-        self, mock_reflection, mock_client, mock_curator
-    ):
-        """Should include article reference list"""
+    def test_builds_citation_map_from_articles(self, mock_client, mock_curator, mock_frame_mgr):
+        """Citation map should index articles by 1-based position"""
         synthesizer = NarrativeSynthesizer()
         articles = [
-            {"id": 1, "title": "Article 1", "source": "Source 1", "published_date": "2024-01-15"},
-            {"id": 2, "title": "Article 2", "source": "Source 2", "published_date": "2024-01-15"},
+            {"id": 10, "title": "Article A", "source": "Source A", "url": "https://a.com"},
+            {"id": 20, "title": "Article B", "source": "Source B", "url": "https://b.com"},
         ]
 
-        task, citation_map = synthesizer._build_synthesis_task_with_citations(articles, 2)
+        result = synthesizer._build_citation_map(articles)
 
-        assert "[1]" in task
-        assert "[2]" in task
-        assert "Article 1" in task
-        assert "Article 2" in task
-        # Verify citation_map is also returned
-        assert "1" in citation_map
-        assert "2" in citation_map
-        assert citation_map["1"]["title"] == "Article 1"
-
-    @patch("src.context.synthesizer.ContextCurator")
-    @patch("src.context.synthesizer.ClaudeClient")
-    @patch("src.context.synthesizer.ReflectionEngine")
-    def test_build_task_with_citations_includes_citation_instructions(
-        self, mock_reflection, mock_client, mock_curator
-    ):
-        """Should include citation instructions"""
-        synthesizer = NarrativeSynthesizer()
-        articles = [{"id": 1, "title": "Test", "source": "Test", "published_date": "2024-01-15"}]
-
-        task, citation_map = synthesizer._build_synthesis_task_with_citations(articles, 1)
-
-        assert "CRITICAL" in task
-        assert "citation" in task.lower()
-        assert "article_citations" in task
-
-
-class TestParseSynthesisResponse:
-    """Tests for parsing Claude's response"""
-
-    @patch("src.context.synthesizer.ContextCurator")
-    @patch("src.context.synthesizer.ClaudeClient")
-    @patch("src.context.synthesizer.ReflectionEngine")
-    def test_parse_valid_json(
-        self, mock_reflection, mock_client, mock_curator
-    ):
-        """Should parse valid JSON response"""
-        synthesizer = NarrativeSynthesizer()
-        response = json.dumps({
-            "bottom_line": {"summary": "Test summary"},
-            "trends_and_patterns": {},
-            "priority_events": [],
-            "predictions_scenarios": {},
-        })
-
-        result = synthesizer._parse_synthesis_response(response)
-
-        assert result["bottom_line"]["summary"] == "Test summary"
-
-    @patch("src.context.synthesizer.ContextCurator")
-    @patch("src.context.synthesizer.ClaudeClient")
-    @patch("src.context.synthesizer.ReflectionEngine")
-    def test_parse_removes_markdown_blocks(
-        self, mock_reflection, mock_client, mock_curator
-    ):
-        """Should remove markdown code blocks"""
-        synthesizer = NarrativeSynthesizer()
-        response = """```json
-        {"bottom_line": {"summary": "Test"}, "trends_and_patterns": {}, "priority_events": [], "predictions_scenarios": {}}
-        ```"""
-
-        result = synthesizer._parse_synthesis_response(response)
-
-        assert result["bottom_line"]["summary"] == "Test"
-
-    @patch("src.context.synthesizer.ContextCurator")
-    @patch("src.context.synthesizer.ClaudeClient")
-    @patch("src.context.synthesizer.ReflectionEngine")
-    def test_parse_adds_timestamp(
-        self, mock_reflection, mock_client, mock_curator
-    ):
-        """Should add timestamp to metadata"""
-        synthesizer = NarrativeSynthesizer()
-        response = json.dumps({
-            "bottom_line": {},
-            "trends_and_patterns": {},
-            "priority_events": [],
-            "predictions_scenarios": {},
-        })
-
-        result = synthesizer._parse_synthesis_response(response)
-
-        assert "metadata" in result
-        assert "generated_at" in result["metadata"]
-
-    @patch("src.context.synthesizer.ContextCurator")
-    @patch("src.context.synthesizer.ClaudeClient")
-    @patch("src.context.synthesizer.ReflectionEngine")
-    def test_parse_invalid_json_returns_fallback(
-        self, mock_reflection, mock_client, mock_curator
-    ):
-        """Should return fallback structure for invalid JSON"""
-        synthesizer = NarrativeSynthesizer()
-        response = "This is not valid JSON"
-
-        result = synthesizer._parse_synthesis_response(response)
-
-        assert "bottom_line" in result
-        assert "trends_and_patterns" in result
-        assert "parse_error" in result["metadata"]
-
-
-class TestExtractNarrativeForVerification:
-    """Tests for extracting narrative text"""
-
-    @patch("src.context.synthesizer.ContextCurator")
-    @patch("src.context.synthesizer.ClaudeClient")
-    @patch("src.context.synthesizer.ReflectionEngine")
-    def test_extract_includes_bottom_line(
-        self, mock_reflection, mock_client, mock_curator, sample_synthesis_data
-    ):
-        """Should include bottom line summary"""
-        synthesizer = NarrativeSynthesizer()
-
-        result = synthesizer._extract_narrative_for_verification(sample_synthesis_data)
-
-        assert "Test summary" in result
-
-    @patch("src.context.synthesizer.ContextCurator")
-    @patch("src.context.synthesizer.ClaudeClient")
-    @patch("src.context.synthesizer.ReflectionEngine")
-    def test_extract_includes_trends(
-        self, mock_reflection, mock_client, mock_curator, sample_synthesis_data
-    ):
-        """Should include trend information"""
-        synthesizer = NarrativeSynthesizer()
-
-        result = synthesizer._extract_narrative_for_verification(sample_synthesis_data)
-
-        assert "cybersecurity" in result.lower()
-
-    @patch("src.context.synthesizer.ContextCurator")
-    @patch("src.context.synthesizer.ClaudeClient")
-    @patch("src.context.synthesizer.ReflectionEngine")
-    def test_extract_includes_events(
-        self, mock_reflection, mock_client, mock_curator, sample_synthesis_data
-    ):
-        """Should include priority events"""
-        synthesizer = NarrativeSynthesizer()
-
-        result = synthesizer._extract_narrative_for_verification(sample_synthesis_data)
-
-        assert "council meeting" in result.lower()
-
-    @patch("src.context.synthesizer.ContextCurator")
-    @patch("src.context.synthesizer.ClaudeClient")
-    @patch("src.context.synthesizer.ReflectionEngine")
-    def test_extract_handles_string_events(
-        self, mock_reflection, mock_client, mock_curator
-    ):
-        """Should handle events that are strings (Claude formatting issue)"""
-        synthesizer = NarrativeSynthesizer()
-        data = {
-            "bottom_line": {"summary": "Summary"},
-            "trends_and_patterns": {},
-            "priority_events": ["Event as string", {"event": "Event as dict"}],
-            "predictions_scenarios": {},
-        }
-
-        result = synthesizer._extract_narrative_for_verification(data)
-
-        assert "Event as string" in result
-        assert "Event as dict" in result
-
-
-class TestEvaluateTrustThreshold:
-    """Tests for trust threshold evaluation"""
-
-    @patch("src.context.synthesizer.ContextCurator")
-    @patch("src.context.synthesizer.ClaudeClient")
-    @patch("src.context.synthesizer.ReflectionEngine")
-    def test_passes_with_good_scores(
-        self, mock_reflection, mock_client, mock_curator
-    ):
-        """Should pass with good trust scores"""
-        synthesizer = NarrativeSynthesizer()
-        analysis = {
-            "facts": {"contradicted_count": 0, "total_claims": 20},
-            "bias": {"loaded_language": []},
-            "intimacy": {"issues": []},
-        }
-
-        result = synthesizer._evaluate_trust_threshold(analysis)
-
-        assert result is True
-
-    @patch("src.context.synthesizer.ContextCurator")
-    @patch("src.context.synthesizer.ClaudeClient")
-    @patch("src.context.synthesizer.ReflectionEngine")
-    def test_fails_with_too_many_contradictions(
-        self, mock_reflection, mock_client, mock_curator
-    ):
-        """Should fail when >5% contradictions"""
-        synthesizer = NarrativeSynthesizer()
-        analysis = {
-            "facts": {"contradicted_count": 2, "total_claims": 10},  # 20% contradicted
-            "bias": {"loaded_language": []},
-            "intimacy": {"issues": []},
-        }
-
-        result = synthesizer._evaluate_trust_threshold(analysis)
-
-        assert result is False
-
-    @patch("src.context.synthesizer.ContextCurator")
-    @patch("src.context.synthesizer.ClaudeClient")
-    @patch("src.context.synthesizer.ReflectionEngine")
-    def test_fails_with_too_much_bias(
-        self, mock_reflection, mock_client, mock_curator
-    ):
-        """Should fail when >3 loaded language instances"""
-        synthesizer = NarrativeSynthesizer()
-        analysis = {
-            "facts": {"contradicted_count": 0, "total_claims": 10},
-            "bias": {"loaded_language": ["word1", "word2", "word3", "word4"]},
-            "intimacy": {"issues": []},
-        }
-
-        result = synthesizer._evaluate_trust_threshold(analysis)
-
-        assert result is False
-
-    @patch("src.context.synthesizer.ContextCurator")
-    @patch("src.context.synthesizer.ClaudeClient")
-    @patch("src.context.synthesizer.ReflectionEngine")
-    def test_fails_with_high_intimacy_issues(
-        self, mock_reflection, mock_client, mock_curator
-    ):
-        """Should fail with high-severity intimacy issues"""
-        synthesizer = NarrativeSynthesizer()
-        analysis = {
-            "facts": {"contradicted_count": 0, "total_claims": 10},
-            "bias": {"loaded_language": []},
-            "intimacy": {"issues": [{"severity": "HIGH", "text": "issue"}]},
-        }
-
-        result = synthesizer._evaluate_trust_threshold(analysis)
-
-        assert result is False
-
-    @patch("src.context.synthesizer.ContextCurator")
-    @patch("src.context.synthesizer.ClaudeClient")
-    @patch("src.context.synthesizer.ReflectionEngine")
-    def test_passes_with_medium_intimacy_issues(
-        self, mock_reflection, mock_client, mock_curator
-    ):
-        """Should pass with medium-severity intimacy issues"""
-        synthesizer = NarrativeSynthesizer()
-        analysis = {
-            "facts": {"contradicted_count": 0, "total_claims": 10},
-            "bias": {"loaded_language": []},
-            "intimacy": {"issues": [{"severity": "MEDIUM", "text": "issue"}]},
-        }
-
-        result = synthesizer._evaluate_trust_threshold(analysis)
-
-        assert result is True
-
-
-class TestAddTrustConstraints:
-    """Tests for adding trust constraints to failed attempts"""
-
-    @patch("src.context.synthesizer.ContextCurator")
-    @patch("src.context.synthesizer.ClaudeClient")
-    @patch("src.context.synthesizer.ReflectionEngine")
-    def test_adds_fact_constraints(
-        self, mock_reflection, mock_client, mock_curator
-    ):
-        """Should add fact accuracy constraints for fact failures"""
-        synthesizer = NarrativeSynthesizer()
-        task = "Original task"
-        history = [
-            {"analysis": {"facts": {"contradicted_count": 2}}}
-        ]
-
-        result = synthesizer._add_trust_constraints(task, history)
-
-        assert "FACTUAL ACCURACY" in result
-        assert "ONLY make claims" in result
-
-    @patch("src.context.synthesizer.ContextCurator")
-    @patch("src.context.synthesizer.ClaudeClient")
-    @patch("src.context.synthesizer.ReflectionEngine")
-    def test_adds_bias_constraints(
-        self, mock_reflection, mock_client, mock_curator
-    ):
-        """Should add bias constraints for bias failures"""
-        synthesizer = NarrativeSynthesizer()
-        task = "Original task"
-        history = [
-            {"analysis": {"bias": {"loaded_language": ["a", "b", "c", "d"]}}}
-        ]
-
-        result = synthesizer._add_trust_constraints(task, history)
-
-        assert "NEUTRAL FRAMING" in result
-        assert "neutral" in result.lower()
-
-    @patch("src.context.synthesizer.ContextCurator")
-    @patch("src.context.synthesizer.ClaudeClient")
-    @patch("src.context.synthesizer.ReflectionEngine")
-    def test_adds_tone_constraints(
-        self, mock_reflection, mock_client, mock_curator
-    ):
-        """Should add tone constraints for intimacy failures"""
-        synthesizer = NarrativeSynthesizer()
-        task = "Original task"
-        history = [
-            {"analysis": {"intimacy": {"issues": [{"severity": "HIGH"}]}}}
-        ]
-
-        result = synthesizer._add_trust_constraints(task, history)
-
-        assert "PROFESSIONAL TONE" in result
+        assert result["1"]["title"] == "Article A"
+        assert result["1"]["article_id"] == 10
+        assert result["2"]["title"] == "Article B"
+        assert result["2"]["source"] == "Source B"
 
 
 class TestEstimateTokens:
     """Tests for token estimation"""
 
+    @patch("src.context.synthesizer.FrameManager")
     @patch("src.context.synthesizer.ContextCurator")
     @patch("src.context.synthesizer.ClaudeClient")
-    @patch("src.context.synthesizer.ReflectionEngine")
-    def test_estimate_tokens_basic(
-        self, mock_reflection, mock_client, mock_curator
-    ):
+    def test_estimate_tokens_basic(self, mock_client, mock_curator, mock_frame_mgr):
         """Should estimate tokens from context"""
         synthesizer = NarrativeSynthesizer()
         context = {"articles": [{"content": "a" * 100}], "memory": "b" * 100}
@@ -424,12 +101,10 @@ class TestEstimateTokens:
 
         assert result > 0
 
+    @patch("src.context.synthesizer.FrameManager")
     @patch("src.context.synthesizer.ContextCurator")
     @patch("src.context.synthesizer.ClaudeClient")
-    @patch("src.context.synthesizer.ReflectionEngine")
-    def test_estimate_tokens_empty_context(
-        self, mock_reflection, mock_client, mock_curator
-    ):
+    def test_estimate_tokens_empty_context(self, mock_client, mock_curator, mock_frame_mgr):
         """Should handle empty context"""
         synthesizer = NarrativeSynthesizer()
 
@@ -441,28 +116,23 @@ class TestEstimateTokens:
 class TestHashProfile:
     """Tests for profile hashing"""
 
+    @patch("src.context.synthesizer.FrameManager")
     @patch("src.context.synthesizer.ContextCurator")
     @patch("src.context.synthesizer.ClaudeClient")
-    @patch("src.context.synthesizer.ReflectionEngine")
-    def test_hash_profile_consistent(
-        self, mock_reflection, mock_client, mock_curator
-    ):
-        """Should produce consistent hash for same profile"""
+    def test_hash_profile_consistent(self, mock_client, mock_curator, mock_frame_mgr):
+        """Same profile should produce same hash"""
         synthesizer = NarrativeSynthesizer()
         profile = {"location": "Fairfax", "domains": ["cyber"]}
 
-        hash1 = synthesizer._hash_profile(profile)
-        hash2 = synthesizer._hash_profile(profile)
+        assert synthesizer._hash_profile(profile) == synthesizer._hash_profile(profile)
 
-        assert hash1 == hash2
-
+    @patch("src.context.synthesizer.FrameManager")
     @patch("src.context.synthesizer.ContextCurator")
     @patch("src.context.synthesizer.ClaudeClient")
-    @patch("src.context.synthesizer.ReflectionEngine")
     def test_hash_profile_different_for_different_profiles(
-        self, mock_reflection, mock_client, mock_curator
+        self, mock_client, mock_curator, mock_frame_mgr
     ):
-        """Should produce different hash for different profiles"""
+        """Different profiles should produce different hashes"""
         synthesizer = NarrativeSynthesizer()
 
         hash1 = synthesizer._hash_profile({"location": "Fairfax"})
@@ -470,31 +140,25 @@ class TestHashProfile:
 
         assert hash1 != hash2
 
+    @patch("src.context.synthesizer.FrameManager")
     @patch("src.context.synthesizer.ContextCurator")
     @patch("src.context.synthesizer.ClaudeClient")
-    @patch("src.context.synthesizer.ReflectionEngine")
-    def test_hash_profile_none_returns_none(
-        self, mock_reflection, mock_client, mock_curator
-    ):
-        """Should return 'none' for None profile"""
+    def test_hash_profile_none_returns_none(self, mock_client, mock_curator, mock_frame_mgr):
+        """None profile should return 'none'"""
         synthesizer = NarrativeSynthesizer()
 
-        result = synthesizer._hash_profile(None)
-
-        assert result == "none"
+        assert synthesizer._hash_profile(None) == "none"
 
 
-class TestSynthesize:
-    """Tests for main synthesize method"""
+class TestSynthesizeNoArticles:
+    """Tests for synthesize with no available articles"""
 
     @pytest.mark.asyncio
+    @patch("src.context.synthesizer.FrameManager")
     @patch("src.context.synthesizer.ContextCurator")
     @patch("src.context.synthesizer.ClaudeClient")
-    @patch("src.context.synthesizer.ReflectionEngine")
-    async def test_synthesize_no_articles(
-        self, mock_reflection, mock_client, mock_curator
-    ):
-        """Should return no_articles status when no articles available"""
+    async def test_returns_no_articles_status(self, mock_client, mock_curator, mock_frame_mgr):
+        """Should return no_articles when curator finds nothing"""
         mock_curator_instance = MagicMock()
         mock_curator.return_value = mock_curator_instance
         mock_curator_instance.curate_for_narrative_synthesis = AsyncMock(
@@ -502,168 +166,124 @@ class TestSynthesize:
         )
 
         synthesizer = NarrativeSynthesizer()
-
         result = await synthesizer.synthesize()
 
         assert result["status"] == "no_articles"
         assert result["articles_analyzed"] == 0
 
 
-class TestSynthesizeWithTrustVerificationCitationMap:
-    """Integration tests for citation_map handling in trust-verified synthesis"""
+class TestSynthesizeTwoPass:
+    """Tests for the two-pass synthesis flow"""
 
     @pytest.mark.asyncio
+    @patch("src.context.synthesizer.FrameManager")
     @patch("src.context.synthesizer.ContextCurator")
     @patch("src.context.synthesizer.ClaudeClient")
-    @patch("src.context.synthesizer.ReflectionEngine")
-    @patch("src.context.synthesizer.TrustPipeline", create=True)
-    async def test_citation_map_injected_from_articles(
-        self, mock_trust_pipeline_class, mock_reflection, mock_client, mock_curator
+    async def test_clusters_articles_then_synthesizes(
+        self, mock_client, mock_curator, mock_frame_mgr
     ):
-        """Citation map should be built from articles and injected into synthesis output"""
-        # Setup curator to return test articles
+        """Should run clustering (Pass 1) then situation synthesis (Pass 2)"""
+        # Setup curator with test articles
         test_articles = [
             {
-                "id": 1,
-                "title": "Article One",
-                "source": "Source A",
-                "url": "https://example.com/1",
-                "published_date": "2025-01-15",
-            },
-            {
-                "id": 2,
-                "title": "Article Two",
-                "source": "Source B",
-                "url": "https://example.com/2",
-                "published_date": "2025-01-16",
-            },
+                "id": i,
+                "title": f"Article {i}",
+                "source": f"Source {i}",
+                "content": f"Content {i}",
+                "published_date": "2026-01-15",
+                "url": f"https://example.com/{i}",
+            }
+            for i in range(1, 6)
         ]
         mock_curator_instance = MagicMock()
         mock_curator.return_value = mock_curator_instance
         mock_curator_instance.curate_for_narrative_synthesis = AsyncMock(
             return_value={"articles": test_articles}
         )
+        mock_curator_instance._format_user_profile = MagicMock(return_value={})
+        mock_curator_instance._get_synthesis_instructions = MagicMock(return_value="")
 
-        # Setup Claude to return valid synthesis (without citation_map - simulating real behavior)
+        # Setup Claude responses
         mock_client_instance = MagicMock()
         mock_client.return_value = mock_client_instance
-        mock_client_instance.analyze_with_context = AsyncMock(
-            return_value=json.dumps({
-                "bottom_line": {"summary": "Test summary^[1,2]", "article_citations": [1, 2]},
-                "trends_and_patterns": {"local": [], "national": []},
-                "priority_events": [],
-                "predictions_scenarios": {},
-                "metadata": {
-                    "articles_analyzed": 2,
-                    "generated_at": "2025-01-15T00:00:00",
-                    # Note: No citation_map - Claude didn't return it
-                },
-            })
-        )
 
-        # Setup trust pipeline to pass verification
-        mock_trust_pipeline_instance = MagicMock()
-        mock_trust_pipeline_class.return_value = mock_trust_pipeline_instance
-        mock_trust_pipeline_instance.analyze_response = AsyncMock(
-            return_value={
-                "facts": {"contradicted_count": 0, "total_claims": 5},
-                "bias": {"loaded_language": []},
-                "intimacy": {"issues": []},
+        # Pass 1: clustering response
+        clustering_response = json.dumps(
+            {
+                "clusters": [
+                    {"title": "Topic A", "article_ids": [1, 2, 3], "keywords": ["topic", "a"]},
+                    {"title": "Topic B", "article_ids": [4], "keywords": ["topic", "b"]},
+                    {"title": "Topic C", "article_ids": [5], "keywords": ["topic", "c"]},
+                ]
             }
         )
 
-        # Patch the import inside the method
-        with patch("src.context.synthesizer.TrustPipeline", mock_trust_pipeline_class):
-            synthesizer = NarrativeSynthesizer()
-            result = await synthesizer.synthesize_with_trust_verification(
-                hours=24, max_articles=10, max_retries=1
-            )
-
-        # Verify synthesis succeeded
-        assert result["status"] == "success"
-        assert "synthesis_data" in result
-
-        # KEY TEST: Citation map should be present and match our articles
-        synthesis_data = result["synthesis_data"]
-        assert "metadata" in synthesis_data
-        assert "citation_map" in synthesis_data["metadata"]
-
-        citation_map = synthesis_data["metadata"]["citation_map"]
-        assert "1" in citation_map
-        assert "2" in citation_map
-        assert citation_map["1"]["title"] == "Article One"
-        assert citation_map["1"]["source"] == "Source A"
-        assert citation_map["1"]["url"] == "https://example.com/1"
-        assert citation_map["2"]["title"] == "Article Two"
-        assert citation_map["2"]["source"] == "Source B"
-
-    @pytest.mark.asyncio
-    @patch("src.context.synthesizer.ContextCurator")
-    @patch("src.context.synthesizer.ClaudeClient")
-    @patch("src.context.synthesizer.ReflectionEngine")
-    @patch("src.context.synthesizer.TrustPipeline", create=True)
-    async def test_citation_map_overrides_claude_response(
-        self, mock_trust_pipeline_class, mock_reflection, mock_client, mock_curator
-    ):
-        """Our citation map should override any citation_map Claude returns"""
-        # Setup curator with specific articles
-        test_articles = [
+        # Pass 2: situation response (for Topic A, the only cluster with 3+ articles)
+        situation_response = json.dumps(
             {
-                "id": 99,
-                "title": "Correct Title",
-                "source": "Correct Source",
-                "url": "https://correct.com",
-                "published_date": "2025-01-15",
-            },
-        ]
-        mock_curator_instance = MagicMock()
-        mock_curator.return_value = mock_curator_instance
-        mock_curator_instance.curate_for_narrative_synthesis = AsyncMock(
-            return_value={"articles": test_articles}
+                "title": "Topic A situation",
+                "narrative": "Examined narrative about Topic A.",
+                "actors": [
+                    {
+                        "name": "Actor 1",
+                        "role": "Role",
+                        "interests": "Interests",
+                        "epistemic_status": "reported_fact",
+                    }
+                ],
+                "power_dynamics": {"who_benefits": "X", "who_is_harmed": "Y", "who_decides": "Z"},
+                "coverage_frame": {
+                    "dominant_frame": "Frame",
+                    "assumed_premise": "Premise",
+                    "de_emphasized": "Hidden",
+                },
+                "causal_structure": {"forces": "F", "constraints": "C", "dependencies": "D"},
+                "information_gaps": [],
+                "article_citations": [1, 2, 3],
+            }
         )
 
-        # Claude returns a WRONG citation_map (simulating the bug we're fixing)
-        mock_client_instance = MagicMock()
-        mock_client.return_value = mock_client_instance
-        mock_client_instance.analyze_with_context = AsyncMock(
-            return_value=json.dumps({
-                "bottom_line": {"summary": "Test^[1]", "article_citations": [1]},
-                "trends_and_patterns": {},
-                "priority_events": [],
-                "predictions_scenarios": {},
-                "metadata": {
-                    "articles_analyzed": 1,
-                    "citation_map": {
-                        "1": {
-                            "article_id": 999,
-                            "title": "WRONG Title",
-                            "source": "WRONG Source",
-                            "url": "https://wrong.com",
-                        }
+        # Thin coverage response
+        thin_response = json.dumps(
+            {
+                "thin_coverage": [
+                    {
+                        "title": "Topic B",
+                        "article_count": 1,
+                        "sources": ["Source 4"],
+                        "note": "Insufficient coverage",
                     },
-                },
-            })
-        )
-
-        # Setup trust pipeline
-        mock_trust_pipeline_instance = MagicMock()
-        mock_trust_pipeline_class.return_value = mock_trust_pipeline_instance
-        mock_trust_pipeline_instance.analyze_response = AsyncMock(
-            return_value={
-                "facts": {"contradicted_count": 0, "total_claims": 1},
-                "bias": {"loaded_language": []},
-                "intimacy": {"issues": []},
+                    {
+                        "title": "Topic C",
+                        "article_count": 1,
+                        "sources": ["Source 5"],
+                        "note": "Insufficient coverage",
+                    },
+                ]
             }
         )
 
-        with patch("src.context.synthesizer.TrustPipeline", mock_trust_pipeline_class):
-            synthesizer = NarrativeSynthesizer()
-            result = await synthesizer.synthesize_with_trust_verification(
-                hours=24, max_articles=10, max_retries=1
-            )
+        # Mock analyze calls in order: clustering, situation, thin
+        mock_client_instance.analyze = AsyncMock(side_effect=[clustering_response, thin_response])
+        mock_client_instance.analyze_with_context = AsyncMock(return_value=situation_response)
 
-        # KEY TEST: Our citation_map should override Claude's wrong one
-        citation_map = result["synthesis_data"]["metadata"]["citation_map"]
-        assert citation_map["1"]["title"] == "Correct Title"  # Not "WRONG Title"
-        assert citation_map["1"]["source"] == "Correct Source"  # Not "WRONG Source"
-        assert citation_map["1"]["url"] == "https://correct.com"  # Not "https://wrong.com"
+        # Mock frame manager to return no existing clusters
+        mock_frame_mgr_instance = MagicMock()
+        mock_frame_mgr.return_value = mock_frame_mgr_instance
+        mock_frame_mgr_instance.find_matching_cluster.return_value = None
+        mock_frame_mgr_instance.discover_frames = AsyncMock(return_value=None)
+
+        synthesizer = NarrativeSynthesizer()
+        result = await synthesizer.synthesize(hours=24, max_articles=10)
+
+        assert result["status"] == "success"
+        assert result["articles_analyzed"] == 5
+
+        synthesis_data = result["synthesis_data"]
+        assert len(synthesis_data["situations"]) == 1
+        assert synthesis_data["situations"][0]["title"] == "Topic A situation"
+        assert len(synthesis_data["thin_coverage"]) == 2
+        assert synthesis_data["metadata"]["clusters_total"] == 3
+        assert synthesis_data["metadata"]["clusters_analyzed"] == 1
+        assert synthesis_data["metadata"]["clusters_thin"] == 2
+        assert synthesis_data["metadata"]["analysis_threshold"] == "2+ articles"

@@ -1,49 +1,25 @@
 """
 Database-specific test fixtures
-Provides in-memory SQLite database and sample model instances
+Provides sample model instances for database tests.
+test_engine and test_session are inherited from tests/conftest.py.
 """
 
 from datetime import datetime, timedelta
 
 import pytest
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
 
 from src.database.models import (
     AnalysisRun,
-    APIDataPoint,
-    APIDataSource,
     Article,
-    Base,
     CausalChain,
     ContextSnapshot,
     ForecastRun,
     ForecastScenario,
     LongTermForecast,
     MemoryFact,
-    MonitoredPage,
     NarrativeSynthesis,
-    PageChange,
     RSSFeed,
 )
-
-
-@pytest.fixture
-def test_engine(tmp_path):
-    """Create in-memory SQLite database for testing"""
-    db_path = tmp_path / "test.db"
-    engine = create_engine(f"sqlite:///{db_path}", echo=False)
-    Base.metadata.create_all(bind=engine)
-    return engine
-
-
-@pytest.fixture
-def test_session(test_engine):
-    """Database session for tests"""
-    Session = sessionmaker(bind=test_engine)
-    session = Session()
-    yield session
-    session.close()
 
 
 @pytest.fixture
@@ -92,7 +68,7 @@ def sample_analysis_run(test_session):
         completed_at=datetime.utcnow(),
         articles_processed=10,
         context_token_count=5000,
-        claude_model="claude-3-5-sonnet",
+        claude_model="claude-sonnet-4-20250514",
     )
     test_session.add(run)
     test_session.commit()
@@ -130,73 +106,6 @@ def sample_narrative_synthesis(test_session, sample_analysis_run, sample_context
     test_session.add(synthesis)
     test_session.commit()
     return synthesis
-
-
-@pytest.fixture
-def sample_api_data_source(test_session):
-    """Create a sample APIDataSource for testing"""
-    source = APIDataSource(
-        name="Test API Source",
-        source_type="calendar",
-        endpoint_url="https://api.example.com/events",
-        api_key_required=False,
-        refresh_frequency_hours=24,
-        is_active=True,
-    )
-    test_session.add(source)
-    test_session.commit()
-    return source
-
-
-@pytest.fixture
-def sample_api_data_point(test_session, sample_api_data_source):
-    """Create a sample APIDataPoint for testing"""
-    data_point = APIDataPoint(
-        source_id=sample_api_data_source.id,
-        data_type="event",
-        external_id="event-123",
-        title="Test Event",
-        description="Test event description",
-        data_payload={"location": "Test Location", "time": "10:00 AM"},
-        event_date=datetime.utcnow() + timedelta(days=7),
-        relevance_score=0.75,
-    )
-    test_session.add(data_point)
-    test_session.commit()
-    return data_point
-
-
-@pytest.fixture
-def sample_monitored_page(test_session):
-    """Create a sample MonitoredPage for testing"""
-    page = MonitoredPage(
-        url="https://example.gov/policy",
-        name="Policy Page",
-        page_type="policy",
-        selector=".content-main",
-        check_frequency_hours=12,
-        is_active=True,
-    )
-    test_session.add(page)
-    test_session.commit()
-    return page
-
-
-@pytest.fixture
-def sample_page_change(test_session, sample_monitored_page):
-    """Create a sample PageChange for testing"""
-    change = PageChange(
-        monitored_page_id=sample_monitored_page.id,
-        change_type="content_modified",
-        old_content="Old policy text",
-        new_content="New policy text with updates",
-        diff_summary="Policy updated with new requirements",
-        content_hash="newhash123",
-        relevance_score=0.9,
-    )
-    test_session.add(change)
-    test_session.commit()
-    return change
 
 
 @pytest.fixture
@@ -249,7 +158,7 @@ def sample_long_term_forecast(test_session, sample_forecast_run):
             "causal_chains": [],
             "event_risks": {},
         },
-        data_sources_used=["RSS feeds", "API data"],
+        data_sources_used=["RSS feeds"],
         articles_analyzed=50,
         historical_months_analyzed=6,
         context_tokens=10000,

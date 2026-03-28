@@ -10,8 +10,6 @@ from sqlalchemy.exc import IntegrityError
 
 from src.database.models import (
     AnalysisRun,
-    APIDataPoint,
-    APIDataSource,
     Article,
     CausalChain,
     ContextSnapshot,
@@ -19,9 +17,7 @@ from src.database.models import (
     ForecastScenario,
     LongTermForecast,
     MemoryFact,
-    MonitoredPage,
     NarrativeSynthesis,
-    PageChange,
     RSSFeed,
 )
 
@@ -223,108 +219,6 @@ class TestContextSnapshotModel:
 
         assert snapshot.id is not None
         assert snapshot.article_ids == [1, 2, 3, 4, 5]
-
-
-class TestAPIDataSourceModel:
-    """Tests for APIDataSource model"""
-
-    def test_create_api_data_source(self, test_session):
-        """Should create an APIDataSource"""
-        source = APIDataSource(
-            name="Test API",
-            source_type="calendar",
-            endpoint_url="https://api.example.com",
-        )
-        test_session.add(source)
-        test_session.commit()
-
-        assert source.id is not None
-        assert source.refresh_frequency_hours == 24  # Default
-        assert source.is_active is True  # Default
-
-
-class TestAPIDataPointModel:
-    """Tests for APIDataPoint model"""
-
-    def test_create_api_data_point(self, test_session, sample_api_data_source):
-        """Should create an APIDataPoint"""
-        point = APIDataPoint(
-            source_id=sample_api_data_source.id,
-            data_type="event",
-            external_id="ext-123",
-            title="Test Event",
-        )
-        test_session.add(point)
-        test_session.commit()
-
-        assert point.id is not None
-        assert point.included_count == 0  # Default
-
-    def test_api_data_point_unique_constraint(self, test_session, sample_api_data_source):
-        """APIDataPoint source_id + external_id should be unique"""
-        point1 = APIDataPoint(
-            source_id=sample_api_data_source.id,
-            data_type="event",
-            external_id="same-id",
-        )
-        test_session.add(point1)
-        test_session.commit()
-
-        point2 = APIDataPoint(
-            source_id=sample_api_data_source.id,
-            data_type="event",
-            external_id="same-id",
-        )
-        test_session.add(point2)
-
-        with pytest.raises(IntegrityError):
-            test_session.commit()
-
-
-class TestMonitoredPageModel:
-    """Tests for MonitoredPage model"""
-
-    def test_create_monitored_page(self, test_session):
-        """Should create a MonitoredPage"""
-        page = MonitoredPage(
-            url="https://example.gov/policy",
-            name="Policy Page",
-        )
-        test_session.add(page)
-        test_session.commit()
-
-        assert page.id is not None
-        assert page.check_frequency_hours == 24  # Default
-        assert page.is_active is True  # Default
-
-    def test_monitored_page_url_unique(self, test_session):
-        """MonitoredPage URL should be unique"""
-        page1 = MonitoredPage(url="https://example.gov/page", name="Page 1")
-        test_session.add(page1)
-        test_session.commit()
-
-        page2 = MonitoredPage(url="https://example.gov/page", name="Page 2")
-        test_session.add(page2)
-
-        with pytest.raises(IntegrityError):
-            test_session.commit()
-
-
-class TestPageChangeModel:
-    """Tests for PageChange model"""
-
-    def test_create_page_change(self, test_session, sample_monitored_page):
-        """Should create a PageChange"""
-        change = PageChange(
-            monitored_page_id=sample_monitored_page.id,
-            change_type="content_added",
-            new_content="New content here",
-        )
-        test_session.add(change)
-        test_session.commit()
-
-        assert change.id is not None
-        assert change.detected_at is not None
 
 
 class TestMemoryFactModel:

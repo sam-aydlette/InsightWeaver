@@ -69,17 +69,13 @@ insightweaver/
 │   ├── cli/                  # Command-line interface
 │   ├── collectors/           # RSS feed collectors
 │   ├── context/              # Context and narrative synthesis
-│   ├── trust/                # Trust verification system
+│   ├── prompts/              # Analysis rules and frame prompts
 │   ├── forecast/             # Forecasting engine
 │   ├── database/             # Database models and migrations
 │   └── utils/                # Utility functions
 ├── tests/                    # Automated test suite (pytest)
 │   ├── conftest.py           # Shared test fixtures
-│   └── trust/                # Trust module tests
-├── scripts/                  # Manual test scripts and utilities
-│   ├── test_collectors.py   # Manual collector testing
-│   ├── test_semantic_memory.py  # Manual memory testing
-│   └── scheduled_report.py  # Scheduled task runner
+│   └── context/              # Synthesizer tests
 ├── config/                   # Configuration files
 └── docs/                     # Documentation
 
@@ -164,25 +160,23 @@ Then create a pull request on GitHub.
 ### Example
 
 ```python
-from typing import Optional
+class NarrativeSynthesizer:
+    """Generates narrative intelligence briefs using context engineering."""
 
-class FactVerifier:
-    """Verifies claims against authoritative sources."""
-
-    def verify_claim(
+    async def synthesize_with_citations(
         self,
-        claim: str,
-        sources: Optional[list[str]] = None
+        hours: int = 48,
+        max_articles: int = 50,
     ) -> dict:
         """
-        Verify a factual claim.
+        Generate narrative synthesis with inline citations.
 
         Args:
-            claim: The claim to verify
-            sources: Optional list of authoritative sources
+            hours: Hours to look back for articles
+            max_articles: Maximum articles to include in context
 
         Returns:
-            Dictionary containing verification result
+            Synthesis results dictionary
         """
         # Implementation
         pass
@@ -202,23 +196,25 @@ class FactVerifier:
 
 ```python
 import pytest
-from src.trust.fact_verifier import FactVerifier
+from src.context.synthesizer import NarrativeSynthesizer
 
-class TestFactVerifier:
-    """Test fact verification functionality."""
+class TestSchemaValidation:
+    """Test synthesis output schema validation."""
 
-    @pytest.mark.asyncio
-    async def test_verify_simple_claim(self, fact_verifier):
-        """Test verification of a simple factual claim."""
+    def test_passes_with_executive_summary(self):
+        """Test validation of new-format output."""
         # Arrange
-        claim = "Paris is the capital of France"
+        synthesizer = NarrativeSynthesizer()
+        data = {
+            "executive_summary": {"headline": "Test"},
+            "metadata": {"generated_at": "2026-01-01"},
+        }
 
         # Act
-        result = await fact_verifier.verify_claim(claim)
+        result = synthesizer._validate_synthesis_schema(data)
 
         # Assert
-        assert result["verdict"] == "VERIFIED"
-        assert result["confidence"] > 0.9
+        assert result is True
 ```
 
 ### Running Tests
@@ -231,17 +227,16 @@ make test
 make coverage
 
 # Run specific test file
-pytest tests/trust/test_fact_verifier.py -v
+pytest tests/context/test_synthesizer.py -v
 
 # Run specific test
-pytest tests/trust/test_fact_verifier.py::TestFactVerifier::test_verify_simple_claim -v
+pytest tests/context/test_synthesizer.py::TestSchemaValidation::test_passes_with_executive_summary -v
 ```
 
 ### Coverage Requirements
 
 - Aim for 85%+ overall coverage
 - New features should have 90%+ coverage
-- Critical components (trust, verification) should have 95%+ coverage
 
 ### Manual Testing Scripts
 

@@ -76,3 +76,6 @@ deployment/systemd/insightweaver-daily.timer
 # Keep template files:
 # deployment/systemd/*.service.template
 # deployment/systemd/*.timer.template
+# Coverage
+.coverage
+htmlcov/

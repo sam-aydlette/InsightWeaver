@@ -5,7 +5,8 @@ Core forecasting logic using certainty-based categorization (Rumsfeld framework)
 
 import json
 import logging
-from datetime import datetime
+import re
+from datetime import datetime, timedelta
 from typing import Any
 
 from ..context.claude_client import ClaudeClient
@@ -74,24 +75,53 @@ class ForecastEngine:
         Returns:
             Formatted task prompt
         """
-        task = """Generate forecasts organized by certainty level using the Rumsfeld framework.
+        current_date = datetime.utcnow()
+        current_date_str = current_date.strftime("%B %d, %Y")
+
+        task = f"""Generate forecasts organized by certainty level using the Rumsfeld framework.
+
+## CURRENT DATE: {current_date_str}
+
+CRITICAL TEMPORAL REQUIREMENT: All forecasts must be for events AFTER {current_date_str}.
+- Events that have ALREADY OCCURRED are FACTS, not forecasts - do not include them
+- Events HAPPENING TODAY are NEWS, not forecasts - do not include them
+- Only FUTURE events (after {current_date_str}) can be forecasts
 
 Analyze the provided articles and data to identify forecasts across three certainty categories.
 Use trend analysis, pattern recognition, and causal reasoning internally to ground your forecasts,
 but organize your output by certainty level rather than by methodology.
 
-Each forecast MUST include its own timeline (when it will occur/unfold).
+Each forecast MUST include its own timeline (when it will occur/unfold) - and that timeline
+MUST be in the future relative to {current_date_str}.
 
-## CATEGORY 1: KNOWN KNOWNS (Certain or Near-Certain)
-These are forecasts that are virtually guaranteed to happen based on:
+## CATEGORY 1: KNOWN KNOWNS (Certain or Near-Certain FUTURE Events)
+These are forecasts for events that HAVE NOT YET OCCURRED but are virtually guaranteed to happen.
+
+CRITICAL DISTINCTION - Read carefully:
+- If an article describes something that HAS ALREADY HAPPENED -> This is a FACT, not a forecast. DO NOT INCLUDE IT.
+- If an article describes something HAPPENING NOW/TODAY -> This is NEWS, not a forecast. DO NOT INCLUDE IT.
+- If an article announces something SCHEDULED FOR THE FUTURE -> This IS a forecast. Include it.
+
+Examples of what IS a Known Known (future events):
+- "Election scheduled for November 2026" -> YES, include this
+- "Budget deadline in Q3 2026" -> YES, include this
+- "Construction to begin Spring 2026" -> YES, include this
+
+Examples of what is NOT a Known Known (past/present events):
+- "Governor sworn in today" -> NO, this is news (present) - DO NOT INCLUDE
+- "Democrats won the election" -> NO, this is a fact (past) - DO NOT INCLUDE
+- "Legislature passed the bill" -> NO, this is a fact (past) - DO NOT INCLUDE
+- "Company announced layoffs" -> NO, this already happened - DO NOT INCLUDE
+
+For genuine FUTURE events, Known Knowns are virtually guaranteed based on:
 - Scheduled events (elections, policy deadlines, product launches)
 - Announced plans (confirmed projects, stated intentions by authorities)
 - Legal/regulatory requirements (compliance deadlines, mandated changes)
 - Demographic certainties (population milestones, generational shifts)
 
 For each Known Known, provide:
-- The forecast itself (what will happen)
-- Timeline (specific date or timeframe)
+- The forecast itself (what WILL happen in the future)
+- Timeline (specific FUTURE date or timeframe - must be after {current_date_str})
 - Basis for certainty (why this is certain - cite evidence)
 - Impact (how it affects the user's context)
 
@@ -127,35 +157,35 @@ For each Unknown Unknown, provide:
 Return ONLY valid JSON matching this structure:
 
 ```json
-{
+{{
   "known_knowns": [
-    {
+    {{
       "forecast": "Clear description of the certain/near-certain forecast",
       "timeline": "Specific date or timeframe (e.g., 'November 2026', 'Q2 2026', '6 months')",
       "basis": "Why this is certain - cite specific evidence from articles",
       "impact": "How this affects the user's local/professional context"
-    }
+    }}
   ],
   "known_unknowns": [
-    {
+    {{
       "forecast": "Description of the evidence-based projection",
       "timeline": "Expected timeframe for resolution/occurrence",
       "evidence": "What data/trends support this projection",
       "possible_outcomes": ["outcome1", "outcome2", "outcome3"],
       "key_factors": ["factor1", "factor2"]
-    }
+    }}
   ],
   "unknown_unknowns": [
-    {
+    {{
       "forecast": "Description of the speculative forecast",
       "timeline": "Potential timeframe if it occurs",
       "weak_signal": "What early indicator suggests this possibility",
       "potential_impact": "Consequences if this materializes",
       "why_plausible": "Reasoning for why this deserves consideration"
-    }
+    }}
   ],
   "data_sources_summary": "Brief summary of what data informed these forecasts"
-}
+}}
 ```
 
 ## GUIDELINES
@@ -246,4 +276,121 @@ For each forecast, clearly state:
             if not forecast.get(category):
                 logger.warning(f"Category '{category}' is empty")
 
+        # Validate Known Knowns have future timelines
+        current_date = datetime.utcnow()
+        known_knowns = forecast.get("known_knowns", [])
+        valid_known_knowns = []
+
+        for item in known_knowns:
+            timeline = item.get("timeline", "")
+            parsed_date = self._parse_timeline_to_date(timeline)
+
+            if parsed_date and parsed_date < current_date:
+                logger.warning(
+                    f"Removing Known Known with past timeline: '{item.get('forecast', '')[:50]}...' "
+                    f"(timeline: {timeline})"
+                )
+                continue
+
+            valid_known_knowns.append(item)
+
+        if len(valid_known_knowns) < len(known_knowns):
+            logger.info(
+                f"Filtered {len(known_knowns) - len(valid_known_knowns)} Known Knowns with past timelines"
+            )
+
+        forecast["known_knowns"] = valid_known_knowns
+
         logger.info("Forecast structure validation passed")
+
+    def _parse_timeline_to_date(self, timeline: str) -> datetime | None:
+        """
+        Attempt to parse a timeline string into a date.
+
+        Handles formats like:
+        - "December 6, 2025" -> datetime(2025, 12, 6)
+        - "December 6th, 2025" -> datetime(2025, 12, 6)
+        - "November 2026" -> datetime(2026, 11, 1)
+        - "Q2 2026" -> datetime(2026, 4, 1)
+        - "Spring 2026" -> datetime(2026, 3, 1)
+        - "6 months" -> now + 6 months
+        - "2026" -> datetime(2026, 1, 1)
+
+        Returns None if unparseable.
+        """
+        if not timeline:
+            return None
+
+        timeline_lower = timeline.strip().lower()
+        now = datetime.utcnow()
+
+        month_names = [
+            "january",
+            "february",
+            "march",
+            "april",
+            "may",
+            "june",
+            "july",
+            "august",
+            "september",
+            "october",
+            "november",
+            "december",
+        ]
+
+        # Month Day, Year format: "December 6, 2025" or "December 6th, 2025"
+        month_day_year = re.match(
+            r"(january|february|march|april|may|june|july|august|september|october|november|december)\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})",
+            timeline_lower,
+        )
+        if month_day_year:
+            month = month_names.index(month_day_year.group(1)) + 1
+            day = int(month_day_year.group(2))
+            year = int(month_day_year.group(3))
+            return datetime(year, month, day)
+
+        # Month Year format: "November 2026"
+        month_year = re.match(
+            r"(january|february|march|april|may|june|july|august|september|october|november|december)\s+(\d{4})",
+            timeline_lower,
+        )
+        if month_year:
+            month = month_names.index(month_year.group(1)) + 1
+            year = int(month_year.group(2))
+            return datetime(year, month, 1)
+
+        # Quarter format: "Q2 2026"
+        quarter = re.match(r"q([1-4])\s+(\d{4})", timeline_lower)
+        if quarter:
+            q = int(quarter.group(1))
+            year = int(quarter.group(2))
+            month = (q - 1) * 3 + 1  # Q1=1, Q2=4, Q3=7, Q4=10
+            return datetime(year, month, 1)
+
+        # Season format: "Spring 2026"
+        season = re.match(r"(spring|summer|fall|autumn|winter)\s+(\d{4})", timeline_lower)
+        if season:
+            season_months = {"spring": 3, "summer": 6, "fall": 9, "autumn": 9, "winter": 12}
+            month = season_months[season.group(1)]
+            year = int(season.group(2))
+            return datetime(year, month, 1)
+
+        # Year only: "2026"
+        year_only = re.match(r"^(\d{4})$", timeline_lower)
+        if year_only:
+            return datetime(int(year_only.group(1)), 1, 1)
+
+        # Relative: "6 months", "2 years", "3 weeks"
+        relative = re.match(r"(\d+)\s+(month|year|week)s?", timeline_lower)
+        if relative:
+            num = int(relative.group(1))
+            unit = relative.group(2)
+            if unit == "month":
+                return now + timedelta(days=num * 30)
+            elif unit == "year":
+                return now + timedelta(days=num * 365)
+            elif unit == "week":
+                return now + timedelta(weeks=num)
+
+        return None

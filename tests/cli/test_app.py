@@ -2,7 +2,7 @@
 Tests for CLI App
 """
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from src.cli.app import cli, interactive_mode, print_command_refresher
 
@@ -45,7 +45,6 @@ class TestPrintCommandRefresher:
 
         assert "Commands:" in captured.out
         assert "brief" in captured.out
-        assert "trust" in captured.out
         assert "forecast" in captured.out
 
 
@@ -59,80 +58,12 @@ class TestSubcommandRegistration:
         assert result.exit_code == 0
         assert "hours" in result.output.lower()
 
-    def test_trust_command_registered(self, cli_runner):
-        """Should have trust command registered"""
-        result = cli_runner.invoke(cli, ["trust", "--help"])
-
-        assert result.exit_code == 0
-        assert "query" in result.output.lower() or "verified" in result.output.lower()
-
     def test_forecast_command_registered(self, cli_runner):
         """Should have forecast command registered"""
         result = cli_runner.invoke(cli, ["forecast", "--help"])
 
         assert result.exit_code == 0
         assert "forecast" in result.output.lower()
-
-    def test_setup_command_registered(self, cli_runner):
-        """Should have setup command registered"""
-        result = cli_runner.invoke(cli, ["setup", "--help"])
-
-        assert result.exit_code == 0
-        assert "port" in result.output.lower()
-
-    def test_start_command_registered(self, cli_runner):
-        """Should have start command registered"""
-        result = cli_runner.invoke(cli, ["start", "--help"])
-
-        assert result.exit_code == 0
-        assert "port" in result.output.lower()
-
-
-class TestSetupCommand:
-    """Tests for setup command"""
-
-    def test_setup_help(self, cli_runner):
-        """Should show setup help"""
-        result = cli_runner.invoke(cli, ["setup", "--help"])
-
-        assert result.exit_code == 0
-        assert "wizard" in result.output.lower()
-
-    @patch("src.web.server.create_app")
-    @patch("src.cli.app.webbrowser")
-    @patch("os.path.exists")
-    def test_setup_command_starts_server(
-        self, mock_exists, mock_webbrowser, mock_create_app, cli_runner
-    ):
-        """Should start web server for setup"""
-        mock_exists.return_value = False
-        mock_app = MagicMock()
-        mock_create_app.return_value = mock_app
-        import contextlib
-
-        mock_app.run.side_effect = KeyboardInterrupt()  # Stop immediately
-
-        with contextlib.suppress(KeyboardInterrupt):
-            cli_runner.invoke(cli, ["setup", "--port", "5001"])
-
-        mock_create_app.assert_called_once()
-
-
-class TestStartCommand:
-    """Tests for start command"""
-
-    def test_start_help(self, cli_runner):
-        """Should show start help"""
-        result = cli_runner.invoke(cli, ["start", "--help"])
-
-        assert result.exit_code == 0
-        assert "web interface" in result.output.lower()
-
-    def test_start_no_browser_option(self, cli_runner):
-        """Should accept no-browser option"""
-        result = cli_runner.invoke(cli, ["start", "--help"])
-
-        assert "--no-browser" in result.output
 
 
 class TestAsciiArt:
@@ -153,9 +84,7 @@ class TestInteractiveMode:
     @patch("src.cli.app.click.prompt")
     @patch("src.cli.app.click.echo")
     @patch("src.cli.app.time.sleep")
-    def test_interactive_mode_exits_on_exit_command(
-        self, mock_sleep, mock_echo, mock_prompt
-    ):
+    def test_interactive_mode_exits_on_exit_command(self, mock_sleep, mock_echo, mock_prompt):
         """Should exit on 'exit' command"""
         mock_prompt.return_value = "exit"
 
@@ -167,9 +96,7 @@ class TestInteractiveMode:
     @patch("src.cli.app.click.prompt")
     @patch("src.cli.app.click.echo")
     @patch("src.cli.app.time.sleep")
-    def test_interactive_mode_exits_on_quit_command(
-        self, mock_sleep, mock_echo, mock_prompt
-    ):
+    def test_interactive_mode_exits_on_quit_command(self, mock_sleep, mock_echo, mock_prompt):
         """Should exit on 'quit' command"""
         mock_prompt.return_value = "quit"
 
@@ -192,9 +119,7 @@ class TestInteractiveMode:
     @patch("src.cli.app.click.prompt")
     @patch("src.cli.app.click.echo")
     @patch("src.cli.app.time.sleep")
-    def test_interactive_mode_handles_keyboard_interrupt(
-        self, mock_sleep, mock_echo, mock_prompt
-    ):
+    def test_interactive_mode_handles_keyboard_interrupt(self, mock_sleep, mock_echo, mock_prompt):
         """Should handle KeyboardInterrupt gracefully"""
         mock_prompt.side_effect = KeyboardInterrupt()
 
@@ -206,9 +131,7 @@ class TestInteractiveMode:
     @patch("src.cli.app.click.prompt")
     @patch("src.cli.app.click.echo")
     @patch("src.cli.app.time.sleep")
-    def test_interactive_mode_handles_unknown_command(
-        self, mock_sleep, mock_echo, mock_prompt
-    ):
+    def test_interactive_mode_handles_unknown_command(self, mock_sleep, mock_echo, mock_prompt):
         """Should handle unknown commands"""
         mock_prompt.side_effect = ["unknown_cmd", "exit"]
 

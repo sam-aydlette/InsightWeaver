@@ -1,1 +1,0 @@
-"""Collectors tests package"""

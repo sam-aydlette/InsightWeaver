@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from ..context.curator import ContextCurator
 from ..database.connection import get_db
-from ..database.models import APIDataPoint, Article
+from ..database.models import Article
 
 logger = logging.getLogger(__name__)
 
@@ -139,45 +139,15 @@ class ForecastContextCurator(ContextCurator):
         logger.info(f"Stratified sampling: {len(all_articles)} articles across {months} months")
         return all_articles
 
-    def _get_authoritative_data(self, session: Session, _horizon_months: int) -> list[APIDataPoint]:
+    def _get_authoritative_data(self, _session: Session, _horizon_months: int) -> list:
+        """Get authoritative data from external sources for forecasting.
+
+        Returns empty list -- API data collectors have been removed.
+        Forecasts rely on RSS article corpus only.
         """
-        Get authoritative data from external sources for forecasting
+        return []
 
-        Queries APIDataPoint for Census Bureau, World Bank, UN, think tanks, etc.
-
-        Args:
-            session: Database session
-            horizon_months: Forecast horizon in months
-
-        Returns:
-            List of authoritative data points
-        """
-        # Get data from last 90 days (authoritative data refreshes weekly/monthly)
-        cutoff_date = datetime.utcnow() - timedelta(days=90)
-
-        # Query for statistical and authoritative data
-        authoritative_sources = [
-            "census_statistical",
-            "world_bank_indicator",
-            "un_statistical",
-            "think_tank_research",
-        ]
-
-        data_points = (
-            session.query(APIDataPoint)
-            .filter(
-                APIDataPoint.data_type.in_(authoritative_sources),
-                APIDataPoint.fetched_at >= cutoff_date,
-            )
-            .order_by(APIDataPoint.relevance_score.desc())
-            .limit(50)
-            .all()
-        )  # Top 50 most relevant data points
-
-        logger.info(f"Retrieved {len(data_points)} authoritative data points for forecasting")
-        return data_points
-
-    def _get_forecast_memory(self, session: Session, articles: list[Article]) -> str:
+    def _get_forecast_memory(self, session: Session, _articles: list[Article]) -> str:
         """
         Get historical memory relevant to forecasting
 
@@ -190,43 +160,11 @@ class ForecastContextCurator(ContextCurator):
         Returns:
             Formatted memory context string
         """
-        from ..config.settings import settings
-        from ..context.semantic_memory import SemanticMemory
-
-        memory_parts = []
-
-        # Get semantic memory if enabled
-        if getattr(settings, "enable_semantic_memory", False):
-            try:
-                semantic_memory = SemanticMemory(session)
-                relevant_facts = semantic_memory.retrieve_relevant_facts(
-                    articles,
-                    max_facts=30,  # More facts for long-term context
-                )
-                semantic_context = semantic_memory.build_historical_context(relevant_facts)
-                if semantic_context:
-                    memory_parts.append(semantic_context)
-                    logger.info(f"Added {len(relevant_facts)} semantic facts to forecast context")
-            except Exception as e:
-                logger.warning(f"Failed to retrieve semantic memory: {e}")
-
         # Get historical synthesis insights
-        historical_memory = self._get_historical_memory(session)
-        if historical_memory:
-            memory_parts.append(historical_memory)
+        return self._get_historical_memory(session)
 
-        return "\n\n".join(memory_parts)
-
-    def _format_authoritative_data(self, data_points: list[APIDataPoint]) -> str:
-        """
-        Format authoritative data for context inclusion
-
-        Args:
-            data_points: List of APIDataPoint objects
-
-        Returns:
-            Formatted string for context
-        """
+    def _format_authoritative_data(self, data_points: list) -> str:
+        """Format authoritative data for context inclusion."""
         if not data_points:
             return "No authoritative data available."
 

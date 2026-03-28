@@ -9,7 +9,6 @@ from typing import Any
 from anthropic import AsyncAnthropic
 
 from ..config.settings import settings
-from .examples import format_examples_for_prompt, get_few_shot_examples
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +27,7 @@ class ClaudeClient:
         if not self.api_key:
             raise ValueError("ANTHROPIC_API_KEY not configured")
 
-        self.client = AsyncAnthropic(api_key=self.api_key)
+        self.client = AsyncAnthropic(api_key=self.api_key, timeout=300.0)  # 5 min timeout
         self.model = "claude-sonnet-4-20250514"  # Latest Sonnet model
         self.max_tokens = 16384  # Increased for complete synthesis JSON output
 
@@ -58,6 +57,41 @@ class ClaudeClient:
                 temperature=temperature,
                 system=system_prompt,
                 messages=[{"role": "user", "content": user_message}],
+            )
+
+            return response.content[0].text
+
+        except Exception as e:
+            logger.error(f"Claude API error: {e}")
+            raise
+
+    async def analyze_conversation(
+        self,
+        system_prompt: str,
+        messages: list[dict[str, str]],
+        temperature: float = 1.0,
+        max_tokens: int | None = None,
+    ) -> str:
+        """
+        Send conversation request to Claude with message history
+
+        Args:
+            system_prompt: System context and instructions
+            messages: List of message dicts with 'role' and 'content' keys
+                      Roles must alternate: user, assistant, user, assistant...
+            temperature: Sampling temperature (0-1)
+            max_tokens: Maximum tokens in response
+
+        Returns:
+            Claude's response text
+        """
+        try:
+            response = await self.client.messages.create(
+                model=self.model,
+                max_tokens=max_tokens or self.max_tokens,
+                temperature=temperature,
+                system=system_prompt,
+                messages=messages,
             )
 
             return response.content[0].text
@@ -105,10 +139,6 @@ class ClaudeClient:
             )
             parts.append(f"Civic Interests: {', '.join(profile.get('civic_interests', []))}")
             parts.append("")
-
-        # Add few-shot examples (for synthesis tasks)
-        if "instructions" in context and "Perspective:" in context["instructions"]:
-            parts.append(format_examples_for_prompt(get_few_shot_examples()))
 
         # Add recent articles context
         if "articles" in context:

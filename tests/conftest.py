@@ -4,6 +4,28 @@ Provides mocks for ClaudeClient, web_fetch, and common test data
 """
 
 import pytest
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
+from src.database.models import Base
+
+
+@pytest.fixture
+def test_engine(tmp_path):
+    """Create temporary SQLite database with all tables."""
+    db_path = tmp_path / "test.db"
+    engine = create_engine(f"sqlite:///{db_path}", echo=False)
+    Base.metadata.create_all(bind=engine)
+    return engine
+
+
+@pytest.fixture
+def test_session(test_engine):
+    """Database session for tests."""
+    Session = sessionmaker(bind=test_engine)
+    session = Session()
+    yield session
+    session.close()
 
 
 @pytest.fixture
@@ -86,239 +108,6 @@ def sample_response():
     """
     return """The unemployment rate is 3.7% as of December 2025. This suggests a strong labor market.
     It's possible that rates will remain low through 2026. Many economists believe the economy is healthy."""
-
-
-@pytest.fixture
-def sample_claims():
-    """
-    Sample Claim objects for testing
-    """
-    from src.trust.fact_verifier import Claim
-
-    return [
-        Claim("The unemployment rate is 3.7%", "FACT", 0.9, "Specific quantitative claim"),
-        Claim(
-            "This suggests a strong labor market", "INFERENCE", 0.7, "Logical conclusion from data"
-        ),
-        Claim("Rates will remain low", "SPECULATION", 0.5, "Prediction without evidence"),
-        Claim("The economy is healthy", "OPINION", 0.6, "Subjective judgment"),
-    ]
-
-
-@pytest.fixture
-def sample_verifications():
-    """
-    Sample FactVerification objects with all verdict types
-    """
-    from src.trust.fact_verifier import Claim, FactVerification
-
-    return [
-        FactVerification(
-            claim=Claim("Python was created in 1991", "FACT", 0.9, "Historical fact"),
-            verdict="VERIFIED",
-            confidence=0.95,
-            reasoning="Confirmed by multiple authoritative sources",
-            caveats=["First public release was February 1991"],
-            contradictions=[],
-        ),
-        FactVerification(
-            claim=Claim(
-                "The sky appears blue due to Rayleigh scattering", "FACT", 0.9, "Scientific fact"
-            ),
-            verdict="VERIFIED",
-            confidence=0.98,
-            reasoning="Well-established scientific phenomenon",
-            caveats=[],
-            contradictions=[],
-        ),
-        FactVerification(
-            claim=Claim("The president is John Smith", "FACT", 0.8, "Time-sensitive claim"),
-            verdict="CONTRADICTED",
-            confidence=0.9,
-            reasoning="This contradicts current factual information",
-            caveats=[],
-            contradictions=["The current president is not John Smith"],
-        ),
-        FactVerification(
-            claim=Claim(
-                "The quantum flux capacitor was invented in 1985", "FACT", 0.7, "Unverifiable claim"
-            ),
-            verdict="UNVERIFIABLE",
-            confidence=0.0,
-            reasoning="Cannot verify this claim with available sources; appears to be fictional",
-            caveats=[],
-            contradictions=[],
-        ),
-        FactVerification(
-            claim=Claim("The CEO is Jane Doe", "FACT", 0.8, "Time-sensitive corporate claim"),
-            verdict="OUTDATED",
-            confidence=0.85,
-            reasoning="This claim was true in 2023 but is now outdated",
-            caveats=[],
-            contradictions=[],
-            temporal_check={
-                "still_current": False,
-                "confidence": 0.9,
-                "reasoning": "The CEO changed in 2024",
-                "checked_date": "2026-01-01",
-                "source": "Company Leadership Page",
-                "update_info": "Current CEO is John Brown as of January 2024",
-            },
-        ),
-        FactVerification(
-            claim=Claim("AI might transform industries", "SPECULATION", 0.5, "Future prediction"),
-            verdict="UNVERIFIABLE",
-            confidence=1.0,
-            reasoning="Claim is speculation and cannot be factually verified",
-            caveats=[],
-            contradictions=[],
-        ),
-    ]
-
-
-@pytest.fixture
-def sample_fact_analysis():
-    """
-    Complete fact analysis dictionary with all verdict types
-    """
-    return {
-        "verifications": [
-            {
-                "claim": {
-                    "text": "Python was created in 1991",
-                    "type": "FACT",
-                    "confidence": 0.9,
-                    "reasoning": "Historical fact",
-                },
-                "verdict": "VERIFIED",
-                "confidence": 0.95,
-                "reasoning": "Confirmed by multiple authoritative sources",
-                "caveats": ["First public release was February 1991"],
-                "contradictions": [],
-            },
-            {
-                "claim": {
-                    "text": "The quantum flux capacitor was invented in 1985",
-                    "type": "FACT",
-                    "confidence": 0.7,
-                    "reasoning": "Unverifiable claim",
-                },
-                "verdict": "UNVERIFIABLE",
-                "confidence": 0.0,
-                "reasoning": "Cannot verify this claim with available sources; appears to be fictional",
-                "caveats": [],
-                "contradictions": [],
-            },
-            {
-                "claim": {
-                    "text": "The president is John Smith",
-                    "type": "FACT",
-                    "confidence": 0.8,
-                    "reasoning": "Time-sensitive claim",
-                },
-                "verdict": "CONTRADICTED",
-                "confidence": 0.9,
-                "reasoning": "This contradicts current factual information",
-                "caveats": [],
-                "contradictions": ["The current president is not John Smith"],
-            },
-            {
-                "claim": {
-                    "text": "The CEO is Jane Doe",
-                    "type": "FACT",
-                    "confidence": 0.8,
-                    "reasoning": "Time-sensitive claim",
-                },
-                "verdict": "OUTDATED",
-                "confidence": 0.85,
-                "reasoning": "This claim was true in 2023 but is now outdated",
-                "caveats": [],
-                "contradictions": [],
-                "temporal_check": {
-                    "still_current": False,
-                    "confidence": 0.9,
-                    "reasoning": "The CEO changed in 2024",
-                    "checked_date": "2026-01-01",
-                    "source": "Company Leadership Page",
-                    "update_info": "Current CEO is John Brown as of January 2024",
-                },
-            },
-        ],
-        "total_claims": 4,
-        "verified_count": 1,
-        "uncertain_count": 1,
-        "contradicted_count": 1,
-        "error_count": 0,
-    }
-
-
-@pytest.fixture
-def sample_bias_analysis():
-    """
-    Sample BiasAnalysis dictionary for testing
-    """
-    return {
-        "framing_issues": [
-            {
-                "frame_type": "crisis-urgency",
-                "text": "The situation demands immediate action",
-                "effect": "Creates artificial urgency without justification",
-                "alternative": "The situation requires consideration and appropriate response",
-            }
-        ],
-        "assumptions": [
-            {
-                "assumption": "All users prioritize speed over accessibility",
-                "basis": "Focus on performance optimization without mentioning accessibility",
-                "impact": "Excludes users with disabilities from consideration",
-            }
-        ],
-        "omissions": [
-            {
-                "missing_perspective": "Environmental impact of the solution",
-                "relevance": "Critical for sustainability assessment",
-                "suggestion": "Include carbon footprint and environmental considerations",
-            }
-        ],
-        "loaded_terms": [
-            {
-                "term": "radical changes",
-                "connotation": "Extreme, potentially dangerous",
-                "neutral_alternative": "significant changes",
-            }
-        ],
-    }
-
-
-@pytest.fixture
-def sample_intimacy_analysis():
-    """
-    Sample IntimacyAnalysis dictionary for testing
-    """
-    return {
-        "issues": [
-            {
-                "category": "EMOTION",
-                "text": "I'm excited to help you",
-                "explanation": "AI cannot experience emotions like excitement",
-                "severity": "HIGH",
-                "professional_alternative": "I'm ready to assist you",
-            },
-            {
-                "category": "FALSE_EMPATHY",
-                "text": "I understand how frustrating this must be",
-                "explanation": "AI cannot genuinely understand human emotions",
-                "severity": "MEDIUM",
-                "professional_alternative": "I recognize this situation may be challenging",
-            },
-        ],
-        "overall_tone": "FAMILIAR",
-        "summary": "Response contains emotion claims and false empathy",
-        "total_issues": 2,
-        "high_severity_count": 1,
-        "medium_severity_count": 1,
-        "low_severity_count": 0,
-    }
 
 
 @pytest.fixture

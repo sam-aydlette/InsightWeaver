@@ -3,7 +3,6 @@ Tests for Settings configuration
 """
 
 
-
 class TestSettingsDefaults:
     """Tests for default setting values"""
 
@@ -109,35 +108,6 @@ class TestBooleanParsing:
 
         assert settings_module.settings.debug is False
 
-    def test_enable_reflection_default_true(self, monkeypatch):
-        """ENABLE_REFLECTION should default to True"""
-        monkeypatch.delenv("ENABLE_REFLECTION", raising=False)
-
-        import importlib
-
-        import src.config.settings as settings_module
-
-        importlib.reload(settings_module)
-
-        assert settings_module.settings.enable_reflection is True
-
-    def test_enable_semantic_memory_can_be_toggled(self, monkeypatch):
-        """ENABLE_SEMANTIC_MEMORY should be configurable via env var"""
-        monkeypatch.setenv("ENABLE_SEMANTIC_MEMORY", "false")
-
-        import importlib
-
-        import src.config.settings as settings_module
-
-        importlib.reload(settings_module)
-
-        assert settings_module.settings.enable_semantic_memory is False
-
-        # Test enabling it
-        monkeypatch.setenv("ENABLE_SEMANTIC_MEMORY", "true")
-        importlib.reload(settings_module)
-        assert settings_module.settings.enable_semantic_memory is True
-
 
 class TestNumericParsing:
     """Tests for numeric environment variable parsing"""
@@ -192,7 +162,7 @@ class TestPathConfiguration:
         assert settings.reports_dir == settings.project_root / "reports"
         assert settings.briefings_dir == settings.reports_dir / "briefings"
         assert settings.forecasts_dir == settings.reports_dir / "forecasts"
-        assert settings.trust_reports_dir == settings.reports_dir / "trust"
+        assert settings.forecasts_dir == settings.reports_dir / "forecasts"
 
 
 class TestDirectoryCreation:
@@ -219,7 +189,7 @@ class TestDirectoryCreation:
         assert settings.reports_dir.exists()
         assert settings.briefings_dir.exists()
         assert settings.forecasts_dir.exists()
-        assert settings.trust_reports_dir.exists()
+        assert settings.forecasts_dir.exists()
 
 
 class TestFeatureFlags:
@@ -236,18 +206,6 @@ class TestFeatureFlags:
         importlib.reload(settings_module)
 
         assert settings_module.settings.enable_smart_rss_fetch is True
-
-    def test_trust_verification_default(self, monkeypatch):
-        """Trust verification should default to enabled"""
-        monkeypatch.delenv("ENABLE_TRUST_VERIFICATION", raising=False)
-
-        import importlib
-
-        import src.config.settings as settings_module
-
-        importlib.reload(settings_module)
-
-        assert settings_module.settings.enable_trust_verification is True
 
     def test_daily_report_default(self, monkeypatch):
         """Daily report should default to enabled"""

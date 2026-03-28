@@ -26,32 +26,20 @@ class Settings(BaseSettings):
     debug: bool = os.getenv("DEBUG", "False").lower() == "true"
     log_level: str = os.getenv("LOG_LEVEL", "INFO")
 
-    # Deep Context Enhancements
-    enable_reflection: bool = os.getenv("ENABLE_REFLECTION", "True").lower() == "true"
-    reflection_depth_threshold: float = float(os.getenv("REFLECTION_DEPTH_THRESHOLD", "8.0"))
-    enable_semantic_memory: bool = (
-        os.getenv("ENABLE_SEMANTIC_MEMORY", "False").lower() == "true"
-    )  # Phase 2
-    enable_perception: bool = os.getenv("ENABLE_PERCEPTION", "False").lower() == "true"  # Phase 3
-
     # Performance Optimizations
     enable_smart_rss_fetch: bool = os.getenv("ENABLE_SMART_RSS_FETCH", "True").lower() == "true"
     smart_rss_fetch_threshold_minutes: int = int(
         os.getenv("SMART_RSS_FETCH_THRESHOLD_MINUTES", "60")
-    )
-    enable_trust_verification: bool = (
-        os.getenv("ENABLE_TRUST_VERIFICATION", "True").lower() == "true"
     )
 
     # Data Retention Policies (in days)
     retention_articles_days: int = int(os.getenv("RETENTION_ARTICLES_DAYS", "90"))
     retention_syntheses_days: int = int(os.getenv("RETENTION_SYNTHESES_DAYS", "180"))
     retention_feed_health_days: int = int(os.getenv("RETENTION_FEED_HEALTH_DAYS", "30"))
-    # Note: Semantic facts use type-based expiration (60-365 days)
 
     # Scheduling
     daily_report_enabled: bool = os.getenv("DAILY_REPORT_ENABLED", "True").lower() == "true"
-    daily_report_hours: int = int(os.getenv("DAILY_REPORT_HOURS", "24"))  # Look back window
+    daily_report_hours: int = int(os.getenv("DAILY_REPORT_HOURS", "24"))
     auto_cleanup_enabled: bool = os.getenv("AUTO_CLEANUP_ENABLED", "True").lower() == "true"
 
     # Paths
@@ -59,26 +47,23 @@ class Settings(BaseSettings):
     data_dir: Path = project_root / "data"
     logs_dir: Path = project_root / "src" / "logs"
 
-    # Reports directories (centralized location)
+    # Reports directories
     reports_dir: Path = project_root / "reports"
     briefings_dir: Path = reports_dir / "briefings"
     forecasts_dir: Path = reports_dir / "forecasts"
-    trust_reports_dir: Path = reports_dir / "trust"
 
     class Config:
         env_file = ".env"
         case_sensitive = False
+        extra = "ignore"
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        # Create necessary directories
         self.data_dir.mkdir(exist_ok=True)
         self.logs_dir.mkdir(exist_ok=True)
-        # Create reports directories
         self.reports_dir.mkdir(exist_ok=True)
         self.briefings_dir.mkdir(exist_ok=True)
         self.forecasts_dir.mkdir(exist_ok=True)
-        self.trust_reports_dir.mkdir(exist_ok=True)
 
 
 settings = Settings()

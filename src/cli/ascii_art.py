@@ -68,34 +68,6 @@ def render_forecast_art(status: str = "Gazing into the future...") -> str:
     return "\n".join(lines)
 
 
-def render_trust_art(status: str = "Verifying response...") -> str:
-    """
-    Render ASCII art for the trust command - Shield
-
-    Args:
-        status: Status message to display next to the art
-
-    Returns:
-        Formatted ASCII art string with colors
-    """
-    title = "TRUST VERIFICATION"
-    underline = "=" * len(title)
-
-    lines = [
-        "",
-        "       " + accent("/\\"),
-        "      " + accent("/  \\"),
-        "     " + accent("/ == \\") + "     " + header(title),
-        "    " + accent("/======\\") + "    " + header(underline),
-        "    " + accent("\\======/") + "    " + status,
-        "     " + accent("\\    /"),
-        "      " + accent("\\  /"),
-        "       " + accent("\\/"),
-        "",
-    ]
-    return "\n".join(lines)
-
-
 def should_show_art(quiet: bool = False) -> bool:
     """
     Determine if ASCII art should be displayed

@@ -30,7 +30,6 @@ class PipelineOrchestrator:
         prioritize_hours: int = 48,
         prioritize_limit: int | None = None,
         topic_filters: dict | None = None,
-        verify_trust: bool = True,
     ):
         """
         Initialize pipeline orchestrator
@@ -42,7 +41,6 @@ class PipelineOrchestrator:
             prioritize_hours: Hours to look back for prioritization
             prioritize_limit: Max articles to prioritize (None = all)
             topic_filters: Optional topic/scope filters for article selection
-            verify_trust: Whether to run trust verification (default: True)
         """
         self.max_concurrent_feeds = max_concurrent_feeds
         self.rate_limit = rate_limit
@@ -50,7 +48,6 @@ class PipelineOrchestrator:
         self.prioritize_hours = prioritize_hours
         self.prioritize_limit = prioritize_limit
         self.topic_filters = topic_filters or {}
-        self.verify_trust = verify_trust
         self.content_filter = None
 
     def _should_skip_rss_fetch(self, max_age_minutes: int = 60) -> tuple:
@@ -286,27 +283,14 @@ class PipelineOrchestrator:
 
     async def _synthesize_narrative(self) -> dict[str, Any]:
         """
-        Run narrative synthesis stage with trust verification and citations
+        Two-pass situation synthesis.
 
-        Uses trust-verified synthesis with inline citations and automatic
-        verification loop (max 3 retries). Falls back to basic synthesis
-        if trust verification is disabled.
+        Pass 1: Cluster articles into topics.
+        Pass 2: Examined narratives for clusters with 3+ articles,
+                thin coverage summaries for the rest.
         """
         synthesizer = NarrativeSynthesizer(topic_filters=self.topic_filters)
-
-        # Check if trust verification is enabled (can be overridden by CLI flag or settings)
-        use_trust_verification = self.verify_trust and getattr(
-            settings, "enable_trust_verification", True
-        )
-
-        if use_trust_verification:
-            logger.info("Using trust-verified synthesis with citations")
-            return await synthesizer.synthesize_with_trust_verification(
-                hours=self.prioritize_hours, max_articles=50, max_retries=3
-            )
-        else:
-            logger.info("Using basic synthesis (trust verification disabled)")
-            return await synthesizer.synthesize(hours=self.prioritize_hours, max_articles=50)
+        return await synthesizer.synthesize(hours=self.prioritize_hours, max_articles=50)
 
     def _generate_summary(self, results: dict[str, Any]) -> dict[str, Any]:
         """Generate pipeline execution summary"""
@@ -349,7 +333,6 @@ async def run_pipeline(
     prioritize_hours: int = 48,
     prioritize_limit: int | None = None,
     topic_filters: dict | None = None,
-    verify_trust: bool = True,
 ) -> dict[str, Any]:
     """
     Convenience function to run the complete pipeline
@@ -361,7 +344,6 @@ async def run_pipeline(
         prioritize_hours: Hours to look back for prioritization
         prioritize_limit: Max articles to prioritize (None = all)
         topic_filters: Optional topic/scope filters for article selection
-        verify_trust: Whether to run trust verification (default: True)
 
     Returns:
         Pipeline execution results
@@ -373,7 +355,6 @@ async def run_pipeline(
         prioritize_hours=prioritize_hours,
         prioritize_limit=prioritize_limit,
         topic_filters=topic_filters,
-        verify_trust=verify_trust,
     )
 
     return await orchestrator.run_full_pipeline()
