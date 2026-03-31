@@ -190,9 +190,7 @@ class TestProcessArticle:
     def test_process_article_normalizes_content(self, sample_article_factory):
         """Should normalize content if not already done"""
         normalizer = ArticleNormalizer()
-        article = sample_article_factory(
-            content="<p>HTML content</p>", normalized_content=None
-        )
+        article = sample_article_factory(content="<p>HTML content</p>", normalized_content=None)
 
         result = normalizer.process_article(article)
 

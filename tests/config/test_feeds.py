@@ -2,7 +2,6 @@
 Tests for RSS feed configuration
 """
 
-
 from src.config.feeds import (
     RSS_FEEDS,
     get_all_feeds,
@@ -206,9 +205,9 @@ class TestFeedUrlFormat:
 
         for feed in all_feeds:
             url = feed["url"]
-            assert url.startswith("http://") or url.startswith(
-                "https://"
-            ), f"Invalid URL scheme: {url}"
+            assert url.startswith("http://") or url.startswith("https://"), (
+                f"Invalid URL scheme: {url}"
+            )
 
     def test_no_empty_urls(self):
         """No feed should have empty URL"""

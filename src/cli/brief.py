@@ -12,7 +12,7 @@ from ..config.settings import settings
 from ..database.connection import create_tables
 from ..feed_manager import setup_feeds
 from ..pipeline.orchestrator import run_pipeline
-from .brief_formatter import BriefFormatter, clean_citations
+from .brief_formatter import clean_citations
 from .colors import accent, header, muted, warning
 from .loading import loading
 from .output import get_output_manager, is_debug_mode
@@ -178,6 +178,7 @@ def brief_group(
             result = asyncio.run(run_brief())
 
         # Display results
+        report_path = None
         if result:
             pipeline_summary = result.get("pipeline", {}).get("summary", {})
             report_result = result.get("report", {})
@@ -203,34 +204,36 @@ def brief_group(
                 click.echo("  • Run without filters to see all available content")
                 click.echo("=" * 80)
             elif report_result.get("success") and articles_analyzed > 0:
-                if quiet:
-                    # Compact output: situation titles + stats
-                    synthesis_data = report_result.get("synthesis_data", {})
-                    situations = synthesis_data.get("situations", [])
-                    metadata = synthesis_data.get("metadata", {})
+                synthesis_data = report_result.get("synthesis_data", {})
+                situations = synthesis_data.get("situations", [])
+                metadata = synthesis_data.get("metadata", {})
 
-                    click.echo()
-                    if situations:
-                        click.echo(header("Situations analyzed:"))
-                        for i, s in enumerate(situations, 1):
-                            title = clean_citations(s.get("title", "Untitled"))
-                            click.echo(f"  {accent(f'{i}.')} {title}")
+                # Generate HTML report
+                from .html_report import save_html_report
 
-                    thin = synthesis_data.get("thin_coverage", [])
-                    if thin:
-                        click.echo(muted(f"+ {len(thin)} topics with thin coverage"))
+                report_path = save_html_report(synthesis_data)
 
-                    click.echo(
-                        muted(
-                            f"Articles: {articles_analyzed} | "
-                            f"Clusters: {metadata.get('clusters_total', 0)}"
-                        )
+                # Terminal summary (always shown)
+                click.echo()
+                if situations:
+                    click.echo(header("Situations analyzed:"))
+                    for i, s in enumerate(situations, 1):
+                        title = clean_citations(s.get("title", "Untitled"))
+                        click.echo(f"  {accent(f'{i}.')} {title}")
+
+                thin = synthesis_data.get("thin_coverage", [])
+                if thin:
+                    click.echo(muted(f"\n+ {len(thin)} topics with thin coverage"))
+
+                click.echo(
+                    muted(
+                        f"\nArticles: {articles_analyzed} | "
+                        f"Clusters: {metadata.get('clusters_total', 0)}"
                     )
-                else:
-                    # Full narrative output (default)
-                    formatter = BriefFormatter()
-                    formatted_report = formatter.format_report(report_result)
-                    click.echo(formatted_report)
+                )
+
+                if not quiet:
+                    click.echo(f"\nReport saved: {accent(str(report_path))}")
 
             # Pipeline summary
             click.echo()
@@ -252,6 +255,13 @@ def brief_group(
                 from .frames import run_frame_validation_loop
 
                 run_frame_validation_loop()
+
+                # Open HTML report in browser after frame validation
+                if report_path and not quiet:
+                    import webbrowser
+
+                    click.echo(f"\nOpening report in browser: {accent(str(report_path))}")
+                    webbrowser.open(f"file://{report_path}")
 
 
 # ============================================================================

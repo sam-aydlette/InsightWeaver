@@ -6,11 +6,25 @@
 
 ## The Problem
 
-The dominant narratives in daily news coverage preclude alternatives without the reader knowing it. This is not a conspiracy -- it is a structural feature of how information is produced and distributed. Every article frames its subject: it foregrounds certain facts, backgrounds others, and takes certain premises for granted. When your information sources all use the same frame, you are not exposed to the alternatives. You cannot evaluate what you cannot see.
+The dominant narratives in daily news coverage preclude alternatives without the reader knowing it. This is a structural feature of how information is produced and distributed. Every article frames its subject: it foregrounds certain facts, backgrounds others, and takes certain premises for granted. When your information sources all use the same frame, you are not exposed to the alternatives. You cannot evaluate what you cannot see.
 
 The traditional response to this problem -- aggregating more sources -- does not solve it. More articles using the same frame is not more perspective. It is more volume.
 
 Information overload is a real problem, but it is a symptom. The deeper problem is that the reader has no way to see the editorial structure of their information diet: which frames are present, which are absent, and what assumptions are embedded in the coverage they consume.
+
+---
+
+## What You Get
+
+You read your morning brief and come away understanding:
+
+1. **What is actually happening** -- not just what is being reported. The underlying situation, not the headline.
+2. **Who is doing what to whom, and why** -- named actors with identified interests, not abstract forces.
+3. **What the coverage makes easy to see and what it makes hard to see** -- the narrative layers in the reporting, where they conflict, and what is structurally absent from the sources you read.
+4. **Where the story could go** -- the branching paths, what would have to be true for each one, and the unresolved question that determines which way it breaks.
+5. **What you would need to know to make a good decision about this** -- the specific information gaps, why they exist, and what kind of source would fill them.
+
+This is the value proposition. Everything else -- the architecture, the frame glossary, the clustering -- exists to deliver these five outcomes.
 
 ---
 

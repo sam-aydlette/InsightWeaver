@@ -7,9 +7,9 @@ and the narrative_frames glossary.
 
 # Used when a topic cluster has no known frames yet.
 # The model identifies candidate frames from the article corpus.
-FRAME_DISCOVERY_PROMPT = """You are analyzing a cluster of articles about a single topic. No narrative frames have been catalogued for this topic yet. Your task is to identify the distinct frames present in (and absent from) this coverage.
+FRAME_DISCOVERY_PROMPT = """You are analyzing a cluster of articles about a single topic. No narrative frames have been catalogued for this topic yet. Your task is to identify the distinct narrative layers present in (and absent from) this coverage, and map how they relate to each other.
 
-A "frame" is a coherent way of understanding a story: what it emphasizes, what it de-emphasizes, and what assumption it takes for granted. Frames are not opinions -- they are structural features of how information is organized.
+A "frame" is a coherent way of understanding a story: what it emphasizes, what it de-emphasizes, and what assumption it takes for granted. Frames are not opinions -- they are structural features of how information is organized. There is never just one frame; multiple narrative layers coexist and may conflict.
 
 ## Instructions
 
@@ -20,7 +20,12 @@ Read the articles below and identify 2-4 distinct frames. For each frame:
 3. **De-emphasizes**: What this frame pushes to the background or omits entirely.
 4. **Assumed premise**: The unstated belief a reader must hold for this frame to feel natural.
 
-After identifying frames present in the coverage, consider what frames are plausibly absent. If a common way of understanding this topic is missing from today's articles, list it with the same structure.
+After identifying individual frames, analyze their relationships:
+
+5. **Fractures**: Where do the identified frames conflict? What does one frame assert that another denies or ignores? Name the specific point of disagreement.
+6. **Bridges**: Is there any claim or evidence that connects conflicting frames? If no bridge exists, say so.
+
+Then consider what frames are plausibly absent. Absent frames may be missing because of data gaps, coverage gaps, or structural absences -- the information environment makes that perspective difficult to articulate. Name the reason.
 
 For absent frames, recommend a type of feed source that would carry that perspective. This must be a source category (e.g., "trade union publications", "municipal finance reporting", "patient advocacy press"), not a search query or URL.
 
@@ -39,13 +44,20 @@ Return valid JSON with this exact structure:
       "assumed_premise": "the unstated assumption"
     }}
   ],
+  "narrative_conflicts": [
+    {{
+      "frames_in_tension": ["frame label 1", "frame label 2"],
+      "fracture_point": "the specific disagreement between these frames",
+      "bridge": "what connects them, or 'none identified'"
+    }}
+  ],
   "frames_absent": [
     {{
       "label": "frame name",
       "emphasizes": "what this frame would foreground",
       "de_emphasizes": "what this frame would background",
       "assumed_premise": "the unstated assumption",
-      "why_absent": "why this frame is missing from today's coverage"
+      "why_absent": "data gap, coverage gap, or structural absence -- and why"
     }}
   ],
   "gap_recommendations": [

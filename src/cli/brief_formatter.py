@@ -133,19 +133,38 @@ class BriefFormatter(BaseTerminalFormatter):
                 lines.append(f"    Decides: {clean_citations(power['who_decides'])}")
             lines.append("")
 
-        # Coverage frame
+        # Coverage frame / narrative layers
         frame = situation.get("coverage_frame", {})
         if frame:
-            lines.append(accent("  COVERAGE FRAME:"))
-            if frame.get("dominant_frame"):
+            lines.append(accent("  WHAT THE COVERAGE MAKES VISIBLE AND INVISIBLE:"))
+            if frame.get("narrative_layers"):
+                lines.append(f"    Narratives: {frame['narrative_layers']}")
+            elif frame.get("dominant_frame"):
+                # Backward compat with old schema
                 lines.append(f"    Frame: {frame['dominant_frame']}")
+            if frame.get("fractures"):
+                lines.append(f"    Fractures: {frame['fractures']}")
+            if frame.get("bridges"):
+                lines.append(f"    Bridges: {muted(frame['bridges'])}")
+            if frame.get("structural_absences"):
+                lines.append(f"    Hard to see: {muted(frame['structural_absences'])}")
             if frame.get("assumed_premise"):
                 lines.append(f"    Assumes: {muted(frame['assumed_premise'])}")
-            if frame.get("de_emphasized"):
-                lines.append(f"    De-emphasized: {muted(frame['de_emphasized'])}")
             lines.append("")
 
-        # Causal structure
+        # Where this goes
+        futures = situation.get("where_this_goes", {})
+        if futures:
+            lines.append(accent("  WHERE THIS GOES:"))
+            if futures.get("branching_paths"):
+                lines.append(f"    Paths: {clean_citations(futures['branching_paths'])}")
+            if futures.get("unresolved_question"):
+                lines.append(f"    Key question: {futures['unresolved_question']}")
+            if futures.get("what_to_watch"):
+                lines.append(f"    Watch for: {muted(futures['what_to_watch'])}")
+            lines.append("")
+
+        # Causal structure (backward compat -- may not be present in new schema)
         causal = situation.get("causal_structure", {})
         if causal:
             lines.append(accent("  CAUSAL STRUCTURE:"))
@@ -164,11 +183,14 @@ class BriefFormatter(BaseTerminalFormatter):
             for gap in gaps:
                 missing = gap.get("what_is_missing", "")
                 why = gap.get("why_it_matters", "")
+                why_missing = gap.get("why_missing", "")
                 feed = gap.get("feed_recommendation", "")
 
                 lines.append(f"    {warning('GAP')}: {missing}")
                 if why:
                     lines.append(f"      Why it matters: {muted(why)}")
+                if why_missing:
+                    lines.append(f"      Why missing: {muted(why_missing)}")
                 if feed:
                     lines.append(f"      Suggested source: {muted(feed)}")
             lines.append("")

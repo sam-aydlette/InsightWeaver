@@ -58,9 +58,7 @@ class TestParallelRSSFetcherInit:
 
     def test_init_custom_values(self):
         """Should accept custom values"""
-        fetcher = ParallelRSSFetcher(
-            max_concurrent_feeds=5, requests_per_second=1.0, timeout=60
-        )
+        fetcher = ParallelRSSFetcher(max_concurrent_feeds=5, requests_per_second=1.0, timeout=60)
 
         assert fetcher.max_concurrent_feeds == 5
         assert fetcher.requests_per_second == 1.0
@@ -105,9 +103,7 @@ class TestFetchAllFeeds:
         """Should handle feed errors gracefully"""
         mock_fetcher = MagicMock()
         mock_fetcher_class.return_value = mock_fetcher
-        mock_fetcher.fetch_and_store_feed = AsyncMock(
-            return_value=(False, 0, "Network error")
-        )
+        mock_fetcher.fetch_and_store_feed = AsyncMock(return_value=(False, 0, "Network error"))
         mock_fetcher.close = AsyncMock()
 
         fetcher = ParallelRSSFetcher()
@@ -145,9 +141,7 @@ class TestRateLimitedFetch:
     async def test_rate_limited_fetch_exception(self, mock_fetcher_class, mock_rss_feed):
         """Should handle exceptions during fetch"""
         mock_fetcher = MagicMock()
-        mock_fetcher.fetch_and_store_feed = AsyncMock(
-            side_effect=Exception("Unexpected error")
-        )
+        mock_fetcher.fetch_and_store_feed = AsyncMock(side_effect=Exception("Unexpected error"))
 
         fetcher = ParallelRSSFetcher()
 
@@ -267,9 +261,7 @@ class TestFetchAllActiveFeeds:
     @pytest.mark.asyncio
     @patch("src.rss.parallel_fetcher.ParallelRSSFetcher")
     @patch("src.rss.parallel_fetcher.get_db")
-    async def test_fetch_all_active_feeds_with_feeds(
-        self, mock_get_db, mock_parallel_class
-    ):
+    async def test_fetch_all_active_feeds_with_feeds(self, mock_get_db, mock_parallel_class):
         """Should fetch active feeds from database"""
         mock_db = MagicMock()
         mock_get_db.return_value.__enter__ = MagicMock(return_value=mock_db)
@@ -288,7 +280,5 @@ class TestFetchAllActiveFeeds:
 
         result = await fetch_all_active_feeds(max_concurrent=5, rate_limit=1.0)
 
-        mock_parallel_class.assert_called_with(
-            max_concurrent_feeds=5, requests_per_second=1.0
-        )
+        mock_parallel_class.assert_called_with(max_concurrent_feeds=5, requests_per_second=1.0)
         assert result["total_feeds"] == 1

@@ -41,9 +41,7 @@ class TestFetchFeed:
             mock_response.raise_for_status = MagicMock()
             mock_get.return_value = mock_response
 
-            success, feed_data, error = await fetcher.fetch_feed(
-                "https://example.com/feed.rss"
-            )
+            success, feed_data, error = await fetcher.fetch_feed("https://example.com/feed.rss")
 
             assert success is True
             assert feed_data is not None
@@ -61,9 +59,7 @@ class TestFetchFeed:
         with patch.object(fetcher.session, "get", new_callable=AsyncMock) as mock_get:
             mock_get.side_effect = httpx.HTTPError("Connection failed")
 
-            success, feed_data, error = await fetcher.fetch_feed(
-                "https://example.com/feed.rss"
-            )
+            success, feed_data, error = await fetcher.fetch_feed("https://example.com/feed.rss")
 
             assert success is False
             assert feed_data is None
@@ -79,9 +75,7 @@ class TestFetchFeed:
         with patch.object(fetcher.session, "get", new_callable=AsyncMock) as mock_get:
             mock_get.side_effect = Exception("Unexpected error")
 
-            success, feed_data, error = await fetcher.fetch_feed(
-                "https://example.com/feed.rss"
-            )
+            success, feed_data, error = await fetcher.fetch_feed("https://example.com/feed.rss")
 
             assert success is False
             assert "Unexpected error" in error
@@ -228,9 +222,7 @@ class TestFetchAndStoreFeed:
         mock_db = MagicMock()
         mock_get_db.return_value.__enter__ = MagicMock(return_value=mock_db)
         mock_get_db.return_value.__exit__ = MagicMock(return_value=False)
-        mock_db.query.return_value.filter.return_value.first.return_value = (
-            mock_inactive_feed
-        )
+        mock_db.query.return_value.filter.return_value.first.return_value = mock_inactive_feed
 
         fetcher = RSSFetcher()
 

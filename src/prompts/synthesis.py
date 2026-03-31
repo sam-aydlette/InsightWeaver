@@ -45,7 +45,13 @@ Return valid JSON with this exact structure:
 # Produces examined narratives: actors, interests, power dynamics,
 # coverage frame, causal structure, information gaps.
 # Epistemic labels on every claim. No confidence scores.
-SITUATION_SYNTHESIS_PROMPT = """You are analyzing a set of articles about a single situation. Your task is to produce an examined narrative: who are the actors, what are their interests, who benefits, who is harmed, how the coverage frames the story, what causal structure determines the outcome, and what information is missing.
+SITUATION_SYNTHESIS_PROMPT = """You are analyzing a set of articles about a single situation. The reader should finish your analysis understanding five things:
+
+1. What is actually happening (not just what is being reported)
+2. Who is doing what to whom, and why
+3. What the coverage makes easy to see and what it makes hard to see
+4. Where the story could go, and what would have to be true for each path
+5. What they would need to know to make a good decision about this
 
 {analysis_rules}
 
@@ -63,7 +69,7 @@ Return valid JSON with this exact structure:
 ```json
 {{
   "title": "One-sentence description of the situation",
-  "narrative": "2-4 paragraph examined narrative of the situation. Name actors and their interests. State who benefits, who is harmed, who decides. Every factual claim carries an epistemic label and citation. Uncertainty is expressed as what is missing, not as hedging.",
+  "narrative": "2-4 paragraph examined narrative. Identify the operative narrative layers -- the distinct stories being told about what is happening. Map where they conflict: what does one narrative assert that another denies or ignores? Name actors and their interests. State who benefits, who is harmed, who decides. When actors operate under conflicting narratives, name the discrepancy. Every factual claim carries an epistemic label and citation. End with the unresolved question that determines where this goes.",
   "actors": [
     {{
       "name": "Named person or organization",
@@ -78,19 +84,21 @@ Return valid JSON with this exact structure:
     "who_decides": "Named, with explanation^[citations]"
   }},
   "coverage_frame": {{
-    "dominant_frame": "What the coverage emphasizes and what it takes for granted",
-    "assumed_premise": "What the reader must already believe for this framing to feel natural",
-    "de_emphasized": "What the coverage pushes to background or omits"
+    "narrative_layers": "The distinct narratives operative in the coverage -- not just one dominant frame but the layers that coexist and their relationship to each other",
+    "fractures": "Where these narratives conflict -- the specific point of disagreement, not just the fact that disagreement exists",
+    "bridges": "What connects conflicting narratives, if anything. If no bridge exists, say so.",
+    "structural_absences": "What is hard to see -- perspectives that are absent not because of missing data but because the information environment makes them difficult to articulate. Name the structural reason."
   }},
-  "causal_structure": {{
-    "forces": "What determines the outcome regardless of how the coverage frames it^[citations]",
-    "constraints": "What limits possible outcomes^[citations]",
-    "dependencies": "What this situation depends on that may not be visible in today's coverage"
+  "where_this_goes": {{
+    "branching_paths": "The conditional futures: if X then Y, if A then B. Which narrative layer predicts which outcome.",
+    "unresolved_question": "The single question whose answer determines which path the situation takes. This is often the most valuable part of the analysis.",
+    "what_to_watch": "The specific observable event or data point that would signal which path is unfolding"
   }},
   "information_gaps": [
     {{
-      "what_is_missing": "Specific information or perspective not present in today's coverage",
-      "why_it_matters": "How this gap affects the reliability or completeness of the analysis",
+      "what_is_missing": "Specific information or perspective not present",
+      "why_it_matters": "How this gap affects the reader's ability to understand the situation or make a decision",
+      "why_missing": "Is this a data gap, a coverage gap, or a structural absence?",
       "feed_recommendation": "Type of source that would fill this gap (source category, not URL)"
     }}
   ],
@@ -100,10 +108,11 @@ Return valid JSON with this exact structure:
 
 ## Requirements
 
-- Every factual claim must carry an epistemic status label: reported fact (multiple independent sources), single-source claim (name the source), consensus view (state whose consensus), or speculation (say so plainly).
-- When the evidence is ambiguous about who benefits or who is harmed, say so. Do not pick a side or retreat into "there are many perspectives."
-- The causal structure section should identify forces and constraints that matter whether or not the articles mention them. If you can infer a dependency from the evidence, state it with its epistemic basis. If you cannot, flag it as a gap.
-- Do not recommend actions. Map implications: "if X is true, then Y follows" -- not "you should do Z."
+- Every factual claim must carry an epistemic status label: reported fact, single-source claim, consensus view, or speculation.
+- Identify multiple narrative layers, not just one dominant frame. Map their conflicts and any bridges between them.
+- When the evidence is ambiguous, say so. Do not pick a side or retreat into "there are many perspectives."
+- The where_this_goes section maps conditional futures, not predictions. "If X, then Y" -- not "Y will happen."
+- Do not recommend actions. Map implications so the reader can reason for themselves.
 - Do not use emotional language or urgency framing unless directly quoting a source.
 
 Return ONLY valid JSON, no markdown formatting or additional text."""

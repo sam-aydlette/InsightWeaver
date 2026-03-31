@@ -263,12 +263,8 @@ class TestIsExactDuplicate:
     def test_is_exact_duplicate_false(self, sample_article_factory):
         """Should return False for different content"""
         deduplicator = ArticleDeduplicator()
-        article1 = sample_article_factory(
-            title="Title A", normalized_content="Content A"
-        )
-        article2 = sample_article_factory(
-            title="Title B", normalized_content="Content B"
-        )
+        article1 = sample_article_factory(title="Title A", normalized_content="Content A")
+        article2 = sample_article_factory(title="Title B", normalized_content="Content B")
 
         result = deduplicator._is_exact_duplicate(article1, article2)
 

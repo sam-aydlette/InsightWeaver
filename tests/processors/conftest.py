@@ -69,9 +69,7 @@ def sample_article_factory():
         article.content = content
         article.normalized_content = normalized_content
         # Use default datetime only if not explicitly passed
-        article.published_date = (
-            datetime.utcnow() if published_date is _UNSET else published_date
-        )
+        article.published_date = datetime.utcnow() if published_date is _UNSET else published_date
         article.fetched_at = datetime.utcnow() if fetched_at is _UNSET else fetched_at
         article.feed_id = feed_id
         article.guid = guid

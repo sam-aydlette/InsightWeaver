@@ -21,9 +21,7 @@ def sample_user_profile():
                 "country": "USA",
             }
         },
-        "professional_context": {
-            "professional_domains": ["cybersecurity", "software development"]
-        },
+        "professional_context": {"professional_domains": ["cybersecurity", "software development"]},
         "civic_interests": {"policy_areas": ["education", "housing"]},
         "briefing_preferences": {"perspective": "daily_intelligence_brief"},
     }

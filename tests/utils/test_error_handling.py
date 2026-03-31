@@ -2,7 +2,6 @@
 Tests for error handling utilities
 """
 
-
 from src.utils.error_handling import (
     APIError,
     AuthenticationError,

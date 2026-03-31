@@ -119,9 +119,7 @@ class TestMatchesTopic:
 
         assert matches is True
 
-    def test_entity_matching_increases_score(
-        self, sample_article_for_context, sample_feed
-    ):
+    def test_entity_matching_increases_score(self, sample_article_for_context, sample_feed):
         """Should increase score for entity matches"""
         matcher = TopicMatcher()
         article = sample_article_for_context(
@@ -217,9 +215,7 @@ class TestMatchesScope:
             description="State policy update",
         )
 
-        result = matcher.matches_scope(
-            article, "state", {"state": "Virginia", "city": "Fairfax"}
-        )
+        result = matcher.matches_scope(article, "state", {"state": "Virginia", "city": "Fairfax"})
 
         assert result is True
 
@@ -272,18 +268,14 @@ class TestMatchesScope:
 class TestFilterArticles:
     """Tests for article filtering"""
 
-    def test_filter_by_topic(
-        self, sample_article_for_context, sample_user_profile, sample_feed
-    ):
+    def test_filter_by_topic(self, sample_article_for_context, sample_user_profile, sample_feed):
         """Should filter articles by topic"""
         matcher = TopicMatcher()
 
         cyber_article = sample_article_for_context(
             id=1, title="Ransomware attack detected", feed=sample_feed
         )
-        food_article = sample_article_for_context(
-            id=2, title="New restaurant opens downtown"
-        )
+        food_article = sample_article_for_context(id=2, title="New restaurant opens downtown")
 
         articles = [cyber_article, food_article]
         filters = {"topics": ["cybersecurity"]}
@@ -294,18 +286,12 @@ class TestFilterArticles:
         assert len(result) >= 1
         assert any(a.id == 1 for a in result)
 
-    def test_filter_by_scope(
-        self, sample_article_for_context, sample_user_profile, sample_feed
-    ):
+    def test_filter_by_scope(self, sample_article_for_context, sample_user_profile, sample_feed):
         """Should filter articles by geographic scope"""
         matcher = TopicMatcher()
 
-        local_article = sample_article_for_context(
-            id=1, title="Fairfax City Council meeting"
-        )
-        national_article = sample_article_for_context(
-            id=2, title="Congress debates new bill"
-        )
+        local_article = sample_article_for_context(id=1, title="Fairfax City Council meeting")
+        national_article = sample_article_for_context(id=2, title="Congress debates new bill")
 
         articles = [local_article, national_article]
         filters = {"scopes": ["local"]}
@@ -316,9 +302,7 @@ class TestFilterArticles:
         assert len(result) >= 1
         assert any(a.id == 1 for a in result)
 
-    def test_filter_by_topic_and_scope(
-        self, sample_article_for_context, sample_user_profile
-    ):
+    def test_filter_by_topic_and_scope(self, sample_article_for_context, sample_user_profile):
         """Should filter articles by both topic and scope"""
         matcher = TopicMatcher()
 
@@ -368,9 +352,7 @@ class TestFilterArticles:
 
         assert len(result) == 2
 
-    def test_filter_sorts_by_score(
-        self, sample_article_for_context, sample_user_profile
-    ):
+    def test_filter_sorts_by_score(self, sample_article_for_context, sample_user_profile):
         """Should sort matched articles by relevance score"""
         matcher = TopicMatcher()
 
