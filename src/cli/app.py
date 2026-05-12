@@ -43,7 +43,8 @@ def print_help():
     click.echo()
     click.echo(header("Brief command options:"))
     click.echo(f"  {accent('--hours N')}           - Look back N hours (default: 24)")
-    click.echo(f"  {accent('--email')}             - Send report via email (in addition to saving)")
+    click.echo(f"  {accent('--save PATH')}         - Save brief as markdown to PATH")
+    click.echo(f"  {accent('--quiet')}             - Compact output (titles only)")
     click.echo(muted("  Topic filters:   --cybersecurity (-cs), --ai (-ai)"))
     click.echo(
         muted("  Scope filters:   --local (-l), --state (-s), --national (-n), --global (-g)")
@@ -69,6 +70,7 @@ def print_help():
     click.echo(muted("  brief                  (24-hour brief, all topics)"))
     click.echo(muted("  brief -cs -n           (national cybersecurity news)"))
     click.echo(muted("  brief --hours 48 -l    (48-hour local news brief)"))
+    click.echo(muted("  brief --save brief.md  (save brief as markdown)"))
     click.echo(muted("  forecast               (multi-horizon forecasts, executive mode)"))
     click.echo(muted("  forecast --horizon 1yr --full  (1-year detailed forecast)"))
     click.echo(muted("  frames list            (view narrative frame glossary)"))

@@ -1,6 +1,5 @@
-.PHONY: help install install-dev test lint format typecheck pre-commit clean coverage run-brief run-trust run-forecast
+.PHONY: help install install-dev test lint format typecheck pre-commit clean clean-all coverage run-brief run-forecast db-migrate db-migrate-down db-reset update-deps
 
-# Default target
 help:
 	@echo "InsightWeaver - Makefile Commands"
 	@echo ""
@@ -11,7 +10,6 @@ help:
 	@echo ""
 	@echo "Development:"
 	@echo "  make test            Run tests"
-	@echo "  make test-watch      Run tests in watch mode"
 	@echo "  make coverage        Run tests with coverage report"
 	@echo "  make lint            Run linter (ruff)"
 	@echo "  make format          Auto-format code with ruff"
@@ -21,7 +19,6 @@ help:
 	@echo ""
 	@echo "Application:"
 	@echo "  make run-brief       Run intelligence brief"
-	@echo "  make run-trust       Run trust-verified query"
 	@echo "  make run-forecast    Run forecast generation"
 	@echo ""
 	@echo "Database:"
@@ -33,7 +30,6 @@ help:
 	@echo "  make clean           Remove build artifacts and cache"
 	@echo "  make clean-all       Deep clean including venv"
 
-# Installation
 install:
 	pip install -r requirements.txt
 	pip install -e .
@@ -47,19 +43,12 @@ update-deps:
 	pip-compile pyproject.toml -o requirements.txt
 	pip-compile --extra dev pyproject.toml -o requirements-dev.txt
 
-# Testing
 test:
 	pytest tests/ -v
 
-test-watch:
-	pytest-watch tests/ -v
-
 coverage:
-	pytest tests/ --cov=src --cov-report=html --cov-report=term-missing -v
-	@echo ""
-	@echo "Coverage report generated in htmlcov/index.html"
+	pytest tests/ --cov=src --cov-report=term-missing -v
 
-# Code Quality
 lint:
 	ruff check src/ tests/
 
@@ -74,21 +63,14 @@ pre-commit:
 	pre-commit run --all-files
 
 check: lint typecheck test
-	@echo ""
-	@echo "✓ All checks passed!"
+	@echo "All checks passed."
 
-# Application Commands
 run-brief:
-	python -m src.cli.app brief run
-
-run-trust:
-	@read -p "Enter query: " query; \
-	python -m src.cli.app trust "$$query"
+	insightweaver brief
 
 run-forecast:
-	python -m src.cli.app forecast run
+	insightweaver forecast
 
-# Cleanup
 clean:
 	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 	find . -type d -name "*.egg-info" -exec rm -rf {} + 2>/dev/null || true
@@ -101,23 +83,16 @@ clean:
 	rm -rf htmlcov/
 	rm -rf dist/
 	rm -rf build/
-	@echo "✓ Cleaned build artifacts and cache"
 
 clean-all: clean
 	rm -rf venv/
 	rm -rf .venv/
-	@echo "✓ Deep clean complete"
 
-# Development database commands
 db-migrate:
-	@echo "Running database migrations..."
 	python -m src.database.migrations.add_forecast_tables
-	@echo "✓ Migrations complete"
 
 db-migrate-down:
-	@echo "Rolling back database migrations..."
 	python -m src.database.migrations.add_forecast_tables down
-	@echo "✓ Rollback complete"
 
 db-reset:
 	@echo "WARNING: This will delete all data!"
@@ -125,7 +100,6 @@ db-reset:
 	if [ "$$confirm" = "y" ] || [ "$$confirm" = "Y" ]; then \
 		rm -f data/insightweaver.db; \
 		python -m src.database.migrations.add_forecast_tables; \
-		echo "✓ Database reset complete"; \
 	else \
 		echo "Cancelled"; \
 	fi

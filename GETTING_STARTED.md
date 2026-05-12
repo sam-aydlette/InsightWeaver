@@ -153,11 +153,11 @@ Run `insightweaver --help` or type `help` in interactive mode for the full comma
 
 ### Viewing Reports
 
-All generated reports are saved automatically:
-- `reports/briefings/` - Your daily briefings (HTML and JSON)
-- `reports/forecasts/` - Your trend forecasts
+Briefs render directly to the terminal. To archive a copy as markdown:
 
-Reports are saved as HTML files you can open in any web browser.
+```
+insightweaver brief --save brief.md
+```
 
 ---
 
@@ -220,19 +220,6 @@ pip install -e .
 
 Your preferences are stored in `~/.insightweaver/user_profile.json`. Edit this file directly to change your location, professional domain, or topic interests.
 
-### Email Reports (Optional)
-
-To receive reports via email, add these to your `.env` file:
-
-```
-EMAIL_USERNAME=your_email@gmail.com
-EMAIL_PASSWORD=your_app_password
-FROM_EMAIL=your_email@gmail.com
-RECIPIENT_EMAIL=your_email@gmail.com
-```
-
-For Gmail, you'll need to create an "App Password" in your Google account settings.
-
 ### RSS Feeds
 
 News sources are configured in the `config/feeds/` folder. Each JSON file contains a list of RSS feed URLs organized by category.
@@ -263,4 +250,3 @@ News sources are configured in the `config/feeds/` folder. Each JSON file contai
 Once you're comfortable with the basics, you can explore:
 - **[CLI Reference](docs/cli_reference.md)** - Command-line options for power users
 - **[Configuration Guide](docs/configuration_guide.md)** - Customize your profile and feeds
-- **[Scheduling Setup](deployment/SCHEDULING_SETUP.md)** - Automate daily briefings

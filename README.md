@@ -79,7 +79,7 @@ InsightWeaver uses context engineering: it curates optimal context for Claude an
 3. **Context curation**: Articles are selected based on your profile (location, profession, interests)
 4. **Pass 1 -- Clustering and frame discovery**: Articles are grouped into situations. For each situation, the system checks for known frames or discovers new ones. This pass is auditable: you can inspect which articles landed in which cluster.
 5. **Pass 2 -- Situation synthesis**: Claude analyzes each situation with known frames injected, producing examined narratives with actors, interests, power dynamics, causal structure, frame analysis, and information gaps. ANALYSIS_RULES.md is injected into every prompt, enforcing epistemic labeling and structural honesty.
-6. **Delivery**: Reports are saved locally and optionally emailed
+6. **Delivery**: The brief is rendered to the terminal; pass `--save PATH` to also write a markdown copy
 
 RSS is the only input source.
 

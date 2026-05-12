@@ -5,6 +5,7 @@ Preserves all existing InsightWeaver functionality
 
 import asyncio
 import logging
+from pathlib import Path
 
 import click
 
@@ -12,7 +13,7 @@ from ..config.settings import settings
 from ..database.connection import create_tables
 from ..feed_manager import setup_feeds
 from ..pipeline.orchestrator import run_pipeline
-from .brief_formatter import clean_citations
+from .brief_formatter import BriefFormatter, clean_citations
 from .colors import accent, header, muted, warning
 from .loading import loading
 from .output import get_output_manager, is_debug_mode
@@ -85,6 +86,13 @@ def setup_database():
 @click.option(
     "--global", "-g", "filter_global", is_flag=True, help="Filter to global/international news only"
 )
+@click.option(
+    "--save",
+    "save_path",
+    type=click.Path(dir_okay=False, writable=True),
+    default=None,
+    help="Save brief as markdown to PATH",
+)
 def brief_group(
     ctx,
     hours,
@@ -95,6 +103,7 @@ def brief_group(
     filter_state,
     filter_national,
     filter_global,
+    save_path,
 ):
     """
     Run intelligence brief pipeline and generate report
@@ -178,7 +187,6 @@ def brief_group(
             result = asyncio.run(run_brief())
 
         # Display results
-        report_path = None
         if result:
             pipeline_summary = result.get("pipeline", {}).get("summary", {})
             report_result = result.get("report", {})
@@ -208,32 +216,32 @@ def brief_group(
                 situations = synthesis_data.get("situations", [])
                 metadata = synthesis_data.get("metadata", {})
 
-                # Generate HTML report
-                from .html_report import save_html_report
+                formatter = BriefFormatter()
 
-                report_path = save_html_report(synthesis_data)
+                if quiet:
+                    click.echo()
+                    if situations:
+                        click.echo(header("Situations analyzed:"))
+                        for i, s in enumerate(situations, 1):
+                            title = clean_citations(s.get("title", "Untitled"))
+                            click.echo(f"  {accent(f'{i}.')} {title}")
 
-                # Terminal summary (always shown)
-                click.echo()
-                if situations:
-                    click.echo(header("Situations analyzed:"))
-                    for i, s in enumerate(situations, 1):
-                        title = clean_citations(s.get("title", "Untitled"))
-                        click.echo(f"  {accent(f'{i}.')} {title}")
+                    thin = synthesis_data.get("thin_coverage", [])
+                    if thin:
+                        click.echo(muted(f"\n+ {len(thin)} topics with thin coverage"))
 
-                thin = synthesis_data.get("thin_coverage", [])
-                if thin:
-                    click.echo(muted(f"\n+ {len(thin)} topics with thin coverage"))
-
-                click.echo(
-                    muted(
-                        f"\nArticles: {articles_analyzed} | "
-                        f"Clusters: {metadata.get('clusters_total', 0)}"
+                    click.echo(
+                        muted(
+                            f"\nArticles: {articles_analyzed} | "
+                            f"Clusters: {metadata.get('clusters_total', 0)}"
+                        )
                     )
-                )
+                else:
+                    click.echo(formatter.format_report(report_result))
 
-                if not quiet:
-                    click.echo(f"\nReport saved: {accent(str(report_path))}")
+                if save_path:
+                    Path(save_path).write_text(formatter.format_markdown(report_result))
+                    click.echo(muted(f"\nSaved markdown to {save_path}"))
 
             # Pipeline summary
             click.echo()
@@ -255,13 +263,6 @@ def brief_group(
                 from .frames import run_frame_validation_loop
 
                 run_frame_validation_loop()
-
-                # Open HTML report in browser after frame validation
-                if report_path and not quiet:
-                    import webbrowser
-
-                    click.echo(f"\nOpening report in browser: {accent(str(report_path))}")
-                    webbrowser.open(f"file://{report_path}")
 
 
 # ============================================================================
