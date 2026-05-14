@@ -6,6 +6,7 @@ import re
 
 from src.cli.brief_formatter import (
     BriefFormatter,
+    _decision_summary,
     _prediction_check_line,
     _question_lines,
     _watch_items,
@@ -122,6 +123,66 @@ class TestWatchItems:
     def test_empty(self):
         assert _watch_items({}) == []
         assert _watch_items({"what_to_watch": []}) == []
+
+
+class TestDecisionSummary:
+    def test_empty_when_no_routing(self):
+        assert _decision_summary({}) == []
+        assert _decision_summary({"decision_routing": "not a list"}) == []
+
+    def test_returns_routing_list(self):
+        routing = [
+            {"decision": "housing", "factors": [{"name": "rates", "direction": "complicates"}]}
+        ]
+        assert _decision_summary({"decision_routing": routing}) == routing
+
+    def test_terminal_renders_decision_section(self):
+        report = {
+            "synthesis_data": {
+                "situations": [],
+                "thin_coverage": [],
+                "metadata": {
+                    "articles_analyzed": 3,
+                    "decision_routing": [
+                        {
+                            "decision": "housing market monitoring",
+                            "factors": [
+                                {"name": "interest rates", "direction": "complicates"},
+                                {"name": "inventory", "direction": "supports"},
+                            ],
+                        }
+                    ],
+                },
+            }
+        }
+        out = strip_ansi(BriefFormatter().format_report(report))
+        assert "YOUR DECISIONS" in out
+        assert "housing market monitoring" in out
+        assert "interest rates" in out
+        assert "complicates" in out
+        assert "[-]" in out  # complicates glyph
+        assert "[+]" in out  # supports glyph
+
+    def test_markdown_renders_decision_section(self):
+        report = {
+            "synthesis_data": {
+                "situations": [],
+                "thin_coverage": [],
+                "metadata": {
+                    "articles_analyzed": 3,
+                    "decision_routing": [
+                        {
+                            "decision": "career move",
+                            "factors": [{"name": "salary range", "direction": "supports"}],
+                        }
+                    ],
+                },
+            }
+        }
+        md = BriefFormatter().format_markdown(report)
+        assert "## Your decisions" in md
+        assert "### career move" in md
+        assert "**salary range** — supports" in md
 
 
 class TestRenderIntegration:

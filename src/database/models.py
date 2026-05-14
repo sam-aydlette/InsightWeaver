@@ -611,3 +611,92 @@ class Prediction(Base):
         Index("idx_prediction_question", "question_id"),
         Index("idx_prediction_made_at", "made_at"),
     )
+
+
+# ============================================================================
+# Decision Journal
+# Standing decisions the user is carrying. Each run routes situation evidence
+# into the factors the user cares about, turning daily coverage into an
+# accumulating record per decision rather than a one-off briefing.
+# ============================================================================
+
+
+DECISION_STATUS_OPEN = "open"
+DECISION_STATUS_DECIDED = "decided"
+DECISION_STATUS_DEFERRED = "deferred"
+
+# How a piece of evidence moved a factor.
+EVIDENCE_DIRECTION_SUPPORTS = "supports"
+EVIDENCE_DIRECTION_COMPLICATES = "complicates"
+EVIDENCE_DIRECTION_NEUTRAL = "neutral"
+
+
+class Decision(Base):
+    """A standing decision the user is carrying, seeded from the profile."""
+
+    __tablename__ = "decisions"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(300), nullable=False)
+    decision_type = Column(String(50))  # career / housing / education / financial / civic / other
+    status = Column(String(20), nullable=False, default=DECISION_STATUS_OPEN)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    decided_at = Column(DateTime, nullable=True)
+    notes = Column(Text, nullable=True)
+
+    factors = relationship("DecisionFactor", back_populates="decision")
+    evidence = relationship("DecisionEvidence", back_populates="decision")
+
+    __table_args__ = (Index("idx_decision_status", "status"),)
+
+
+class DecisionFactor(Base):
+    """
+    A variable the user is tracking for a decision. ``what_would_update_me``
+    is the user's stated rule for what evidence would change their read --
+    it is what makes routing tractable, since the router matches situations
+    against these clauses.
+    """
+
+    __tablename__ = "decision_factors"
+
+    id = Column(Integer, primary_key=True)
+    decision_id = Column(Integer, ForeignKey("decisions.id"), nullable=False)
+    name = Column(String(300), nullable=False)
+    what_would_update_me = Column(Text, nullable=True)
+    current_state_note = Column(Text, nullable=True)
+
+    decision = relationship("Decision", back_populates="factors")
+    evidence = relationship("DecisionEvidence", back_populates="factor")
+
+    __table_args__ = (Index("idx_decision_factor_decision", "decision_id"),)
+
+
+class DecisionEvidence(Base):
+    """
+    One run's routing result: a situation contained evidence bearing on a
+    decision factor. This is the only place situation-to-decision routing is
+    recorded, so the chain from coverage to decision stays inspectable.
+    """
+
+    __tablename__ = "decision_evidence"
+
+    id = Column(Integer, primary_key=True)
+    decision_id = Column(Integer, ForeignKey("decisions.id"), nullable=False)
+    factor_id = Column(Integer, ForeignKey("decision_factors.id"), nullable=False)
+    synthesis_id = Column(Integer, ForeignKey("narrative_syntheses.id"), nullable=False)
+    question_id = Column(Integer, ForeignKey("questions.id"), nullable=True)
+
+    situation_excerpt = Column(Text, nullable=False)
+    direction = Column(String(20), nullable=False, default=EVIDENCE_DIRECTION_NEUTRAL)
+    epistemic_status = Column(String(30))  # reported_fact/single_source/consensus/speculation
+    observed_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    decision = relationship("Decision", back_populates="evidence")
+    factor = relationship("DecisionFactor", back_populates="evidence")
+
+    __table_args__ = (
+        Index("idx_decision_evidence_decision", "decision_id"),
+        Index("idx_decision_evidence_factor", "factor_id"),
+        Index("idx_decision_evidence_synthesis", "synthesis_id"),
+    )

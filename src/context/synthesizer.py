@@ -16,6 +16,7 @@ from ..database.models import (
     AnalysisRun,
     Article,
     ContextSnapshot,
+    DecisionEvidence,
     NarrativeSynthesis,
     Prediction,
     Question,
@@ -30,6 +31,7 @@ from ..prompts.synthesis import (
 from ..utils.profiler import profile
 from .claude_client import ClaudeClient
 from .curator import ContextCurator
+from .decision_router import DecisionRouter
 from .frame_manager import FrameManager
 from .prediction_tracker import PredictionTracker
 from .question_matcher import ProposedQuestion, QuestionMatcher
@@ -50,6 +52,7 @@ class NarrativeSynthesizer:
         self.frame_manager = FrameManager(self.client)
         self.question_matcher = QuestionMatcher()
         self.prediction_tracker = PredictionTracker()
+        self.decision_router = DecisionRouter()
 
     async def synthesize(self, hours: int = 48, max_articles: int = 50) -> dict[str, Any]:
         """
@@ -440,6 +443,14 @@ class NarrativeSynthesizer:
                 else:
                     resolved = []
 
+                # Route situation evidence into open decision factors. Done
+                # before the synthesis row write so the routing summary lands
+                # in the stored synthesis_data blob.
+                routed_evidence = await self.decision_router.route_evidence(situations, session)
+                synthesis_data.setdefault("metadata", {})["decision_routing"] = (
+                    self._build_decision_summary(routed_evidence, session)
+                )
+
                 exec_summary = (
                     situations[0].get("title", "No summary available")
                     if situations
@@ -491,6 +502,22 @@ class NarrativeSynthesizer:
                         )
                     )
 
+                # Persist routed decision evidence, attaching synthesis_id and
+                # the situation's primary Question.
+                for routed in routed_evidence:
+                    primary_q = primary_question_by_situation.get(routed.situation_index)
+                    session.add(
+                        DecisionEvidence(
+                            decision_id=routed.decision_id,
+                            factor_id=routed.factor_id,
+                            synthesis_id=synthesis.id,
+                            question_id=primary_q.id if primary_q else None,
+                            situation_excerpt=routed.excerpt,
+                            direction=routed.direction,
+                            epistemic_status=routed.epistemic_status,
+                        )
+                    )
+
                 if context:
                     article_ids = [
                         int(a.get("id")) for a in context.get("articles", []) if a.get("id")
@@ -523,6 +550,38 @@ class NarrativeSynthesizer:
                 "expired": 0,
                 "still_open": 0,
             }
+
+    @staticmethod
+    def _build_decision_summary(routed_evidence, session) -> list[dict]:
+        """
+        Group routed evidence by decision into a compact brief summary:
+        ``[{"decision": name, "factors": [{"name", "direction"}]}]``.
+        """
+        from ..database.models import Decision, DecisionFactor
+
+        if not routed_evidence:
+            return []
+
+        decision_ids = {r.decision_id for r in routed_evidence}
+        factor_ids = {r.factor_id for r in routed_evidence}
+        decisions = {
+            d.id: d.name
+            for d in session.query(Decision).filter(Decision.id.in_(decision_ids)).all()
+        }
+        factors = {
+            f.id: f.name
+            for f in session.query(DecisionFactor).filter(DecisionFactor.id.in_(factor_ids)).all()
+        }
+
+        grouped: dict[int, list[dict]] = {}
+        for r in routed_evidence:
+            grouped.setdefault(r.decision_id, []).append(
+                {"name": factors.get(r.factor_id, "(factor)"), "direction": r.direction}
+            )
+        return [
+            {"decision": decisions.get(did, "(decision)"), "factors": factor_list}
+            for did, factor_list in grouped.items()
+        ]
 
     @staticmethod
     def _collect_predictions(situations: list[dict]) -> list[tuple[int, str, str]]:

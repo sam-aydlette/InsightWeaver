@@ -151,6 +151,8 @@ insightweaver questions list     # Open questions the coverage is still tracking
 insightweaver questions show 47  # History of question Q47 across runs
 insightweaver predictions open   # Observables the tool is still waiting on
 insightweaver predictions track-record  # The tool's own calibration record
+insightweaver decisions list     # Standing decisions and routed evidence
+insightweaver decisions show 1   # Factors and evidence for decision D1
 ```
 
 Run `insightweaver --help` or type `help` in interactive mode for the full command list.

@@ -10,6 +10,7 @@ import click
 
 from .brief import brief_group
 from .colors import accent, header, muted
+from .decisions import decisions_command
 from .forecast import forecast_command
 from .frames import frames_command
 from .output import set_debug_mode
@@ -24,6 +25,7 @@ COMMAND_DISPATCH = {
     "frames": frames_command,
     "questions": questions_command,
     "predictions": predictions_command,
+    "decisions": decisions_command,
 }
 
 
@@ -32,7 +34,7 @@ def print_command_refresher():
     refresher = (
         f"\n{header('Commands:')} {accent('brief')} | {accent('forecast')} | "
         f"{accent('frames')} | {accent('questions')} | {accent('predictions')} | "
-        f"help | exit\n"
+        f"{accent('decisions')} | help | exit\n"
     )
     click.echo(refresher)
 
@@ -45,6 +47,7 @@ def print_help():
     click.echo(f"  {accent('frames')}              - Manage narrative frame glossary")
     click.echo(f"  {accent('questions')}           - Inspect the persistent question graph")
     click.echo(f"  {accent('predictions')}         - Inspect the predictions ledger")
+    click.echo(f"  {accent('decisions')}           - Manage the decision journal")
     click.echo(f"  {accent('help')}                - Show this help message")
     click.echo(f"  {accent('exit')}                - Exit InsightWeaver")
     click.echo()
@@ -83,6 +86,13 @@ def print_help():
     click.echo(f"  {accent('predictions triggered')}    - Predictions later coverage confirmed")
     click.echo(f"  {accent('predictions contradicted')} - Predictions later coverage went against")
     click.echo(f"  {accent('predictions track-record')} - Rolling calibration record")
+    click.echo()
+    click.echo(header("Decisions command:"))
+    click.echo(f"  {accent('decisions list')}            - List standing decisions")
+    click.echo(f"  {accent('decisions show')} <id>       - Show factors and routed evidence")
+    click.echo(f"  {accent('decisions add')} --name '...' --type ...  - Add a decision")
+    click.echo(f"  {accent('decisions factor add')} <id> --name '...'  - Add a factor")
+    click.echo(f"  {accent('decisions resolve')} <id> --note '...'  - Mark a decision decided")
     click.echo()
     click.echo(header("Examples:"))
     click.echo(muted("  brief                  (24-hour brief, all topics)"))

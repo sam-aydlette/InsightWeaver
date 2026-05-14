@@ -17,6 +17,19 @@ def clean_citations(text: str) -> str:
     return re.sub(r"\^\[([0-9,\s]+)\]", r"[\1]", text)
 
 
+def _decision_summary(metadata: dict) -> list[dict]:
+    """Pull the decision-routing summary out of synthesis metadata."""
+    routing = metadata.get("decision_routing")
+    return routing if isinstance(routing, list) else []
+
+
+_DIRECTION_GLYPH = {
+    "supports": "+",
+    "complicates": "-",
+    "neutral": "~",
+}
+
+
 def _prediction_check_line(check: dict | None) -> str:
     """One-line transparency summary of the pre-synthesis prediction check."""
     if not isinstance(check, dict):
@@ -140,6 +153,21 @@ class BriefFormatter(BaseTerminalFormatter):
         if check_line:
             lines.append(muted(check_line))
         lines.append("")
+
+        # Your decisions -- what today's coverage moved
+        decisions = _decision_summary(metadata)
+        if decisions:
+            lines.append(header("YOUR DECISIONS"))
+            lines.append(muted("What today's coverage moved. See 'decisions show <id>'."))
+            lines.append("")
+            for entry in decisions:
+                lines.append(f"  {accent(entry.get('decision', '(decision)'))}")
+                for factor in entry.get("factors", []):
+                    direction = factor.get("direction", "neutral")
+                    glyph = _DIRECTION_GLYPH.get(direction, "~")
+                    name = factor.get("name", "(factor)")
+                    lines.append(f"    [{glyph}] {name} {muted(f'({direction})')}")
+            lines.append("")
 
         # Situations
         if situations:
@@ -321,6 +349,20 @@ class BriefFormatter(BaseTerminalFormatter):
             lines.append("")
             lines.append(f"_{check_line}_")
         lines.append("")
+
+        decisions = _decision_summary(metadata)
+        if decisions:
+            lines.append("## Your decisions")
+            lines.append("")
+            lines.append("_What today's coverage moved._")
+            lines.append("")
+            for entry in decisions:
+                lines.append(f"### {entry.get('decision', '(decision)')}")
+                for factor in entry.get("factors", []):
+                    direction = factor.get("direction", "neutral")
+                    name = factor.get("name", "(factor)")
+                    lines.append(f"- **{name}** — {direction}")
+                lines.append("")
 
         if situations:
             for i, situation in enumerate(situations, 1):
