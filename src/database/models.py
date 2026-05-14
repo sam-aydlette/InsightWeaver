@@ -559,3 +559,55 @@ class QuestionSituation(Base):
             "question_id", "synthesis_id", "situation_index", name="_question_situation_uc"
         ),
     )
+
+
+# ============================================================================
+# Predictions Ledger
+# Falsifiable observables the synthesis committed to, keyed to Questions.
+# A pre-synthesis check pass grades open predictions against fresh coverage,
+# which makes the tool's own forward-looking statements auditable over time.
+# ============================================================================
+
+
+PREDICTION_STATUS_OPEN = "open"
+PREDICTION_STATUS_TRIGGERED = "triggered"
+PREDICTION_STATUS_CONTRADICTED = "contradicted"
+PREDICTION_STATUS_EXPIRED = "expired"
+
+# Open predictions older than this are expired by the check pass; coverage
+# that far out is unlikely to still bear on the original observable.
+PREDICTION_EXPIRY_DAYS = 90
+
+
+class Prediction(Base):
+    """
+    A falsifiable observable the synthesis flagged as worth watching.
+
+    Each what_to_watch entry from a situation becomes a Prediction keyed to
+    that situation's primary Question. The check pass that runs before each
+    synthesis grades open predictions: triggered (the observable appeared),
+    contradicted (coverage explicitly went the other way), or expired (aged
+    out without resolution).
+    """
+
+    __tablename__ = "predictions"
+
+    id = Column(Integer, primary_key=True)
+    question_id = Column(Integer, ForeignKey("questions.id"), nullable=False)
+    observable_text = Column(Text, nullable=False)
+    trigger_condition = Column(Text, nullable=False)
+
+    made_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    made_in_synthesis_id = Column(Integer, ForeignKey("narrative_syntheses.id"), nullable=False)
+
+    status = Column(String(20), nullable=False, default=PREDICTION_STATUS_OPEN)
+    resolved_at = Column(DateTime, nullable=True)
+    resolution_note = Column(Text, nullable=True)
+
+    question = relationship("Question")
+
+    __table_args__ = (
+        Index("idx_prediction_status", "status"),
+        Index("idx_prediction_question", "question_id"),
+        Index("idx_prediction_made_at", "made_at"),
+    )

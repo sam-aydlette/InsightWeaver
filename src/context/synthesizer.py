@@ -17,6 +17,7 @@ from ..database.models import (
     Article,
     ContextSnapshot,
     NarrativeSynthesis,
+    Prediction,
     Question,
     QuestionSituation,
 )
@@ -30,6 +31,7 @@ from ..utils.profiler import profile
 from .claude_client import ClaudeClient
 from .curator import ContextCurator
 from .frame_manager import FrameManager
+from .prediction_tracker import PredictionTracker
 from .question_matcher import ProposedQuestion, QuestionMatcher
 
 logger = logging.getLogger(__name__)
@@ -47,6 +49,7 @@ class NarrativeSynthesizer:
         self.analysis_rules = load_analysis_rules()
         self.frame_manager = FrameManager(self.client)
         self.question_matcher = QuestionMatcher()
+        self.prediction_tracker = PredictionTracker()
 
     async def synthesize(self, hours: int = 48, max_articles: int = 50) -> dict[str, Any]:
         """
@@ -76,6 +79,12 @@ class NarrativeSynthesizer:
                 return {"articles_analyzed": 0, "synthesis_id": None, "status": "no_articles"}
 
             try:
+                # Pre-pass: grade the open-prediction ledger against today's
+                # coverage before any new analysis. This keeps the tool's own
+                # forward-looking statements auditable.
+                with profile("PREDICTION_CHECK"):
+                    prediction_check = await self._check_predictions(articles)
+
                 # Pass 1: Cluster articles
                 with profile("PASS_1_CLUSTERING"):
                     clusters = await self._cluster_articles(articles)
@@ -192,6 +201,7 @@ class NarrativeSynthesizer:
                         "analysis_threshold": f"{ANALYSIS_THRESHOLD}+ articles",
                         "generated_at": datetime.utcnow().isoformat(),
                         "citation_map": citation_map,
+                        "prediction_check": prediction_check,
                     },
                 }
 
@@ -454,12 +464,30 @@ class NarrativeSynthesizer:
                     )
 
                 # Write QuestionSituation join rows now that we have synthesis.id.
-                for (sit_idx, _slot, _pq), q in zip(question_plan, resolved, strict=True):
+                primary_question_by_situation: dict[int, Question] = {}
+                for (sit_idx, slot, _pq), q in zip(question_plan, resolved, strict=True):
                     session.add(
                         QuestionSituation(
                             question_id=q.id,
                             synthesis_id=synthesis.id,
                             situation_index=sit_idx,
+                        )
+                    )
+                    if slot == "primary":
+                        primary_question_by_situation[sit_idx] = q
+
+                # Persist this run's what_to_watch observables as Predictions,
+                # each keyed to its situation's primary Question.
+                for sit_idx, observable, trigger in self._collect_predictions(situations):
+                    question = primary_question_by_situation.get(sit_idx)
+                    if question is None:
+                        continue
+                    session.add(
+                        Prediction(
+                            question_id=question.id,
+                            observable_text=observable,
+                            trigger_condition=trigger,
+                            made_in_synthesis_id=synthesis.id,
                         )
                     )
 
@@ -480,6 +508,42 @@ class NarrativeSynthesizer:
         except Exception as e:
             logger.error(f"Failed to store synthesis: {e}")
             return None
+
+    async def _check_predictions(self, articles: list[dict]) -> dict:
+        """Grade the open-prediction ledger against today's coverage."""
+        try:
+            with get_db() as session:
+                return await self.prediction_tracker.check_open_predictions(articles, session)
+        except Exception as e:
+            logger.warning(f"Prediction check failed; continuing without it: {e}")
+            return {
+                "checked": 0,
+                "triggered": 0,
+                "contradicted": 0,
+                "expired": 0,
+                "still_open": 0,
+            }
+
+    @staticmethod
+    def _collect_predictions(situations: list[dict]) -> list[tuple[int, str, str]]:
+        """
+        Walk situations and extract what_to_watch observables.
+
+        Returns ``[(situation_index, observable_text, trigger_condition), ...]``.
+        """
+        out: list[tuple[int, str, str]] = []
+        for s_idx, situation in enumerate(situations):
+            futures = situation.get("where_this_goes") or {}
+            watch = futures.get("what_to_watch")
+            if isinstance(watch, list):
+                for entry in watch:
+                    if not isinstance(entry, dict):
+                        continue
+                    observable = (entry.get("observable") or "").strip()
+                    trigger = (entry.get("trigger_condition") or "").strip()
+                    if observable and trigger:
+                        out.append((s_idx, observable, trigger))
+        return out
 
     @staticmethod
     def _collect_proposed_questions(

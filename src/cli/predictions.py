@@ -1,0 +1,140 @@
+"""
+Predictions Command - Inspect the predictions ledger and the tool's own
+calibration track record.
+"""
+
+from datetime import datetime, timedelta
+
+import click
+
+from ..database.connection import get_db
+from ..database.models import (
+    PREDICTION_STATUS_CONTRADICTED,
+    PREDICTION_STATUS_EXPIRED,
+    PREDICTION_STATUS_OPEN,
+    PREDICTION_STATUS_TRIGGERED,
+    Prediction,
+)
+from .colors import accent, header, muted, success, warning
+
+
+@click.group(name="predictions")
+def predictions_command():
+    """Inspect the predictions ledger and calibration record."""
+    pass
+
+
+def _print_predictions(rows, show_resolution: bool):
+    now = datetime.utcnow()
+    for p in rows:
+        age_days = (now - p.made_at).days
+        question_text = p.question.text if p.question else "(unknown question)"
+        click.echo(
+            f"{accent(f'P{p.id}')}  {muted(f'made {p.made_at.date().isoformat()} ({age_days}d ago)')}"
+        )
+        click.echo(f"  Observable: {p.observable_text}")
+        click.echo(f"  Trigger: {muted(p.trigger_condition)}")
+        click.echo(f"  Bears on: {muted(question_text)}")
+        if show_resolution and p.resolution_note:
+            click.echo(f"  {p.resolution_note}")
+        click.echo()
+
+
+@predictions_command.command(name="open")
+@click.option("--limit", "-n", type=int, default=50)
+def open_predictions(limit):
+    """List predictions still waiting on coverage."""
+    with get_db() as session:
+        rows = (
+            session.query(Prediction)
+            .filter(Prediction.status == PREDICTION_STATUS_OPEN)
+            .order_by(Prediction.made_at.asc())
+            .limit(limit)
+            .all()
+        )
+        if not rows:
+            click.echo(muted("No open predictions."))
+            return
+        click.echo(header(f"OPEN PREDICTIONS ({len(rows)} shown)"))
+        click.echo("=" * 80)
+        _print_predictions(rows, show_resolution=False)
+
+
+@predictions_command.command(name="triggered")
+@click.option("--limit", "-n", type=int, default=50)
+def triggered_predictions(limit):
+    """List predictions whose observable showed up in later coverage."""
+    with get_db() as session:
+        rows = (
+            session.query(Prediction)
+            .filter(Prediction.status == PREDICTION_STATUS_TRIGGERED)
+            .order_by(Prediction.resolved_at.desc())
+            .limit(limit)
+            .all()
+        )
+        if not rows:
+            click.echo(muted("No triggered predictions yet."))
+            return
+        click.echo(header(f"TRIGGERED PREDICTIONS ({len(rows)} shown)"))
+        click.echo("=" * 80)
+        _print_predictions(rows, show_resolution=True)
+
+
+@predictions_command.command(name="contradicted")
+@click.option("--limit", "-n", type=int, default=50)
+def contradicted_predictions(limit):
+    """List predictions later coverage explicitly went against."""
+    with get_db() as session:
+        rows = (
+            session.query(Prediction)
+            .filter(Prediction.status == PREDICTION_STATUS_CONTRADICTED)
+            .order_by(Prediction.resolved_at.desc())
+            .limit(limit)
+            .all()
+        )
+        if not rows:
+            click.echo(muted("No contradicted predictions yet."))
+            return
+        click.echo(header(f"CONTRADICTED PREDICTIONS ({len(rows)} shown)"))
+        click.echo("=" * 80)
+        _print_predictions(rows, show_resolution=True)
+
+
+@predictions_command.command(name="track-record")
+@click.option("--days", "-d", type=int, default=90, help="Window in days (default: 90).")
+def track_record(days):
+    """Show the tool's calibration record over a rolling window."""
+    cutoff = datetime.utcnow() - timedelta(days=days)
+    with get_db() as session:
+        window = session.query(Prediction).filter(Prediction.made_at >= cutoff)
+        total = window.count()
+        if total == 0:
+            click.echo(muted(f"No predictions made in the last {days} days."))
+            return
+
+        counts = {
+            "open": window.filter(Prediction.status == PREDICTION_STATUS_OPEN).count(),
+            "triggered": window.filter(Prediction.status == PREDICTION_STATUS_TRIGGERED).count(),
+            "contradicted": window.filter(
+                Prediction.status == PREDICTION_STATUS_CONTRADICTED
+            ).count(),
+            "expired": window.filter(Prediction.status == PREDICTION_STATUS_EXPIRED).count(),
+        }
+        resolved = counts["triggered"] + counts["contradicted"]
+
+        click.echo(header(f"CALIBRATION RECORD (last {days} days)"))
+        click.echo("=" * 80)
+        click.echo(f"  Predictions made:     {total}")
+        click.echo(f"  {success('Triggered')}:            {counts['triggered']}")
+        click.echo(f"  {warning('Contradicted')}:         {counts['contradicted']}")
+        click.echo(f"  {muted('Still open')}:           {counts['open']}")
+        click.echo(f"  {muted('Expired (no signal)')}:  {counts['expired']}")
+        click.echo()
+        if resolved:
+            hit_rate = counts["triggered"] / resolved
+            click.echo(
+                f"  Of {resolved} resolved predictions, "
+                f"{hit_rate:.0%} were triggered rather than contradicted."
+            )
+        else:
+            click.echo(muted("  No predictions resolved yet in this window."))

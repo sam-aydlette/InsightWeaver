@@ -1,0 +1,179 @@
+"""
+Prediction Tracker
+Runs before each synthesis: expires stale open predictions, then grades the
+rest against today's coverage. This is what makes the tool's own
+forward-looking statements auditable -- every observable it flagged gets
+checked against what later actually showed up in the feeds.
+"""
+
+import json
+import logging
+from datetime import datetime, timedelta
+
+from sqlalchemy.orm import Session
+
+from ..database.models import (
+    PREDICTION_EXPIRY_DAYS,
+    PREDICTION_STATUS_CONTRADICTED,
+    PREDICTION_STATUS_EXPIRED,
+    PREDICTION_STATUS_OPEN,
+    PREDICTION_STATUS_TRIGGERED,
+    Prediction,
+)
+from ..prompts.predictions import PREDICTION_CHECK_PROMPT
+from .claude_client import ClaudeClient
+
+logger = logging.getLogger(__name__)
+
+TRACKER_MODEL = "claude-haiku-4-5-20251001"
+OPEN_PREDICTION_LIMIT = 200
+CHECK_MAX_TOKENS = 4096
+# Article snippets passed to the check pass; titles + a short lead is enough
+# to tell whether an observable was reported.
+COVERAGE_SNIPPET_CHARS = 200
+
+
+class PredictionTracker:
+    """Grades the open-prediction ledger against fresh coverage."""
+
+    def __init__(self, client: ClaudeClient | None = None):
+        self.client = client or ClaudeClient(model=TRACKER_MODEL)
+
+    async def check_open_predictions(self, articles: list[dict], session: Session) -> dict:
+        """
+        Expire stale predictions, then grade the rest against today's coverage.
+
+        Returns a summary dict for the brief's transparency block. Writes
+        status changes to the session but does not commit -- the caller owns
+        the transaction.
+        """
+        now = datetime.utcnow()
+        summary = {
+            "checked": 0,
+            "triggered": 0,
+            "contradicted": 0,
+            "expired": 0,
+            "still_open": 0,
+        }
+
+        # Expire anything that aged out without resolution.
+        cutoff = now - timedelta(days=PREDICTION_EXPIRY_DAYS)
+        stale = (
+            session.query(Prediction)
+            .filter(
+                Prediction.status == PREDICTION_STATUS_OPEN,
+                Prediction.made_at < cutoff,
+            )
+            .all()
+        )
+        for pred in stale:
+            pred.status = PREDICTION_STATUS_EXPIRED
+            pred.resolved_at = now
+            pred.resolution_note = (
+                f"Expired after {PREDICTION_EXPIRY_DAYS} days without resolution."
+            )
+        summary["expired"] = len(stale)
+
+        open_preds = (
+            session.query(Prediction)
+            .filter(Prediction.status == PREDICTION_STATUS_OPEN)
+            .order_by(Prediction.made_at.desc())
+            .limit(OPEN_PREDICTION_LIMIT)
+            .all()
+        )
+        summary["checked"] = len(open_preds)
+        summary["still_open"] = len(open_preds)
+
+        if not open_preds or not articles:
+            session.flush()
+            return summary
+
+        verdicts = await self._llm_check(open_preds, articles)
+        for pred in open_preds:
+            verdict = verdicts.get(pred.id)
+            if not verdict:
+                continue
+            label, note = verdict
+            if label == "triggered":
+                pred.status = PREDICTION_STATUS_TRIGGERED
+                pred.resolved_at = now
+                pred.resolution_note = f"Triggered: {note}"
+                summary["triggered"] += 1
+                summary["still_open"] -= 1
+            elif label == "contradicted":
+                pred.status = PREDICTION_STATUS_CONTRADICTED
+                pred.resolved_at = now
+                pred.resolution_note = f"Contradicted: {note}"
+                summary["contradicted"] += 1
+                summary["still_open"] -= 1
+
+        session.flush()
+        return summary
+
+    async def _llm_check(
+        self, predictions: list[Prediction], articles: list[dict]
+    ) -> dict[int, tuple[str, str]]:
+        """One Haiku call: maps prediction id to (verdict, note)."""
+        pred_lines = []
+        for p in predictions:
+            question_text = p.question.text if p.question else "(unknown question)"
+            pred_lines.append(
+                f"[{p.id}] observable: {p.observable_text}\n"
+                f"      trigger: {p.trigger_condition}\n"
+                f"      bears on: {question_text}"
+            )
+        predictions_block = "\n\n".join(pred_lines)
+
+        coverage_lines = []
+        for article in articles:
+            title = article.get("title", "Untitled")
+            content = article.get("content") or article.get("description") or ""
+            snippet = content[:COVERAGE_SNIPPET_CHARS].strip()
+            source = article.get("source", "Unknown")
+            coverage_lines.append(f"- {title} ({source})\n  {snippet}")
+        coverage_block = "\n".join(coverage_lines)
+
+        prompt = PREDICTION_CHECK_PROMPT.format(
+            predictions_block=predictions_block,
+            coverage_block=coverage_block,
+        )
+
+        try:
+            raw = await self.client.analyze(
+                system_prompt=(
+                    "You grade open predictions against fresh news coverage. "
+                    "Be conservative; 'open' is the default."
+                ),
+                user_message=prompt,
+                temperature=0.0,
+                max_tokens=CHECK_MAX_TOKENS,
+            )
+        except Exception as e:
+            logger.warning(f"Prediction check LLM call failed; leaving all open: {e}")
+            return {}
+
+        parsed = self._parse_json(raw)
+        results: dict[int, tuple[str, str]] = {}
+        valid = {"triggered", "contradicted", "open"}
+        for entry in parsed.get("verdicts", []):
+            pid = entry.get("prediction_id")
+            verdict = entry.get("verdict")
+            note = entry.get("note", "")
+            if isinstance(pid, int) and verdict in valid:
+                results[pid] = (verdict, str(note))
+        return results
+
+    @staticmethod
+    def _parse_json(response: str) -> dict:
+        try:
+            text = response.strip()
+            if text.startswith("```json"):
+                text = text[7:]
+            if text.startswith("```"):
+                text = text[3:]
+            if text.endswith("```"):
+                text = text[:-3]
+            return json.loads(text.strip())
+        except json.JSONDecodeError as e:
+            logger.warning(f"Failed to parse prediction check response: {e}")
+            return {}

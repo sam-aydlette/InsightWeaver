@@ -13,6 +13,7 @@ from .colors import accent, header, muted
 from .forecast import forecast_command
 from .frames import frames_command
 from .output import set_debug_mode
+from .predictions import predictions_command
 from .questions import questions_command
 
 # Maps command prefix to its Click command object.
@@ -22,6 +23,7 @@ COMMAND_DISPATCH = {
     "forecast": forecast_command,
     "frames": frames_command,
     "questions": questions_command,
+    "predictions": predictions_command,
 }
 
 
@@ -29,7 +31,8 @@ def print_command_refresher():
     """Print a short refresher of available commands."""
     refresher = (
         f"\n{header('Commands:')} {accent('brief')} | {accent('forecast')} | "
-        f"{accent('frames')} | {accent('questions')} | help | exit\n"
+        f"{accent('frames')} | {accent('questions')} | {accent('predictions')} | "
+        f"help | exit\n"
     )
     click.echo(refresher)
 
@@ -41,6 +44,7 @@ def print_help():
     click.echo(f"  {accent('forecast')}            - Generate long-term trend forecasts")
     click.echo(f"  {accent('frames')}              - Manage narrative frame glossary")
     click.echo(f"  {accent('questions')}           - Inspect the persistent question graph")
+    click.echo(f"  {accent('predictions')}         - Inspect the predictions ledger")
     click.echo(f"  {accent('help')}                - Show this help message")
     click.echo(f"  {accent('exit')}                - Exit InsightWeaver")
     click.echo()
@@ -73,6 +77,12 @@ def print_help():
     click.echo(f"  {accent('questions list')}         - List open (or resolved) questions")
     click.echo(f"  {accent('questions show')} <id>    - Show a question's full history")
     click.echo(f"  {accent('questions resolve')} <id> --note '...'  - Resolve a question")
+    click.echo()
+    click.echo(header("Predictions command:"))
+    click.echo(f"  {accent('predictions open')}         - Predictions still waiting on coverage")
+    click.echo(f"  {accent('predictions triggered')}    - Predictions later coverage confirmed")
+    click.echo(f"  {accent('predictions contradicted')} - Predictions later coverage went against")
+    click.echo(f"  {accent('predictions track-record')} - Rolling calibration record")
     click.echo()
     click.echo(header("Examples:"))
     click.echo(muted("  brief                  (24-hour brief, all topics)"))

@@ -4,7 +4,12 @@ Tests for brief_formatter — focused on the question-identity render integratio
 
 import re
 
-from src.cli.brief_formatter import BriefFormatter, _question_lines
+from src.cli.brief_formatter import (
+    BriefFormatter,
+    _prediction_check_line,
+    _question_lines,
+    _watch_items,
+)
 
 
 def strip_ansi(text: str) -> str:
@@ -64,6 +69,59 @@ class TestQuestionLines:
         assert out[0] == "Will A?"
         assert out[1] == "Q7 (run 4, asked 2026-03-12)"
         assert out[2] == [("Will B?", "Q8 (run 2, asked 2026-05-01)")]
+
+
+class TestPredictionCheckLine:
+    def test_empty_when_no_check(self):
+        assert _prediction_check_line(None) == ""
+        assert _prediction_check_line({}) == ""
+
+    def test_empty_when_nothing_checked_or_expired(self):
+        assert _prediction_check_line({"checked": 0, "expired": 0}) == ""
+
+    def test_renders_summary(self):
+        line = _prediction_check_line(
+            {
+                "checked": 10,
+                "triggered": 2,
+                "contradicted": 1,
+                "still_open": 7,
+                "expired": 3,
+            }
+        )
+        assert "10 open observables graded" in line
+        assert "2 triggered" in line
+        assert "1 contradicted" in line
+        assert "7 still open" in line
+        assert "3 expired" in line
+
+    def test_renders_when_only_expired(self):
+        line = _prediction_check_line({"checked": 0, "expired": 4})
+        assert "4 expired" in line
+
+
+class TestWatchItems:
+    def test_list_of_objects(self):
+        futures = {
+            "what_to_watch": [
+                {"observable": "Fed cuts", "trigger_condition": "cut announced"},
+                {"observable": "Yield inverts", "trigger_condition": "2y > 10y"},
+            ]
+        }
+        assert _watch_items(futures) == [
+            "Fed cuts -- cut announced",
+            "Yield inverts -- 2y > 10y",
+        ]
+
+    def test_legacy_string(self):
+        assert _watch_items({"what_to_watch": "Watch the Fed"}) == ["Watch the Fed"]
+
+    def test_observable_only(self):
+        assert _watch_items({"what_to_watch": [{"observable": "Just this"}]}) == ["Just this"]
+
+    def test_empty(self):
+        assert _watch_items({}) == []
+        assert _watch_items({"what_to_watch": []}) == []
 
 
 class TestRenderIntegration:

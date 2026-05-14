@@ -17,6 +17,47 @@ def clean_citations(text: str) -> str:
     return re.sub(r"\^\[([0-9,\s]+)\]", r"[\1]", text)
 
 
+def _prediction_check_line(check: dict | None) -> str:
+    """One-line transparency summary of the pre-synthesis prediction check."""
+    if not isinstance(check, dict):
+        return ""
+    checked = check.get("checked", 0)
+    if not checked and not check.get("expired"):
+        return ""
+    triggered = check.get("triggered", 0)
+    contradicted = check.get("contradicted", 0)
+    still_open = check.get("still_open", 0)
+    expired = check.get("expired", 0)
+    return (
+        f"Prediction check: {checked} open observables graded -- "
+        f"{triggered} triggered, {contradicted} contradicted, "
+        f"{still_open} still open, {expired} expired. "
+        f"See 'predictions track-record'."
+    )
+
+
+def _watch_items(futures: dict) -> list[str]:
+    """Extract what_to_watch observables. Handles the list-of-objects shape
+    and the legacy single-string shape."""
+    watch = futures.get("what_to_watch")
+    if isinstance(watch, str):
+        return [watch] if watch.strip() else []
+    if not isinstance(watch, list):
+        return []
+    items: list[str] = []
+    for entry in watch:
+        if isinstance(entry, str) and entry.strip():
+            items.append(entry.strip())
+        elif isinstance(entry, dict):
+            observable = (entry.get("observable") or "").strip()
+            trigger = (entry.get("trigger_condition") or "").strip()
+            if observable and trigger:
+                items.append(f"{observable} -- {trigger}")
+            elif observable:
+                items.append(observable)
+    return items
+
+
 def _question_lines(
     futures: dict,
 ) -> tuple[str, str, list[tuple[str, str]]]:
@@ -94,6 +135,10 @@ class BriefFormatter(BaseTerminalFormatter):
                 f"Threshold: {threshold}"
             )
         )
+
+        check_line = _prediction_check_line(metadata.get("prediction_check"))
+        if check_line:
+            lines.append(muted(check_line))
         lines.append("")
 
         # Situations
@@ -209,8 +254,8 @@ class BriefFormatter(BaseTerminalFormatter):
                 tag = f"{muted(sec_prefix)} " if sec_prefix else ""
                 lines.append(f"      Also open: {tag}{muted(sec_text)}")
 
-            if futures.get("what_to_watch"):
-                lines.append(f"    Watch for: {muted(futures['what_to_watch'])}")
+            for item in _watch_items(futures):
+                lines.append(f"    Watch for: {muted(item)}")
             lines.append("")
 
         # Causal structure (backward compat -- may not be present in new schema)
@@ -271,6 +316,10 @@ class BriefFormatter(BaseTerminalFormatter):
             f"_Articles: {articles} | Situations: {clusters_analyzed} analyzed, "
             f"{clusters_thin} thin coverage | Threshold: {threshold}_"
         )
+        check_line = _prediction_check_line(metadata.get("prediction_check"))
+        if check_line:
+            lines.append("")
+            lines.append(f"_{check_line}_")
         lines.append("")
 
         if situations:
@@ -371,8 +420,8 @@ class BriefFormatter(BaseTerminalFormatter):
                 prefix_part = f"_{sec_prefix}_ " if sec_prefix else ""
                 lines.append(f"  - Also open: {prefix_part}{sec_text}")
 
-            if futures.get("what_to_watch"):
-                lines.append(f"- **Watch for:** {futures['what_to_watch']}")
+            for item in _watch_items(futures):
+                lines.append(f"- **Watch for:** {item}")
             lines.append("")
 
         causal = situation.get("causal_structure", {})

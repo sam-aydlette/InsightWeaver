@@ -149,6 +149,8 @@ insightweaver frames list        # View narrative frame glossary
 insightweaver frames gaps        # View perspective gaps in your feeds
 insightweaver questions list     # Open questions the coverage is still tracking
 insightweaver questions show 47  # History of question Q47 across runs
+insightweaver predictions open   # Observables the tool is still waiting on
+insightweaver predictions track-record  # The tool's own calibration record
 ```
 
 Run `insightweaver --help` or type `help` in interactive mode for the full command list.

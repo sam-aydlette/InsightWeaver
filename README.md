@@ -77,10 +77,11 @@ InsightWeaver uses context engineering: it curates optimal context for Claude an
 1. **Collection**: RSS feeds are fetched in parallel from sources you configure
 2. **Deduplication**: Duplicate and near-duplicate articles are removed
 3. **Context curation**: Articles are selected based on your profile (location, profession, interests)
-4. **Pass 1 -- Clustering and frame discovery**: Articles are grouped into situations. For each situation, the system checks for known frames or discovers new ones. This pass is auditable: you can inspect which articles landed in which cluster.
-5. **Pass 2 -- Situation synthesis**: Claude analyzes each situation with known frames injected, producing examined narratives with actors, interests, power dynamics, causal structure, frame analysis, and information gaps. ANALYSIS_RULES.md is injected into every prompt, enforcing epistemic labeling and structural honesty.
-6. **Question accumulation**: each situation's unresolved questions are bound to a persistent Question graph. Returning questions surface their identity (`Q47 (run 4, asked 2026-03-12)`) so you can see which threads are still open and how long they've been running. Inspect with `insightweaver questions list`.
-7. **Delivery**: The brief is rendered to the terminal; pass `--save PATH` to also write a markdown copy
+4. **Prediction check**: before any new analysis, the open-prediction ledger is graded against today's coverage -- observables that the tool flagged in past runs are marked triggered, contradicted, or still open. This keeps the tool's own forward-looking statements auditable.
+5. **Pass 1 -- Clustering and frame discovery**: Articles are grouped into situations. For each situation, the system checks for known frames or discovers new ones. This pass is auditable: you can inspect which articles landed in which cluster.
+6. **Pass 2 -- Situation synthesis**: Claude analyzes each situation with known frames injected, producing examined narratives with actors, interests, power dynamics, causal structure, frame analysis, and information gaps. ANALYSIS_RULES.md is injected into every prompt, enforcing epistemic labeling and structural honesty.
+7. **Question and prediction accumulation**: each situation's unresolved questions are bound to a persistent Question graph, and its `what_to_watch` observables become predictions keyed to those questions. Returning questions surface their identity (`Q47 (run 4, asked 2026-03-12)`). Inspect with `insightweaver questions list` and `insightweaver predictions track-record`.
+8. **Delivery**: The brief is rendered to the terminal; pass `--save PATH` to also write a markdown copy
 
 RSS is the only input source.
 

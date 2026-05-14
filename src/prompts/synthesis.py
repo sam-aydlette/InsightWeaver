@@ -95,7 +95,12 @@ Return valid JSON with this exact structure:
       "primary": "The single question whose answer most determines which path the situation takes. This is often the most valuable part of the analysis. Phrase as a question.",
       "secondary": ["0-3 additional unresolved questions, included only if genuinely open and material. Phrase each as a question. Omit the field or pass an empty array when there are none."]
     }},
-    "what_to_watch": "The specific observable event or data point that would signal which path is unfolding"
+    "what_to_watch": [
+      {{
+        "observable": "A specific, concrete event or data point that future coverage could report on -- not a vague trend. Must be falsifiable.",
+        "trigger_condition": "What value or outcome of that observable would signal which path is unfolding. State it so a later run can check 'did this happen'."
+      }}
+    ]
   }},
   "information_gaps": [
     {{
