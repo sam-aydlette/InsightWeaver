@@ -91,7 +91,10 @@ Return valid JSON with this exact structure:
   }},
   "where_this_goes": {{
     "branching_paths": "The conditional futures: if X then Y, if A then B. Which narrative layer predicts which outcome.",
-    "unresolved_question": "The single question whose answer determines which path the situation takes. This is often the most valuable part of the analysis.",
+    "unresolved_questions": {{
+      "primary": "The single question whose answer most determines which path the situation takes. This is often the most valuable part of the analysis. Phrase as a question.",
+      "secondary": ["0-3 additional unresolved questions, included only if genuinely open and material. Phrase each as a question. Omit the field or pass an empty array when there are none."]
+    }},
     "what_to_watch": "The specific observable event or data point that would signal which path is unfolding"
   }},
   "information_gaps": [

@@ -16,20 +16,22 @@ logger = logging.getLogger(__name__)
 class ClaudeClient:
     """Minimal Claude API client for context-driven analysis"""
 
-    def __init__(self, api_key: str | None = None):
+    def __init__(self, api_key: str | None = None, model: str | None = None):
         """
         Initialize Claude client
 
         Args:
             api_key: Anthropic API key (defaults to settings.anthropic_api_key)
+            model: Model id to use; defaults to Sonnet for synthesis workloads.
+                Pass a Haiku id for cheap classification / matching calls.
         """
         self.api_key = api_key or settings.anthropic_api_key
         if not self.api_key:
             raise ValueError("ANTHROPIC_API_KEY not configured")
 
-        self.client = AsyncAnthropic(api_key=self.api_key, timeout=300.0)  # 5 min timeout
-        self.model = "claude-sonnet-4-20250514"  # Latest Sonnet model
-        self.max_tokens = 16384  # Increased for complete synthesis JSON output
+        self.client = AsyncAnthropic(api_key=self.api_key, timeout=300.0)
+        self.model = model or "claude-sonnet-4-20250514"
+        self.max_tokens = 16384
 
     async def analyze(
         self,

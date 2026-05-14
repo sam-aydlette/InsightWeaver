@@ -13,6 +13,7 @@ from .colors import accent, header, muted
 from .forecast import forecast_command
 from .frames import frames_command
 from .output import set_debug_mode
+from .questions import questions_command
 
 # Maps command prefix to its Click command object.
 # Order matters: longer prefixes checked first via startswith().
@@ -20,6 +21,7 @@ COMMAND_DISPATCH = {
     "brief": brief_group,
     "forecast": forecast_command,
     "frames": frames_command,
+    "questions": questions_command,
 }
 
 
@@ -27,7 +29,7 @@ def print_command_refresher():
     """Print a short refresher of available commands."""
     refresher = (
         f"\n{header('Commands:')} {accent('brief')} | {accent('forecast')} | "
-        f"{accent('frames')} | help | exit\n"
+        f"{accent('frames')} | {accent('questions')} | help | exit\n"
     )
     click.echo(refresher)
 
@@ -38,6 +40,7 @@ def print_help():
     click.echo(f"  {accent('brief')}               - Generate intelligence brief and report")
     click.echo(f"  {accent('forecast')}            - Generate long-term trend forecasts")
     click.echo(f"  {accent('frames')}              - Manage narrative frame glossary")
+    click.echo(f"  {accent('questions')}           - Inspect the persistent question graph")
     click.echo(f"  {accent('help')}                - Show this help message")
     click.echo(f"  {accent('exit')}                - Exit InsightWeaver")
     click.echo()
@@ -65,6 +68,11 @@ def print_help():
     click.echo(f"  {accent('frames show')} <topic>  - Show frames for a topic")
     click.echo(f"  {accent('frames edit')} <id>     - Edit a frame in $EDITOR")
     click.echo(f"  {accent('frames gaps')}          - Show recurring perspective gaps")
+    click.echo()
+    click.echo(header("Questions command:"))
+    click.echo(f"  {accent('questions list')}         - List open (or resolved) questions")
+    click.echo(f"  {accent('questions show')} <id>    - Show a question's full history")
+    click.echo(f"  {accent('questions resolve')} <id> --note '...'  - Resolve a question")
     click.echo()
     click.echo(header("Examples:"))
     click.echo(muted("  brief                  (24-hour brief, all topics)"))

@@ -17,6 +17,8 @@ from ..database.models import (
     Article,
     ContextSnapshot,
     NarrativeSynthesis,
+    Question,
+    QuestionSituation,
 )
 from ..prompts import load_analysis_rules
 from ..prompts.synthesis import (
@@ -28,6 +30,7 @@ from ..utils.profiler import profile
 from .claude_client import ClaudeClient
 from .curator import ContextCurator
 from .frame_manager import FrameManager
+from .question_matcher import ProposedQuestion, QuestionMatcher
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +46,7 @@ class NarrativeSynthesizer:
         self.client = ClaudeClient()
         self.analysis_rules = load_analysis_rules()
         self.frame_manager = FrameManager(self.client)
+        self.question_matcher = QuestionMatcher()
 
     async def synthesize(self, hours: int = 48, max_articles: int = 50) -> dict[str, Any]:
         """
@@ -191,8 +195,8 @@ class NarrativeSynthesizer:
                     },
                 }
 
-                # Store in database
-                synthesis_id = self._store_synthesis(
+                # Store in database (also resolves Questions and writes joins)
+                synthesis_id = await self._store_synthesis(
                     synthesis_data=synthesis_data,
                     articles_count=len(articles),
                     context=context,
@@ -378,13 +382,13 @@ class NarrativeSynthesizer:
             logger.debug(f"Response was: {response[:500]}...")
             return {}
 
-    def _store_synthesis(
+    async def _store_synthesis(
         self,
         synthesis_data: dict[str, Any],
         articles_count: int,
         context: dict[str, Any] | None = None,
     ) -> int | None:
-        """Store synthesis and context snapshot in database."""
+        """Store synthesis, resolve Questions, and write join rows in one txn."""
         try:
             with get_db() as session:
                 run = AnalysisRun(
@@ -399,7 +403,6 @@ class NarrativeSynthesizer:
                 session.add(run)
                 session.flush()
 
-                # Context snapshot
                 context_snapshot_id = None
                 if context:
                     article_ids = [a.get("id") for a in context.get("articles", []) if "id" in a]
@@ -415,12 +418,23 @@ class NarrativeSynthesizer:
                     session.flush()
                     context_snapshot_id = snapshot.id
 
-                # Extract summary from first situation
+                # Resolve Questions against persistent graph, then enrich
+                # synthesis_data with question identity metadata so the
+                # formatter can render Q-id prefixes without DB access.
                 situations = synthesis_data.get("situations", [])
-                if situations:
-                    exec_summary = situations[0].get("title", "No summary available")
+                question_plan = self._collect_proposed_questions(situations)
+                if question_plan:
+                    proposed = [pq for _, _, pq in question_plan]
+                    resolved = await self.question_matcher.resolve_questions(proposed, session)
+                    self._enrich_situations_with_questions(situations, question_plan, resolved)
                 else:
-                    exec_summary = "No situations identified"
+                    resolved = []
+
+                exec_summary = (
+                    situations[0].get("title", "No summary available")
+                    if situations
+                    else "No situations identified"
+                )
 
                 synthesis = NarrativeSynthesis(
                     analysis_run_id=run.id,
@@ -439,7 +453,16 @@ class NarrativeSynthesizer:
                         {"synthesis_id": synthesis.id}
                     )
 
-                # Mark articles as included
+                # Write QuestionSituation join rows now that we have synthesis.id.
+                for (sit_idx, _slot, _pq), q in zip(question_plan, resolved, strict=True):
+                    session.add(
+                        QuestionSituation(
+                            question_id=q.id,
+                            synthesis_id=synthesis.id,
+                            situation_index=sit_idx,
+                        )
+                    )
+
                 if context:
                     article_ids = [
                         int(a.get("id")) for a in context.get("articles", []) if a.get("id")
@@ -457,6 +480,87 @@ class NarrativeSynthesizer:
         except Exception as e:
             logger.error(f"Failed to store synthesis: {e}")
             return None
+
+    @staticmethod
+    def _collect_proposed_questions(
+        situations: list[dict],
+    ) -> list[tuple[int, str, ProposedQuestion]]:
+        """
+        Walk situations and extract their unresolved questions.
+
+        Returns ``[(situation_index, slot, ProposedQuestion), ...]`` where
+        ``slot`` is "primary" or "secondary:N". Order matches the order
+        situations + secondaries are emitted, so callers can zip in parallel.
+        """
+        plan: list[tuple[int, str, ProposedQuestion]] = []
+        for s_idx, situation in enumerate(situations):
+            futures = situation.get("where_this_goes") or {}
+            uq = futures.get("unresolved_questions")
+            if isinstance(uq, dict):
+                primary = uq.get("primary")
+                if isinstance(primary, str) and primary.strip():
+                    plan.append((s_idx, "primary", ProposedQuestion(primary.strip(), True)))
+                for i, sec in enumerate(uq.get("secondary") or []):
+                    if isinstance(sec, str) and sec.strip():
+                        plan.append((s_idx, f"secondary:{i}", ProposedQuestion(sec.strip(), False)))
+            elif isinstance(uq, str) and uq.strip():
+                # Backward compat for any synthesis emitting the old string form.
+                plan.append((s_idx, "primary", ProposedQuestion(uq.strip(), True)))
+            else:
+                legacy = futures.get("unresolved_question")
+                if isinstance(legacy, str) and legacy.strip():
+                    plan.append((s_idx, "primary", ProposedQuestion(legacy.strip(), True)))
+        return plan
+
+    @staticmethod
+    def _enrich_situations_with_questions(
+        situations: list[dict],
+        plan: list[tuple[int, str, ProposedQuestion]],
+        resolved: list[Question],
+    ) -> None:
+        """Attach question identity metadata onto each situation's questions."""
+        # Group resolved by situation_index + slot for easy lookup.
+        by_slot: dict[tuple[int, str], Question] = {}
+        for (sit_idx, slot, _pq), q in zip(plan, resolved, strict=True):
+            by_slot[(sit_idx, slot)] = q
+
+        for sit_idx, situation in enumerate(situations):
+            futures = situation.get("where_this_goes")
+            if not isinstance(futures, dict):
+                continue
+            primary_q = by_slot.get((sit_idx, "primary"))
+            if primary_q:
+                appearance_count = len(primary_q.situation_links) + 1
+                futures["unresolved_questions"] = {
+                    "primary": {
+                        "text": primary_q.text,
+                        "question_id": primary_q.id,
+                        "first_asked_at": primary_q.first_asked_at.isoformat(),
+                        "appearance_count": appearance_count,
+                        "previous_question_id": primary_q.previous_question_id,
+                    },
+                    "secondary": [],
+                }
+                # Drop the legacy key if it was present.
+                futures.pop("unresolved_question", None)
+
+            sec_idx = 0
+            while True:
+                sec_q = by_slot.get((sit_idx, f"secondary:{sec_idx}"))
+                if not sec_q:
+                    break
+                appearance_count = len(sec_q.situation_links) + 1
+                futures.setdefault("unresolved_questions", {"primary": None, "secondary": []})
+                futures["unresolved_questions"].setdefault("secondary", []).append(
+                    {
+                        "text": sec_q.text,
+                        "question_id": sec_q.id,
+                        "first_asked_at": sec_q.first_asked_at.isoformat(),
+                        "appearance_count": appearance_count,
+                        "previous_question_id": sec_q.previous_question_id,
+                    }
+                )
+                sec_idx += 1
 
     def _estimate_tokens(self, context: dict[str, Any]) -> int:
         """Rough token count estimate (1 token ~ 4 chars)."""

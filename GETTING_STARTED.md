@@ -147,6 +147,8 @@ insightweaver brief -cs -n       # National cybersecurity news only
 insightweaver forecast           # Generate trend forecasts
 insightweaver frames list        # View narrative frame glossary
 insightweaver frames gaps        # View perspective gaps in your feeds
+insightweaver questions list     # Open questions the coverage is still tracking
+insightweaver questions show 47  # History of question Q47 across runs
 ```
 
 Run `insightweaver --help` or type `help` in interactive mode for the full command list.

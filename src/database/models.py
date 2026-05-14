@@ -481,3 +481,81 @@ class FrameGap(Base):
         Index("idx_frame_gap_cluster", "topic_cluster_id"),
         Index("idx_frame_gap_occurrences", "occurrences"),
     )
+
+
+# ============================================================================
+# Question Graph
+# Persistent, addressable questions that accumulate across runs.
+# A Question is the unit that joins situations, predictions, and decisions
+# across time. unresolved_question fields from synthesis output bind here.
+# ============================================================================
+
+
+QUESTION_STATUS_OPEN = "open"
+QUESTION_STATUS_RESOLVED = "resolved"
+QUESTION_STATUS_SUPERSEDED = "superseded"
+
+
+class Question(Base):
+    """
+    A question the coverage is implicitly tracking across runs.
+
+    Identity rule: when a synthesis emits an unresolved_question, the matcher
+    either binds it to an existing open Question or creates a new one. Resolved
+    questions are never auto-reopened; a fresh appearance gets a new Question
+    with previous_question_id pointing at the resolved record.
+    """
+
+    __tablename__ = "questions"
+
+    id = Column(Integer, primary_key=True)
+    text = Column(Text, nullable=False)
+    normalized_text = Column(Text, nullable=False)
+
+    first_asked_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    status = Column(String(20), nullable=False, default=QUESTION_STATUS_OPEN)
+    resolved_at = Column(DateTime, nullable=True)
+    resolution_note = Column(Text, nullable=True)
+
+    # When a previously resolved question reappears, the new Question record
+    # points back at its predecessor instead of reopening it.
+    previous_question_id = Column(Integer, ForeignKey("questions.id"), nullable=True)
+
+    # Primary vs. secondary unresolved_question within its originating situation.
+    # Secondary questions are tracked but rendered quieter in the brief.
+    is_primary = Column(Boolean, default=True, nullable=False)
+
+    situation_links = relationship("QuestionSituation", back_populates="question")
+
+    __table_args__ = (
+        Index("idx_question_status", "status"),
+        Index("idx_question_normalized", "normalized_text"),
+        Index("idx_question_first_asked", "first_asked_at"),
+    )
+
+
+class QuestionSituation(Base):
+    """
+    Join row: a Question appeared in a specific situation within a synthesis.
+
+    A Question accumulates QuestionSituation rows over time; the count is the
+    question's "run number" when surfaced in the brief.
+    """
+
+    __tablename__ = "question_situations"
+
+    id = Column(Integer, primary_key=True)
+    question_id = Column(Integer, ForeignKey("questions.id"), nullable=False)
+    synthesis_id = Column(Integer, ForeignKey("narrative_syntheses.id"), nullable=False)
+    situation_index = Column(Integer, nullable=False)
+    observed_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    question = relationship("Question", back_populates="situation_links")
+
+    __table_args__ = (
+        Index("idx_qs_question", "question_id"),
+        Index("idx_qs_synthesis", "synthesis_id"),
+        UniqueConstraint(
+            "question_id", "synthesis_id", "situation_index", name="_question_situation_uc"
+        ),
+    )

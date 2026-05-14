@@ -17,6 +17,48 @@ def clean_citations(text: str) -> str:
     return re.sub(r"\^\[([0-9,\s]+)\]", r"[\1]", text)
 
 
+def _question_lines(
+    futures: dict,
+) -> tuple[str, str, list[tuple[str, str]]]:
+    """
+    Extract primary question text + identity prefix and secondary lines from
+    a ``where_this_goes`` block. Returns ``(primary_text, primary_prefix,
+    secondary)`` where each secondary is ``(text, prefix)``. Prefix is empty
+    when a question has no identity metadata or is appearing for the first
+    time -- accumulation context is only shown for repeat appearances.
+    """
+    uq = futures.get("unresolved_questions")
+    if not isinstance(uq, dict):
+        legacy = futures.get("unresolved_question")
+        if isinstance(legacy, str):
+            return legacy, "", []
+        return "", "", []
+
+    def _split(entry: Any) -> tuple[str, str]:
+        if isinstance(entry, str):
+            return entry, ""
+        if not isinstance(entry, dict):
+            return "", ""
+        text = entry.get("text", "")
+        qid = entry.get("question_id")
+        appearance = entry.get("appearance_count")
+        if qid is None or appearance is None:
+            return text, ""
+        if appearance <= 1:
+            return text, f"Q{qid} (new)"
+        first = entry.get("first_asked_at", "")
+        first_date = first.split("T", 1)[0] if isinstance(first, str) else ""
+        return text, f"Q{qid} (run {appearance}, asked {first_date})"
+
+    primary_text, primary_prefix = _split(uq.get("primary"))
+    secondary: list[tuple[str, str]] = []
+    for entry in uq.get("secondary") or []:
+        text, prefix = _split(entry)
+        if text:
+            secondary.append((text, prefix))
+    return primary_text, primary_prefix, secondary
+
+
 class BriefFormatter(BaseTerminalFormatter):
     """Format situation-based intelligence briefs for terminal display."""
 
@@ -158,8 +200,15 @@ class BriefFormatter(BaseTerminalFormatter):
             lines.append(accent("  WHERE THIS GOES:"))
             if futures.get("branching_paths"):
                 lines.append(f"    Paths: {clean_citations(futures['branching_paths'])}")
-            if futures.get("unresolved_question"):
-                lines.append(f"    Key question: {futures['unresolved_question']}")
+
+            primary_text, primary_prefix, secondary = _question_lines(futures)
+            if primary_text:
+                tag = f"{muted(primary_prefix)} " if primary_prefix else ""
+                lines.append(f"    Key question: {tag}{primary_text}")
+            for sec_text, sec_prefix in secondary:
+                tag = f"{muted(sec_prefix)} " if sec_prefix else ""
+                lines.append(f"      Also open: {tag}{muted(sec_text)}")
+
             if futures.get("what_to_watch"):
                 lines.append(f"    Watch for: {muted(futures['what_to_watch'])}")
             lines.append("")
@@ -313,8 +362,15 @@ class BriefFormatter(BaseTerminalFormatter):
             lines.append("")
             if futures.get("branching_paths"):
                 lines.append(f"- **Paths:** {clean_citations(futures['branching_paths'])}")
-            if futures.get("unresolved_question"):
-                lines.append(f"- **Key question:** {futures['unresolved_question']}")
+
+            primary_text, primary_prefix, secondary = _question_lines(futures)
+            if primary_text:
+                prefix_part = f"_{primary_prefix}_ " if primary_prefix else ""
+                lines.append(f"- **Key question:** {prefix_part}{primary_text}")
+            for sec_text, sec_prefix in secondary:
+                prefix_part = f"_{sec_prefix}_ " if sec_prefix else ""
+                lines.append(f"  - Also open: {prefix_part}{sec_text}")
+
             if futures.get("what_to_watch"):
                 lines.append(f"- **Watch for:** {futures['what_to_watch']}")
             lines.append("")
