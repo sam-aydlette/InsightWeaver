@@ -180,46 +180,6 @@ class ContextSnapshot(Base):
     __table_args__ = (Index("idx_context_created_at", "created_at"),)
 
 
-class MemoryFact(Base):
-    """
-    Persistent semantic facts extracted from narrative syntheses
-    Enables historical context and temporal awareness
-    """
-
-    __tablename__ = "memory_facts"
-
-    id = Column(Integer, primary_key=True)
-
-    # Fact structure (subject-predicate-object triple)
-    fact_type = Column(String(50), nullable=False)  # 'metric', 'trend', 'relationship', 'decision'
-    subject = Column(String(200), nullable=False)  # 'Fairfax County unemployment'
-    predicate = Column(String(100), nullable=False)  # 'rate'
-    object = Column(Text, nullable=False)  # '2.3%'
-    temporal_context = Column(String(50))  # '2025-01-15', 'Q4 2024', 'January 2025'
-
-    # Quality metadata
-    confidence = Column(Float, default=0.7)  # 0.0-1.0
-    source_synthesis_id = Column(Integer, ForeignKey("narrative_syntheses.id"))
-
-    # Lifecycle
-    created_at = Column(DateTime, default=datetime.utcnow)
-    expires_at = Column(DateTime, nullable=True)  # NULL for evergreen facts
-
-    # Additional context
-    fact_metadata = Column(JSON)  # Extra context, related entities, etc.
-
-    __table_args__ = (
-        Index("idx_memory_fact_subject", "subject"),
-        Index("idx_memory_fact_type", "fact_type"),
-        Index("idx_memory_fact_temporal", "temporal_context"),
-        Index("idx_memory_fact_composite", "temporal_context", "confidence"),
-        # Additional indexes for semantic memory retrieval optimization
-        Index("idx_memory_fact_expires", "expires_at"),  # For expiration filtering
-        Index("idx_memory_fact_confidence", "confidence"),  # For confidence-based ordering
-        Index("idx_memory_fact_created", "created_at"),  # For recency-based ordering
-    )
-
-
 class ForecastRun(Base):
     """
     Execution tracking for long-term forecast runs

@@ -161,7 +161,6 @@ class TestCreateTables:
             "analysis_runs",
             "narrative_syntheses",
             "context_snapshots",
-            "memory_facts",
             "forecast_runs",
             "long_term_forecasts",
             "forecast_scenarios",

@@ -16,7 +16,6 @@ from src.database.models import (
     ForecastRun,
     ForecastScenario,
     LongTermForecast,
-    MemoryFact,
     NarrativeSynthesis,
     RSSFeed,
 )
@@ -106,23 +105,6 @@ def sample_narrative_synthesis(test_session, sample_analysis_run, sample_context
     test_session.add(synthesis)
     test_session.commit()
     return synthesis
-
-
-@pytest.fixture
-def sample_memory_fact(test_session, sample_narrative_synthesis):
-    """Create a sample MemoryFact for testing"""
-    fact = MemoryFact(
-        fact_type="metric",
-        subject="Fairfax County unemployment",
-        predicate="rate",
-        object="2.3%",
-        temporal_context="January 2026",
-        confidence=0.85,
-        source_synthesis_id=sample_narrative_synthesis.id,
-    )
-    test_session.add(fact)
-    test_session.commit()
-    return fact
 
 
 @pytest.fixture

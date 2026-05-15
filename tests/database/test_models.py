@@ -16,7 +16,6 @@ from src.database.models import (
     ForecastRun,
     ForecastScenario,
     LongTermForecast,
-    MemoryFact,
     NarrativeSynthesis,
     RSSFeed,
 )
@@ -221,40 +220,6 @@ class TestContextSnapshotModel:
         assert snapshot.article_ids == [1, 2, 3, 4, 5]
 
 
-class TestMemoryFactModel:
-    """Tests for MemoryFact model"""
-
-    def test_create_memory_fact(self, test_session):
-        """Should create a MemoryFact"""
-        fact = MemoryFact(
-            fact_type="metric",
-            subject="GDP growth",
-            predicate="rate",
-            object="2.5%",
-            temporal_context="Q4 2025",
-            confidence=0.9,
-        )
-        test_session.add(fact)
-        test_session.commit()
-
-        assert fact.id is not None
-        assert fact.created_at is not None
-
-    def test_memory_fact_with_expiration(self, test_session):
-        """Should handle expiration dates"""
-        fact = MemoryFact(
-            fact_type="trend",
-            subject="Stock market",
-            predicate="direction",
-            object="upward",
-            expires_at=datetime.utcnow() + timedelta(days=7),
-        )
-        test_session.add(fact)
-        test_session.commit()
-
-        assert fact.expires_at is not None
-
-
 class TestForecastRunModel:
     """Tests for ForecastRun model"""
 
@@ -352,20 +317,3 @@ class TestModelIndexes:
 
         for idx in expected_indexes:
             assert idx in index_names, f"Index {idx} should exist on articles table"
-
-    def test_memory_fact_indexes_exist(self, test_engine):
-        """MemoryFact table should have retrieval indexes"""
-        from sqlalchemy import inspect
-
-        inspector = inspect(test_engine)
-        indexes = inspector.get_indexes("memory_facts")
-        index_names = [idx["name"] for idx in indexes]
-
-        expected_indexes = [
-            "idx_memory_fact_subject",
-            "idx_memory_fact_type",
-            "idx_memory_fact_temporal",
-        ]
-
-        for idx in expected_indexes:
-            assert idx in index_names, f"Index {idx} should exist on memory_facts table"
