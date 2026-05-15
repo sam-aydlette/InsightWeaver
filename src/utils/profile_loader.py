@@ -233,37 +233,6 @@ class UserProfile:
             return "civic"
         return "other"
 
-    def get_source_calibration(self) -> dict:
-        """
-        Get source calibration settings
-
-        Returns dict with keys:
-        - trust_overrides: Dict of source_name -> override_value
-        - calibration_alerts_enabled: bool
-        - alert_threshold_deviation: float (how far from tracked trust to trigger alert)
-        """
-        return self.profile.get(
-            "source_calibration",
-            {
-                "trust_overrides": {},
-                "calibration_alerts_enabled": True,
-                "alert_threshold_deviation": 0.2,
-            },
-        )
-
-    def get_source_trust_override(self, source_name: str) -> float | None:
-        """
-        Get user's trust override for a specific source
-
-        Args:
-            source_name: Name of the source
-
-        Returns:
-            Override trust value (0.0-1.0) or None if no override set
-        """
-        calibration = self.get_source_calibration()
-        return calibration.get("trust_overrides", {}).get(source_name)
-
     def get_districts(self) -> list[str]:
         """
         Get list of all electoral districts for the user

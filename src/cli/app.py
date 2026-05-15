@@ -17,6 +17,7 @@ from .frames import frames_command
 from .output import set_debug_mode
 from .predictions import predictions_command
 from .questions import questions_command
+from .sources import sources_command
 
 # Maps command prefix to its Click command object.
 # Order matters: longer prefixes checked first via startswith().
@@ -28,6 +29,7 @@ COMMAND_DISPATCH = {
     "predictions": predictions_command,
     "decisions": decisions_command,
     "diet": diet_command,
+    "sources": sources_command,
 }
 
 
@@ -36,7 +38,8 @@ def print_command_refresher():
     refresher = (
         f"\n{header('Commands:')} {accent('brief')} | {accent('forecast')} | "
         f"{accent('frames')} | {accent('questions')} | {accent('predictions')} | "
-        f"{accent('decisions')} | {accent('diet')} | help | exit\n"
+        f"{accent('decisions')} | {accent('diet')} | {accent('sources')} | "
+        f"help | exit\n"
     )
     click.echo(refresher)
 
@@ -51,6 +54,7 @@ def print_help():
     click.echo(f"  {accent('predictions')}         - Inspect the predictions ledger")
     click.echo(f"  {accent('decisions')}           - Manage the decision journal")
     click.echo(f"  {accent('diet')}                - Inspect your information diet's structure")
+    click.echo(f"  {accent('sources')}             - Per-source structural calibration")
     click.echo(f"  {accent('help')}                - Show this help message")
     click.echo(f"  {accent('exit')}                - Exit InsightWeaver")
     click.echo()
@@ -101,6 +105,10 @@ def print_help():
     click.echo(f"  {accent('diet feeds')}             - Per-feed frame fingerprint")
     click.echo(f"  {accent('diet gaps')}              - Recurring frame absences")
     click.echo(f"  {accent('diet overlap')}           - Which frames only one feed carries")
+    click.echo()
+    click.echo(header("Sources command:"))
+    click.echo(f"  {accent('sources list')}             - All feeds with calibration signals")
+    click.echo(f"  {accent('sources show')} <name>      - Detailed view for one feed")
     click.echo()
     click.echo(header("Examples:"))
     click.echo(muted("  brief                  (24-hour brief, all topics)"))

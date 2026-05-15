@@ -155,6 +155,7 @@ insightweaver decisions list     # Standing decisions and routed evidence
 insightweaver decisions show 1   # Factors and evidence for decision D1
 insightweaver diet feeds         # Which frames each feed carries
 insightweaver diet overlap       # Which frames only one feed supplies
+insightweaver sources list       # Per-source structural calibration
 ```
 
 Run `insightweaver --help` or type `help` in interactive mode for the full command list.
