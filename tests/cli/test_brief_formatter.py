@@ -125,6 +125,60 @@ class TestWatchItems:
         assert _watch_items({"what_to_watch": []}) == []
 
 
+class TestMetaFractures:
+    def _report_with_meta(self, mfs):
+        return {
+            "synthesis_data": {
+                "situations": [
+                    {"title": "S1", "narrative": "a"},
+                    {"title": "S2", "narrative": "b"},
+                ],
+                "thin_coverage": [],
+                "meta_fractures": mfs,
+                "metadata": {"articles_analyzed": 2},
+            }
+        }
+
+    def test_terminal_renders_meta_fractures(self):
+        report = self._report_with_meta(
+            [
+                {
+                    "name": "labor capacity fracture",
+                    "description": "Whether the labor pool can absorb demand.",
+                    "situation_indices": [0, 1],
+                    "shared_point": "Workforce constraints.",
+                }
+            ]
+        )
+        out = strip_ansi(BriefFormatter().format_report(report))
+        assert "META-FRACTURES" in out
+        assert "labor capacity fracture" in out
+        assert "Appears in: Situation 1, Situation 2" in out
+        assert "Workforce constraints." in out
+
+    def test_terminal_skips_when_empty(self):
+        report = self._report_with_meta([])
+        out = strip_ansi(BriefFormatter().format_report(report))
+        assert "META-FRACTURES" not in out
+
+    def test_markdown_renders_meta_fractures(self):
+        report = self._report_with_meta(
+            [
+                {
+                    "name": "labor capacity fracture",
+                    "description": "Whether the labor pool can absorb demand.",
+                    "situation_indices": [0, 1],
+                    "shared_point": "Workforce constraints.",
+                }
+            ]
+        )
+        md = BriefFormatter().format_markdown(report)
+        assert "## Meta-fractures" in md
+        assert "### labor capacity fracture" in md
+        assert "Whether the labor pool can absorb demand." in md
+        assert "Workforce constraints." in md
+
+
 class TestDecisionSummary:
     def test_empty_when_no_routing(self):
         assert _decision_summary({}) == []

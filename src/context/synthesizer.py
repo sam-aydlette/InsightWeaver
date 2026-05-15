@@ -30,6 +30,7 @@ from ..prompts.synthesis import (
 )
 from ..utils.profiler import profile
 from .claude_client import ClaudeClient
+from .cross_cluster_reconciler import CrossClusterReconciler
 from .curator import ContextCurator
 from .decision_router import DecisionRouter
 from .frame_manager import FrameManager
@@ -53,6 +54,7 @@ class NarrativeSynthesizer:
         self.question_matcher = QuestionMatcher()
         self.prediction_tracker = PredictionTracker()
         self.decision_router = DecisionRouter()
+        self.cross_cluster_reconciler = CrossClusterReconciler()
 
     async def synthesize(self, hours: int = 48, max_articles: int = 50) -> dict[str, Any]:
         """
@@ -218,10 +220,24 @@ class NarrativeSynthesizer:
                     with profile("PASS_2_THIN"):
                         thin_coverage = await self._summarize_thin_clusters(thin_clusters, articles)
 
+                # Pass 3: look across situations for meta-fractures (one
+                # underlying frame conflict surfacing in multiple topical
+                # guises). Empty result is the common case; we skip silently.
+                meta_fractures = []
+                if situations:
+                    with profile("PASS_3_RECONCILE"):
+                        try:
+                            meta_fractures = await self.cross_cluster_reconciler.reconcile(
+                                situations
+                            )
+                        except Exception as e:
+                            logger.warning(f"Cross-cluster reconciliation failed: {e}")
+
                 # Assemble output
                 synthesis_data = {
                     "situations": situations,
                     "thin_coverage": thin_coverage,
+                    "meta_fractures": meta_fractures,
                     "metadata": {
                         "articles_analyzed": len(articles),
                         "clusters_total": len(clusters),

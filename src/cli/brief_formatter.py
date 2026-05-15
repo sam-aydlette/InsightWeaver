@@ -124,6 +124,7 @@ class BriefFormatter(BaseTerminalFormatter):
         synthesis_data = report_data.get("synthesis_data", {})
         situations = synthesis_data.get("situations", [])
         thin_coverage = synthesis_data.get("thin_coverage", [])
+        meta_fractures = synthesis_data.get("meta_fractures", [])
         metadata = synthesis_data.get("metadata", {})
 
         lines = []
@@ -177,6 +178,25 @@ class BriefFormatter(BaseTerminalFormatter):
         else:
             lines.append(muted("No situations met the analysis threshold."))
             lines.append("")
+
+        # Meta-fractures across situations (Stage 6).
+        if meta_fractures:
+            lines.append(header("-" * self.max_width))
+            lines.append(header("META-FRACTURES"))
+            lines.append(muted("Underlying frame conflicts that surface across situations."))
+            lines.append(header("-" * self.max_width))
+            lines.append("")
+            for mf in meta_fractures:
+                lines.append(accent(f"  {mf.get('name', '(unnamed)')}"))
+                if mf.get("description"):
+                    lines.append(f"    {mf['description']}")
+                indices = mf.get("situation_indices", [])
+                if indices:
+                    sit_labels = ", ".join(f"Situation {i + 1}" for i in indices)
+                    lines.append(muted(f"    Appears in: {sit_labels}"))
+                if mf.get("shared_point"):
+                    lines.append(f"    Shared point: {muted(mf['shared_point'])}")
+                lines.append("")
 
         # Thin coverage
         if thin_coverage:
@@ -332,6 +352,7 @@ class BriefFormatter(BaseTerminalFormatter):
         synthesis_data = report_data.get("synthesis_data", {})
         situations = synthesis_data.get("situations", [])
         thin_coverage = synthesis_data.get("thin_coverage", [])
+        meta_fractures = synthesis_data.get("meta_fractures", [])
         metadata = synthesis_data.get("metadata", {})
 
         lines: list[str] = ["# Intelligence Brief", ""]
@@ -371,6 +392,26 @@ class BriefFormatter(BaseTerminalFormatter):
         else:
             lines.append("_No situations met the analysis threshold._")
             lines.append("")
+
+        if meta_fractures:
+            lines.append("## Meta-fractures")
+            lines.append("")
+            lines.append("_Underlying frame conflicts that surface across situations._")
+            lines.append("")
+            for mf in meta_fractures:
+                lines.append(f"### {mf.get('name', '(unnamed)')}")
+                if mf.get("description"):
+                    lines.append("")
+                    lines.append(mf["description"])
+                indices = mf.get("situation_indices", [])
+                if indices:
+                    sit_labels = ", ".join(f"Situation {i + 1}" for i in indices)
+                    lines.append("")
+                    lines.append(f"_Appears in: {sit_labels}_")
+                if mf.get("shared_point"):
+                    lines.append("")
+                    lines.append(f"**Shared point:** {mf['shared_point']}")
+                lines.append("")
 
         if thin_coverage:
             lines.append("## Thin coverage")
