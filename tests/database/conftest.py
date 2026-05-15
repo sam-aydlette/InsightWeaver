@@ -11,11 +11,7 @@ import pytest
 from src.database.models import (
     AnalysisRun,
     Article,
-    CausalChain,
     ContextSnapshot,
-    ForecastRun,
-    ForecastScenario,
-    LongTermForecast,
     NarrativeSynthesis,
     RSSFeed,
 )
@@ -105,86 +101,3 @@ def sample_narrative_synthesis(test_session, sample_analysis_run, sample_context
     test_session.add(synthesis)
     test_session.commit()
     return synthesis
-
-
-@pytest.fixture
-def sample_forecast_run(test_session):
-    """Create a sample ForecastRun for testing"""
-    run = ForecastRun(
-        run_type="multi_horizon",
-        horizons_requested=["6mo", "1yr", "3yr"],
-        scenario_count=3,
-        status="completed",
-        started_at=datetime.utcnow() - timedelta(minutes=10),
-        completed_at=datetime.utcnow(),
-        forecasts_generated=3,
-    )
-    test_session.add(run)
-    test_session.commit()
-    return run
-
-
-@pytest.fixture
-def sample_long_term_forecast(test_session, sample_forecast_run):
-    """Create a sample LongTermForecast for testing"""
-    forecast = LongTermForecast(
-        forecast_run_id=sample_forecast_run.id,
-        time_horizon="1yr",
-        horizon_months=12,
-        base_date=datetime.utcnow(),
-        target_date=datetime.utcnow() + timedelta(days=365),
-        forecast_data={
-            "trend_extrapolations": [],
-            "scenarios": [],
-            "historical_patterns": [],
-            "causal_chains": [],
-            "event_risks": {},
-        },
-        data_sources_used=["RSS feeds"],
-        articles_analyzed=50,
-        historical_months_analyzed=6,
-        context_tokens=10000,
-        generation_tokens=2000,
-    )
-    test_session.add(forecast)
-    test_session.commit()
-    return forecast
-
-
-@pytest.fixture
-def sample_forecast_scenario(test_session, sample_long_term_forecast):
-    """Create a sample ForecastScenario for testing"""
-    scenario = ForecastScenario(
-        forecast_id=sample_long_term_forecast.id,
-        scenario_type="baseline",
-        scenario_name="Baseline Scenario",
-        scenario_description="Most likely outcome based on current trends",
-        predictions={"economic_growth": "2.5%", "unemployment": "4.0%"},
-        key_assumptions=["No major policy changes", "Stable global economy"],
-        trigger_events=["GDP reports", "Fed announcements"],
-        scenario_probability=0.5,
-    )
-    test_session.add(scenario)
-    test_session.commit()
-    return scenario
-
-
-@pytest.fixture
-def sample_causal_chain(test_session, sample_long_term_forecast):
-    """Create a sample CausalChain for testing"""
-    chain = CausalChain(
-        forecast_id=sample_long_term_forecast.id,
-        chain_name="Interest Rate Impact",
-        initial_cause="Fed raises interest rates",
-        intermediate_effects=[
-            "Higher borrowing costs",
-            "Reduced consumer spending",
-            "Business investment slowdown",
-        ],
-        final_outcome="Economic growth moderation",
-        time_to_unfold_months=6,
-        confidence=0.7,
-    )
-    test_session.add(chain)
-    test_session.commit()
-    return chain

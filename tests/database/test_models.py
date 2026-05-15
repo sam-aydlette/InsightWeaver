@@ -3,7 +3,7 @@ Tests for database models
 Tests model creation, relationships, constraints, and indexes
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime
 
 import pytest
 from sqlalchemy.exc import IntegrityError
@@ -11,11 +11,7 @@ from sqlalchemy.exc import IntegrityError
 from src.database.models import (
     AnalysisRun,
     Article,
-    CausalChain,
     ContextSnapshot,
-    ForecastRun,
-    ForecastScenario,
-    LongTermForecast,
     NarrativeSynthesis,
     RSSFeed,
 )
@@ -218,81 +214,6 @@ class TestContextSnapshotModel:
 
         assert snapshot.id is not None
         assert snapshot.article_ids == [1, 2, 3, 4, 5]
-
-
-class TestForecastRunModel:
-    """Tests for ForecastRun model"""
-
-    def test_create_forecast_run(self, test_session):
-        """Should create a ForecastRun"""
-        run = ForecastRun(
-            run_type="multi_horizon",
-            horizons_requested=["6mo", "1yr"],
-            scenario_count=3,
-            status="running",
-        )
-        test_session.add(run)
-        test_session.commit()
-
-        assert run.id is not None
-        assert run.horizons_requested == ["6mo", "1yr"]
-
-
-class TestLongTermForecastModel:
-    """Tests for LongTermForecast model"""
-
-    def test_create_long_term_forecast(self, test_session, sample_forecast_run):
-        """Should create a LongTermForecast"""
-        forecast = LongTermForecast(
-            forecast_run_id=sample_forecast_run.id,
-            time_horizon="1yr",
-            horizon_months=12,
-            target_date=datetime.utcnow() + timedelta(days=365),
-            forecast_data={"scenarios": []},
-        )
-        test_session.add(forecast)
-        test_session.commit()
-
-        assert forecast.id is not None
-        assert forecast.time_horizon == "1yr"
-
-
-class TestForecastScenarioModel:
-    """Tests for ForecastScenario model"""
-
-    def test_create_forecast_scenario(self, test_session, sample_long_term_forecast):
-        """Should create a ForecastScenario"""
-        scenario = ForecastScenario(
-            forecast_id=sample_long_term_forecast.id,
-            scenario_type="optimistic",
-            scenario_name="Best Case",
-            scenario_probability=0.25,
-        )
-        test_session.add(scenario)
-        test_session.commit()
-
-        assert scenario.id is not None
-
-
-class TestCausalChainModel:
-    """Tests for CausalChain model"""
-
-    def test_create_causal_chain(self, test_session, sample_long_term_forecast):
-        """Should create a CausalChain"""
-        chain = CausalChain(
-            forecast_id=sample_long_term_forecast.id,
-            chain_name="Economic Impact",
-            initial_cause="Tax increase",
-            intermediate_effects=["Reduced spending", "Lower investment"],
-            final_outcome="Economic slowdown",
-            time_to_unfold_months=12,
-            confidence=0.6,
-        )
-        test_session.add(chain)
-        test_session.commit()
-
-        assert chain.id is not None
-        assert len(chain.intermediate_effects) == 2
 
 
 class TestModelIndexes:

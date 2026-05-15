@@ -48,7 +48,9 @@ def print_help():
     """Print full help text for interactive mode."""
     click.echo(header("Available commands:"))
     click.echo(f"  {accent('brief')}               - Generate intelligence brief and report")
-    click.echo(f"  {accent('forecast')}            - Generate long-term trend forecasts")
+    click.echo(
+        f"  {accent('forecast')}            - View open observables and resolved track record"
+    )
     click.echo(f"  {accent('frames')}              - Manage narrative frame glossary")
     click.echo(f"  {accent('questions')}           - Inspect the persistent question graph")
     click.echo(f"  {accent('predictions')}         - Inspect the predictions ledger")
@@ -68,14 +70,7 @@ def print_help():
     )
     click.echo()
     click.echo(header("Forecast command options:"))
-    click.echo(f"  {accent('--horizon')} [6mo|1yr|3yr|5yr]  - Specific time horizon (default: all)")
-    click.echo(
-        f"  {accent('--scenarios N')}       - Number of detailed scenarios (0 = skip, 3 = standard)"
-    )
-    click.echo(
-        f"  {accent('--full')}              - Show full detailed analysis (default: executive)"
-    )
-    click.echo(muted("  Same topic/scope filters as brief"))
+    click.echo(f"  {accent('--days N')}            - Resolved-record window (default: 60)")
     click.echo()
     click.echo(header("Frames command:"))
     click.echo(f"  {accent('frames list')}          - List all topic clusters and frames")
@@ -115,8 +110,8 @@ def print_help():
     click.echo(muted("  brief -cs -n           (national cybersecurity news)"))
     click.echo(muted("  brief --hours 48 -l    (48-hour local news brief)"))
     click.echo(muted("  brief --save brief.md  (save brief as markdown)"))
-    click.echo(muted("  forecast               (multi-horizon forecasts, executive mode)"))
-    click.echo(muted("  forecast --horizon 1yr --full  (1-year detailed forecast)"))
+    click.echo(muted("  forecast               (open observables + last 60d resolved)"))
+    click.echo(muted("  forecast --days 30     (tighter resolved-record window)"))
     click.echo(muted("  frames list            (view narrative frame glossary)"))
     click.echo(muted("  frames gaps            (view perspective gaps in your feeds)"))
     click.echo()

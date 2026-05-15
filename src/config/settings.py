@@ -24,11 +24,6 @@ class Settings(BaseSettings):
     data_dir: Path = project_root / "data"
     logs_dir: Path = project_root / "src" / "logs"
 
-    # forecasts_dir is consumed by src/forecast/formatter.py and lives until Stage 8
-    # deletes the forecast subsystem.
-    reports_dir: Path = project_root / "reports"
-    forecasts_dir: Path = reports_dir / "forecasts"
-
     class Config:
         env_file = ".env"
         case_sensitive = False
@@ -38,8 +33,6 @@ class Settings(BaseSettings):
         super().__init__(**kwargs)
         self.data_dir.mkdir(exist_ok=True)
         self.logs_dir.mkdir(exist_ok=True)
-        self.reports_dir.mkdir(exist_ok=True)
-        self.forecasts_dir.mkdir(exist_ok=True)
 
 
 settings = Settings()
