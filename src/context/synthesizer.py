@@ -167,24 +167,50 @@ class NarrativeSynthesizer:
 
                         situations.append(situation)
 
-                        # Frame discovery: if no known frames, discover them
+                        # Frame discovery: if no known frames, discover them,
+                        # then tag this cluster's articles against the result.
                         if not existing_cluster:
                             try:
                                 discovery = await self.frame_manager.discover_frames(
                                     cluster_articles, cluster
                                 )
                                 if discovery:
-                                    self.frame_manager.store_discovered_frames(cluster, discovery)
+                                    tc_id = self.frame_manager.store_discovered_frames(
+                                        cluster, discovery
+                                    )
+                                    if tc_id:
+                                        frames = self.frame_manager.get_cluster_frames(tc_id)
+                                        await self.frame_manager.classify_articles_to_frames(
+                                            cluster_articles, frames
+                                        )
                             except Exception as e:
                                 logger.warning(
                                     f"Frame discovery failed for '{cluster['title']}': {e}"
                                 )
 
-                        # Update gap tracking for existing clusters
-                        elif existing_cluster and situation.get("coverage_frame"):
-                            absent = situation.get("coverage_frame", {}).get("de_emphasized", "")
-                            if absent:
-                                self.frame_manager.update_frame_gaps(existing_cluster.id, [absent])
+                        # Known frames: tag articles and update gap tracking.
+                        elif existing_cluster:
+                            try:
+                                cluster_frames = self.frame_manager.get_cluster_frames(
+                                    existing_cluster.id
+                                )
+                                if cluster_frames:
+                                    await self.frame_manager.classify_articles_to_frames(
+                                        cluster_articles, cluster_frames
+                                    )
+                            except Exception as e:
+                                logger.warning(
+                                    f"Frame classification failed for '{cluster['title']}': {e}"
+                                )
+
+                            if situation.get("coverage_frame"):
+                                absent = situation.get("coverage_frame", {}).get(
+                                    "de_emphasized", ""
+                                )
+                                if absent:
+                                    self.frame_manager.update_frame_gaps(
+                                        existing_cluster.id, [absent]
+                                    )
 
                 # Pass 2b: Thin coverage summaries
                 thin_coverage = []

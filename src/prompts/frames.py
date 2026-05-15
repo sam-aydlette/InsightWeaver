@@ -75,6 +75,42 @@ Return valid JSON with this exact structure:
 {articles}"""
 
 
+# Maps each article in a cluster to the frame it most exhibits.
+# Used to populate the article_frames table so the diet view can show
+# which frames each feed carries.
+FRAME_CLASSIFICATION_PROMPT = """You are tagging articles with the narrative frame each one most exhibits. A frame is a coherent way of organizing a story: what it emphasizes and what it takes for granted.
+
+## Frames
+
+{frames_block}
+
+## Instructions
+
+For each article below, decide which single frame from the list above it most exhibits, and how confident you are (0.0 to 1.0). If an article does not clearly exhibit any of the listed frames, omit it from the output -- do not force a match.
+
+## Articles
+
+{articles_block}
+
+## Output
+
+Return valid JSON:
+
+```json
+{{
+  "classifications": [
+    {{
+      "article_index": 0,
+      "frame_label": "exact label from the frames list above",
+      "confidence": 0.8
+    }}
+  ]
+}}
+```
+
+Return ONLY the JSON, no markdown fencing or commentary."""
+
+
 # Injected into the synthesis prompt when known frames exist for a topic.
 # Asks the model to tag coverage against known frames and flag absences.
 FRAME_AWARE_SYNTHESIS_PROMPT = """## Known Narrative Frames for "{topic_name}"

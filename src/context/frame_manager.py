@@ -8,11 +8,20 @@ import logging
 from typing import Any
 
 from ..database.connection import get_db
-from ..database.models import FrameGap, NarrativeFrame, TopicCluster
-from ..prompts.frames import FRAME_AWARE_SYNTHESIS_PROMPT, FRAME_DISCOVERY_PROMPT
+from ..database.models import ArticleFrame, FrameGap, NarrativeFrame, TopicCluster
+from ..prompts.frames import (
+    FRAME_AWARE_SYNTHESIS_PROMPT,
+    FRAME_CLASSIFICATION_PROMPT,
+    FRAME_DISCOVERY_PROMPT,
+)
 from .claude_client import ClaudeClient
 
 logger = logging.getLogger(__name__)
+
+# Haiku for the cheap article-to-frame classification pass.
+CLASSIFIER_MODEL = "claude-haiku-4-5-20251001"
+CLASSIFIER_MAX_TOKENS = 2048
+CLASSIFIER_SNIPPET_CHARS = 300
 
 
 class FrameManager:
@@ -76,6 +85,97 @@ class FrameManager:
             logger.error(f"Error getting validated frames: {e}")
             return []
 
+    def get_cluster_frames(self, topic_cluster_id: int) -> list[NarrativeFrame]:
+        """Get all frames (validated or not) for a topic cluster."""
+        try:
+            with get_db() as session:
+                frames = (
+                    session.query(NarrativeFrame).filter_by(topic_cluster_id=topic_cluster_id).all()
+                )
+                session.expunge_all()
+                return frames
+        except Exception as e:
+            logger.error(f"Error getting cluster frames: {e}")
+            return []
+
+    async def classify_articles_to_frames(
+        self, cluster_articles: list[dict], frames: list[NarrativeFrame]
+    ) -> int:
+        """
+        Tag each article in a cluster with the frame it most exhibits and
+        write ArticleFrame rows. Populating this mapping is what lets the
+        diet view show which frames each feed carries.
+
+        Returns the number of ArticleFrame rows written.
+        """
+        if not cluster_articles or not frames:
+            return 0
+
+        # label -> frame id, for resolving the model's frame_label output.
+        frame_id_by_label = {f.label.strip().lower(): f.id for f in frames}
+
+        frames_block = "\n".join(
+            f"- {f.label}: {f.description or '(no description)'}" for f in frames
+        )
+        article_lines = []
+        indexed_article_ids: list[int | None] = []
+        for i, article in enumerate(cluster_articles):
+            title = article.get("title", "Untitled")
+            content = article.get("content") or article.get("description") or ""
+            snippet = content[:CLASSIFIER_SNIPPET_CHARS].strip()
+            article_lines.append(f"[{i}] {title}\n    {snippet}")
+            indexed_article_ids.append(article.get("id"))
+        articles_block = "\n\n".join(article_lines)
+
+        prompt = FRAME_CLASSIFICATION_PROMPT.format(
+            frames_block=frames_block, articles_block=articles_block
+        )
+
+        classifier = ClaudeClient(model=CLASSIFIER_MODEL)
+        try:
+            raw = await classifier.analyze(
+                system_prompt="You tag articles with the narrative frame they most exhibit.",
+                user_message=prompt,
+                temperature=0.0,
+                max_tokens=CLASSIFIER_MAX_TOKENS,
+            )
+        except Exception as e:
+            logger.warning(f"Frame classification call failed; skipping: {e}")
+            return 0
+
+        parsed = self._parse_json(raw)
+        written = 0
+        try:
+            with get_db() as session:
+                for entry in parsed.get("classifications", []):
+                    idx = entry.get("article_index")
+                    label = entry.get("frame_label")
+                    confidence = entry.get("confidence")
+                    if not isinstance(idx, int) or not (0 <= idx < len(indexed_article_ids)):
+                        continue
+                    article_id = indexed_article_ids[idx]
+                    if article_id is None or not isinstance(label, str):
+                        continue
+                    frame_id = frame_id_by_label.get(label.strip().lower())
+                    if frame_id is None:
+                        continue
+                    if not isinstance(confidence, int | float):
+                        confidence = 0.5
+                    session.add(
+                        ArticleFrame(
+                            article_id=article_id,
+                            frame_id=frame_id,
+                            confidence=max(0.0, min(1.0, float(confidence))),
+                        )
+                    )
+                    written += 1
+                session.commit()
+        except Exception as e:
+            logger.error(f"Failed to store article-frame classifications: {e}")
+            return 0
+
+        return written
+
     def build_frame_aware_prompt(self, topic_name: str, frames: list[NarrativeFrame]) -> str:
         """
         Build FRAME_AWARE_SYNTHESIS_PROMPT for injection into situation synthesis.
@@ -122,23 +222,28 @@ class FrameManager:
                 user_message=prompt,
                 temperature=0.0,
             )
-
-            # Parse JSON response
-            response = response.strip()
-            if response.startswith("```json"):
-                response = response[7:]
-            if response.startswith("```"):
-                response = response[3:]
-            if response.endswith("```"):
-                response = response[:-3]
-
-            import json
-
-            return json.loads(response.strip())
-
+            return self._parse_json(response)
         except Exception as e:
             logger.error(f"Frame discovery failed for '{cluster.get('title', '')}': {e}")
             return None
+
+    @staticmethod
+    def _parse_json(response: str) -> dict[str, Any]:
+        """Parse a Claude JSON response, stripping markdown fences."""
+        import json
+
+        text = response.strip()
+        if text.startswith("```json"):
+            text = text[7:]
+        if text.startswith("```"):
+            text = text[3:]
+        if text.endswith("```"):
+            text = text[:-3]
+        try:
+            return json.loads(text.strip())
+        except json.JSONDecodeError as e:
+            logger.warning(f"Failed to parse frame JSON response: {e}")
+            return {}
 
     def store_discovered_frames(self, cluster: dict, discovery_result: dict) -> int | None:
         """
