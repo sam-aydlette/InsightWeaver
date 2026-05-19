@@ -28,6 +28,18 @@ This is the value proposition. Everything else -- the architecture, the frame gl
 
 ---
 
+## Two ways to use it
+
+**Just stay informed.** Run `insightweaver brief` in the morning. Read the output. You get all five outcomes above, plus a transparency line at the top reporting which of yesterday's flagged observables resolved overnight. That's the whole rhythm.
+
+**Track threads across time.** Behind the brief is a persistent commitment graph: Questions the coverage is still tracking, Predictions whose triggers may yet fire, Decisions you're carrying, Frames each feed exhibits. The graph accumulates whether or not you ever query it -- but you can query it. `insightweaver questions list`, `decisions show housing`, `predictions track-record`, `diet gaps`. The brief itself surfaces returning question identity inline (`Q47 (run 4, asked 2026-03-12)`), so the graph is visible even from the minimal flow.
+
+The deeper layer is optional. Most readers will never touch it. The architecture exists so that the brief is grounded in accumulated context rather than reset every morning.
+
+See [docs/CONCEPTS.md](docs/CONCEPTS.md) for the one-page reference if you want to understand the persistent layer.
+
+---
+
 ## Principles
 
 ### 1. Insight over information
@@ -72,20 +84,28 @@ The output is organized around **situations**, not headlines. A situation is a m
 
 ## How It Works
 
-InsightWeaver uses context engineering: it curates optimal context for Claude and bakes analytical guardrails into the prompt rather than checking outputs after the fact. The pipeline uses a two-pass architecture so that frame analysis is independent of narrative construction.
+InsightWeaver uses context engineering: it curates optimal context for Claude and bakes analytical guardrails into the prompt rather than checking outputs after the fact. The pipeline has three synthesis passes (clustering, situation analysis, cross-cluster reconciliation) plus supporting passes that maintain the persistent layer.
 
-1. **Collection**: RSS feeds are fetched in parallel from sources you configure
-2. **Deduplication**: Duplicate and near-duplicate articles are removed
-3. **Context curation**: Articles are selected based on your profile (location, profession, interests)
-4. **Prediction check**: before any new analysis, the open-prediction ledger is graded against today's coverage -- observables that the tool flagged in past runs are marked triggered, contradicted, or still open. This keeps the tool's own forward-looking statements auditable.
-5. **Pass 1 -- Clustering and frame discovery**: Articles are grouped into situations. For each situation, the system checks for known frames or discovers new ones. This pass is auditable: you can inspect which articles landed in which cluster.
-6. **Pass 2 -- Situation synthesis**: Claude analyzes each situation with known frames injected, producing examined narratives with actors, interests, power dynamics, causal structure, frame analysis, and information gaps. ANALYSIS_RULES.md is injected into every prompt, enforcing epistemic labeling and structural honesty.
-7. **Pass 3 -- Cross-cluster reconciliation**: looks across all of today's situations for meta-fractures -- a single underlying frame conflict appearing in multiple topically distinct situations. Empty result is common and expected.
-8. **Question and prediction accumulation**: each situation's unresolved questions are bound to a persistent Question graph, and its `what_to_watch` observables become predictions keyed to those questions. Returning questions surface their identity (`Q47 (run 4, asked 2026-03-12)`). Inspect with `insightweaver questions list` and `insightweaver predictions track-record`.
-9. **Decision routing**: situations are matched against the factors of your standing decisions. Today's coverage is recorded as evidence per decision, so each run updates an accumulating record rather than producing a one-off briefing. Inspect with `insightweaver decisions show <id>`.
-10. **Delivery**: The brief is rendered to the terminal; pass `--save PATH` to also write a markdown copy. The `forecast` command is a derived view over the predictions ledger -- not a separate engine; it shows open observables and the recently-resolved record.
+The synthesis path (what produces the brief you read):
 
-RSS is the only input source.
+1. **Collection** -- RSS feeds are fetched in parallel from sources you configure
+2. **Deduplication** -- duplicate and near-duplicate articles are removed
+3. **Context curation** -- articles are selected based on your profile (location, profession, interests)
+4. **Pass 1 -- Clustering and frame discovery** -- articles are grouped into situations. For each situation, the system checks for known frames or discovers new ones. This pass is auditable: you can inspect which articles landed in which cluster.
+5. **Pass 2 -- Situation synthesis** -- Claude analyzes each situation with known frames injected, producing examined narratives with actors, interests, power dynamics, frame analysis, and information gaps. `ANALYSIS_RULES.md` is injected into every prompt, enforcing epistemic labeling and structural honesty.
+6. **Pass 3 -- Cross-cluster reconciliation** -- looks for meta-fractures: a single underlying frame conflict appearing across multiple topically distinct situations. Empty result is common and expected.
+
+The persistent-layer maintenance that runs alongside (you don't have to read any of this -- it just makes the next brief grounded in accumulated context):
+
+- **Pre-pass: prediction check.** Before any new analysis, the open-prediction ledger is graded against today's coverage. Observables flagged in past runs are marked triggered, contradicted, or still open. A transparency line at the top of every brief reports the result.
+- **Question matching.** Each situation's unresolved questions are bound to a persistent graph. Returning questions surface their identity inline (`Q47 (run 4, asked 2026-03-12)`).
+- **Prediction creation.** `what_to_watch` observables from each situation become open predictions, keyed to their question.
+- **Frame classification.** Each article in each cluster is tagged with the frame it most exhibits.
+- **Decision routing.** Situations are matched against the factors of standing decisions you've registered. Today's coverage gets recorded as evidence per decision, so each run updates an accumulating record.
+
+RSS is the only input source. The `forecast` command is a derived view over the predictions ledger -- not a separate engine.
+
+See [docs/CONCEPTS.md](docs/CONCEPTS.md) for the entity-by-entity reference.
 
 ---
 

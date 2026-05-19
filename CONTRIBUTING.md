@@ -65,20 +65,20 @@ Thank you for your interest in contributing to InsightWeaver! This guide will he
 
 ```
 insightweaver/
-├── src/                      # Source code
-│   ├── cli/                  # Command-line interface
-│   ├── collectors/           # RSS feed collectors
-│   ├── context/              # Context and narrative synthesis
-│   ├── prompts/              # Analysis rules and frame prompts
-│   ├── forecast/             # Forecasting engine
-│   ├── database/             # Database models and migrations
-│   └── utils/                # Utility functions
-├── tests/                    # Automated test suite (pytest)
-│   ├── conftest.py           # Shared test fixtures
-│   └── context/              # Synthesizer tests
-├── config/                   # Configuration files
-└── docs/                     # Documentation
-
+├── src/
+│   ├── cli/              # Command-line interface (one module per command group)
+│   ├── context/          # Synthesis orchestration: synthesizer, matcher,
+│   │                     # tracker, router, reconciler, frame manager
+│   ├── prompts/          # Analysis rules and per-pass prompt templates
+│   ├── processors/       # Content filter, deduplicator, normalizer
+│   ├── pipeline/         # Top-level pipeline orchestrator
+│   ├── rss/              # RSS fetching
+│   ├── database/         # SQLAlchemy models and migrations
+│   ├── config/           # Settings and feed loaders
+│   └── utils/            # Profile loader, base formatter, logging
+├── tests/                # Pytest suite, mirrors src/ layout
+├── config/               # User profile + feed JSON
+└── docs/                 # CONCEPTS.md and other reference docs
 ```
 
 ## Development Workflow
@@ -195,27 +195,40 @@ class NarrativeSynthesizer:
 ### Test Example
 
 ```python
+import json
 import pytest
-from src.context.synthesizer import NarrativeSynthesizer
 
-class TestSchemaValidation:
-    """Test synthesis output schema validation."""
+from src.context.question_matcher import ProposedQuestion, QuestionMatcher
+from src.database.models import QUESTION_STATUS_OPEN, Question
 
-    def test_passes_with_executive_summary(self):
-        """Test validation of new-format output."""
-        # Arrange
-        synthesizer = NarrativeSynthesizer()
-        data = {
-            "executive_summary": {"headline": "Test"},
-            "metadata": {"generated_at": "2026-01-01"},
-        }
 
-        # Act
-        result = synthesizer._validate_synthesis_schema(data)
+class TestQuestionMatcher:
+    """Validate LLM-output handling for the question matcher."""
 
-        # Assert
-        assert result is True
+    @pytest.fixture
+    def matcher(self, mock_claude_client):
+        return QuestionMatcher(client=mock_claude_client)
+
+    @pytest.mark.asyncio
+    async def test_exact_normalized_match_short_circuits_llm(
+        self, matcher, test_session, mock_claude_client
+    ):
+        existing = Question(
+            text="Will the Fed cut rates?",
+            normalized_text="will the fed cut rates",
+            status=QUESTION_STATUS_OPEN,
+        )
+        test_session.add(existing)
+        test_session.commit()
+
+        proposed = [ProposedQuestion("Will the Fed cut rates?", is_primary=True)]
+        result = await matcher.resolve_questions(proposed, test_session)
+
+        assert result[0].id == existing.id
+        mock_claude_client.analyze.assert_not_called()
 ```
+
+When testing components that take a `session` argument, use the `test_session` fixture from `tests/conftest.py`. When testing components that open their own `get_db()` session (like the frame manager), patch `src.context.<module>.get_db` to yield the test session -- see `tests/context/test_frame_classification.py` for an example.
 
 ### Running Tests
 
@@ -238,34 +251,6 @@ pytest tests/context/test_synthesizer.py::TestSchemaValidation::test_passes_with
 - Aim for 85%+ overall coverage
 - New features should have 90%+ coverage
 
-### Manual Testing Scripts
-
-Manual test scripts belong in `scripts/` directory, NOT in `tests/`:
-
-- **tests/**: Automated unit/integration tests using pytest
-- **scripts/**: Manual testing scripts, utilities, and one-off tasks
-
-Example manual test script:
-```python
-#!/usr/bin/env python3
-"""Manual test script for feature X"""
-import sys
-from pathlib import Path
-
-# Add project root to path
-project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root))
-
-from src.your_module import YourClass
-
-def main():
-    # Manual testing logic
-    pass
-
-if __name__ == "__main__":
-    main()
-```
-
 ## Database Migrations
 
 InsightWeaver uses a custom migration system located in `src/database/migrations/`.
@@ -285,25 +270,28 @@ make db-reset
 
 ### Creating Migrations
 
-Migrations are Python modules in `src/database/migrations/` with `upgrade()` and `downgrade()` functions:
+Migrations are Python modules in `src/database/migrations/` with an `upgrade()` function and optionally a `downgrade()`. For new tables, follow the pattern in `add_questions.py`:
 
 ```python
 """
 Migration: Add New Tables
-Description of what this migration does
+Description of what this migration does.
 """
 from src.database.connection import engine
 from src.database.models import YourModel
 
+
 def upgrade():
-    """Apply migration"""
+    """Apply migration."""
     YourModel.__table__.create(engine, checkfirst=True)
-    print("✓ your_table created")
+    print("  your_table created")
+
 
 def downgrade():
-    """Rollback migration"""
+    """Rollback migration."""
     YourModel.__table__.drop(engine, checkfirst=True)
-    print("✓ your_table dropped")
+    print("  your_table dropped")
+
 
 if __name__ == "__main__":
     import sys
@@ -312,6 +300,8 @@ if __name__ == "__main__":
     else:
         upgrade()
 ```
+
+For drop migrations (where there is no production rollback path), see `drop_orphan_tables.py` -- a hardcoded allowlist of table names used with `DROP TABLE IF EXISTS` via parameterized `text()`. Do not template table names from user input under any circumstances.
 
 ## Documentation
 

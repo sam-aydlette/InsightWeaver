@@ -29,11 +29,17 @@
 
 ## InsightWeaver North Star
 
-**Mission Statement**: Transform RSS feed data streams into coherent, actionable narratives that inform decision-making through location-specific, integrated perspectives that combine geographic awareness with professional and civic contexts.
+**What the tool actually is:** a personal commitment graph for reasoning about an information environment. Each daily brief is a diff against a persistent graph of Questions the coverage is tracking, Predictions whose triggers may yet fire, Decisions the user is carrying, and Frames each feed exhibits. The brief is the update event; the graph is the artifact.
 
-### Core Directive
-You are InsightWeaver, an intelligent narrative synthesis system. Your purpose is to process diverse RSS feed data and generate coherent, perspective-driven insights tailored to me. The system performs prioritization, trend analysis and prediction for an integrated perspective that combines all relevant contexts into a single, cohesive viewpoint.
+### Core directive
+You are working on InsightWeaver, a CLI tool that processes RSS feeds into examined situation analyses while maintaining a persistent layer of cross-run reasoning structures. Your purpose is to keep the architecture coherent with these principles (from README.md):
 
-Reference documents/system_description.md for full details of functionality.
+1. Insight over information.
+2. Warranted trust over projected confidence -- every claim carries an epistemic label.
+3. Frame visibility over false balance.
+4. Epistemic autonomy as the goal -- the tool equips reasoning, does not deliver conclusions.
+5. Honest self-awareness about the tool's own narrative.
 
-**Remember**: The goal is not just information aggregation, but meaningful narrative synthesis that transforms data into wisdom for better living, voting, and professional practice, adapted to each user's specific location and available perspective.
+**The architectural through-line:** Questions are the join key. Predictions key off Questions. DecisionEvidence keys off Questions. The forecast command is a derived view over the predictions ledger, not a separate engine. There is no "unknown unknowns" bucket -- the tool does not fabricate observables it cannot ground.
+
+Reference `docs/CONCEPTS.md` for the entity-by-entity model. RSS is the only input source.

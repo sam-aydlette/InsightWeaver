@@ -7,8 +7,8 @@ This guide walks you through downloading, installing, and running InsightWeaver 
 ## What You Need
 
 1. **A computer** (Windows, Mac, or Linux)
-2. **Python 3.10 or newer** - [Download Python](https://www.python.org/downloads/)
-3. **An Anthropic API key** - [Get one here](https://console.anthropic.com/) (requires account)
+2. **Python 3.11 or newer** -- [Download Python](https://www.python.org/downloads/)
+3. **An Anthropic API key** -- [Get one here](https://console.anthropic.com/) (requires account; ~$0.20-0.40 per brief)
 
 ---
 
@@ -29,51 +29,32 @@ git clone https://github.com/YOUR_USERNAME/InsightWeaver.git
 ## Step 2: Open a Terminal
 
 **Windows:**
-1. Press `Windows + R`
-2. Type `cmd` and press Enter
-3. Navigate to the InsightWeaver folder:
-   ```
-   cd Documents\InsightWeaver
-   ```
+1. Press `Windows + R`, type `cmd`, press Enter
+2. `cd Documents\InsightWeaver`
 
 **Mac:**
-1. Open Spotlight (`Cmd + Space`)
-2. Type `Terminal` and press Enter
-3. Navigate to the InsightWeaver folder:
-   ```
-   cd ~/Documents/InsightWeaver
-   ```
+1. Open Spotlight (`Cmd + Space`), type `Terminal`, press Enter
+2. `cd ~/Documents/InsightWeaver`
 
 **Linux:**
 1. Open your terminal application
-2. Navigate to the InsightWeaver folder:
-   ```
-   cd ~/Documents/InsightWeaver
-   ```
+2. `cd ~/Documents/InsightWeaver`
 
 ---
 
 ## Step 3: Install InsightWeaver
 
-Run these commands one at a time:
-
 ```
 python -m venv venv
 ```
 
-**Activate the virtual environment:**
+Activate the virtual environment:
 
-Windows:
-```
-venv\Scripts\activate
-```
+- Windows: `venv\Scripts\activate`
+- Mac/Linux: `source venv/bin/activate`
 
-Mac/Linux:
-```
-source venv/bin/activate
-```
+Install:
 
-**Install InsightWeaver:**
 ```
 pip install -e .
 ```
@@ -82,41 +63,24 @@ pip install -e .
 
 ## Step 4: Add Your API Key
 
-1. Copy the example environment file:
+```
+cp .env.example .env       # Mac/Linux
+copy .env.example .env     # Windows
+```
 
-   Windows:
-   ```
-   copy .env.example .env
-   ```
-
-   Mac/Linux:
-   ```
-   cp .env.example .env
-   ```
-
-2. Open the `.env` file in a text editor (Notepad, TextEdit, etc.)
-
-3. Find the line that says:
-   ```
-   ANTHROPIC_API_KEY=your_key_here
-   ```
-
-4. Replace `your_key_here` with your actual API key from Anthropic
-
-5. Save and close the file
+Open `.env` in any text editor. Replace `your_key_here` with your actual API key. Save.
 
 ---
 
-## Step 5: Configure Your Profile
+## Step 5: Set Up Your Profile
 
-Edit `config/user_profile.example.json` with your location, profession, and interests, then copy it to `~/.insightweaver/user_profile.json`:
+Copy the example profile to its expected location:
 
 ```
-mkdir -p ~/.insightweaver
-cp config/user_profile.example.json ~/.insightweaver/user_profile.json
+cp config/user_profile.example.json config/user_profile.json
 ```
 
-Edit the file to match your situation -- your location, professional domain, and the topics you want to track.
+Open `config/user_profile.json` and edit it for your situation -- location, profession, civic interests, etc. The profile is what makes the brief location-aware and personally relevant.
 
 ---
 
@@ -126,43 +90,7 @@ Edit the file to match your situation -- your location, professional domain, and
 insightweaver brief
 ```
 
-InsightWeaver will:
-1. Fetch the latest news from your configured RSS feeds
-2. Deduplicate and filter articles relevant to your profile
-3. Synthesize a briefing with inline citations, epistemic labeling, and frame analysis
-4. Save the report locally
-
-This takes 2-5 minutes. Reports are saved to `reports/briefings/`.
-
----
-
-## Using InsightWeaver
-
-InsightWeaver is a CLI application. Run `insightweaver` to enter interactive mode, or run commands directly:
-
-```
-insightweaver brief              # Generate a daily briefing
-insightweaver brief --hours 48   # Look back 48 hours
-insightweaver brief -cs -n       # National cybersecurity news only
-insightweaver forecast           # Generate trend forecasts
-insightweaver frames list        # View narrative frame glossary
-insightweaver frames gaps        # View perspective gaps in your feeds
-insightweaver questions list     # Open questions the coverage is still tracking
-insightweaver questions show 47  # History of question Q47 across runs
-insightweaver predictions open   # Observables the tool is still waiting on
-insightweaver predictions track-record  # The tool's own calibration record
-insightweaver decisions list     # Standing decisions and routed evidence
-insightweaver decisions show 1   # Factors and evidence for decision D1
-insightweaver diet feeds         # Which frames each feed carries
-insightweaver diet overlap       # Which frames only one feed supplies
-insightweaver sources list       # Per-source structural calibration
-```
-
-Run `insightweaver --help` or type `help` in interactive mode for the full command list.
-
-### Viewing Reports
-
-Briefs render directly to the terminal. To archive a copy as markdown:
+This takes 2-5 minutes. The brief renders directly to your terminal. To archive a copy as markdown:
 
 ```
 insightweaver brief --save brief.md
@@ -170,92 +98,101 @@ insightweaver brief --save brief.md
 
 ---
 
-## Running InsightWeaver Each Day
+## Daily Use
 
-After the initial setup, you only need two steps:
+The minimum rhythm is one command:
 
-1. **Open a terminal** and navigate to your InsightWeaver folder
+```
+insightweaver brief
+```
 
-2. **Activate and run:**
+Each morning. That's it. The brief renders to your terminal with everything you need: situation analyses, narrative-layer mapping, branching paths, information gaps, returning question identity (`Q47 (run 4, asked 2026-03-12)`), and a transparency line reporting which of yesterday's flagged observables resolved.
 
-   Windows:
-   ```
-   venv\Scripts\activate
-   insightweaver brief
-   ```
+You don't need to touch anything else.
 
-   Mac/Linux:
-   ```
-   source venv/bin/activate
-   insightweaver brief
-   ```
+---
+
+## Optional: tracking threads across time
+
+InsightWeaver maintains a persistent commitment graph behind the brief -- Questions, Predictions, Decisions, Frames. These accumulate automatically whether or not you ever query them, but the CLI exposes them when you want to look.
+
+**See [docs/CONCEPTS.md](docs/CONCEPTS.md)** for a one-page reference on what each entity is and when it gets created.
+
+Commands available when you want depth:
+
+```
+insightweaver questions list           # threads the coverage is still tracking
+insightweaver questions show 47        # full history of question Q47
+insightweaver predictions track-record # the tool's own calibration record
+insightweaver decisions list           # standing decisions
+insightweaver decisions show 1         # factors and routed evidence for D1
+insightweaver diet feeds               # which frames each feed carries
+insightweaver diet gaps                # frames consistently absent (curation signal)
+insightweaver sources list             # per-source structural calibration
+insightweaver frames list              # the narrative frame glossary
+insightweaver forecast                 # open observables + resolved record
+```
+
+If you want to register decisions so they accumulate evidence over time:
+
+```
+insightweaver decisions add --name "housing market timing" --type housing
+insightweaver decisions factor add 1 --name "interest rates" \
+  --update-when "Fed signals a cut or hold at the next meeting"
+```
+
+Then each subsequent brief will route relevant situation evidence into that decision automatically.
+
+Run `insightweaver --help` or type `help` in interactive mode for the full command list.
+
+---
+
+## Filtering the brief
+
+The brief accepts topic and scope filters:
+
+```
+insightweaver brief --hours 48          # look back 48 hours
+insightweaver brief -cs -n              # national cybersecurity only
+insightweaver brief --hours 48 -l       # 48-hour local news
+```
+
+Topic flags: `--cybersecurity` (`-cs`), `--ai` (`-ai`). Scope flags: `--local` (`-l`), `--state` (`-s`), `--national` (`-n`), `--global` (`-g`). Combine with AND logic.
 
 ---
 
 ## Troubleshooting
 
-### "command not found" or "not recognized"
+**"command not found" or "not recognized"** -- the virtual environment isn't active. Run `source venv/bin/activate` (Mac/Linux) or `venv\Scripts\activate` (Windows). You should see `(venv)` at the start of your prompt.
 
-Make sure you've activated the virtual environment:
-- Windows: `venv\Scripts\activate`
-- Mac/Linux: `source venv/bin/activate`
+**"No module named..."** -- reinstall: `pip install -e .`
 
-You should see `(venv)` at the start of your command line.
+**API key errors** -- check that `.env` exists and contains your key with no extra spaces around the `=`. Verify the key at [console.anthropic.com](https://console.anthropic.com/).
 
-### "No module named..." errors
-
-Try reinstalling:
-```
-pip install -e .
-```
-
-### API key errors
-
-1. Check that your `.env` file exists and contains your API key
-2. Make sure there are no extra spaces around the `=` sign
-3. Verify your API key is valid at [console.anthropic.com](https://console.anthropic.com/)
-
-### Reports are empty or have errors
-
-1. Check your internet connection
-2. Make sure your API key has available credits
-3. Try running with `--debug` flag: `insightweaver brief --debug`
+**Brief is empty or errors out** -- check internet connection and API credit balance. Add `--debug` for verbose logs: `insightweaver brief --debug`.
 
 ---
 
 ## Configuration
 
-### User Profile
+**Your profile** is `config/user_profile.json`. Edit directly to change your location, professional domain, or topic interests. Most users edit this once a year, when major life circumstances change.
 
-Your preferences are stored in `~/.insightweaver/user_profile.json`. Edit this file directly to change your location, professional domain, or topic interests.
-
-### RSS Feeds
-
-News sources are configured in the `config/feeds/` folder. Each JSON file contains a list of RSS feed URLs organized by category.
+**Your RSS feeds** are configured in `config/feeds/`. Each JSON file lists feed URLs by category. Add or remove sources to shape your information diet -- the `diet gaps` command will tell you what perspectives are missing.
 
 ---
 
 ## Privacy
 
-- All data is stored locally on your computer
-- News articles are fetched directly from public RSS feeds
-- Your briefings are processed through the Anthropic API
-- No data is shared with third parties
-- You can delete all data by removing the `data/` folder
+- All data is stored locally in `data/insightweaver.db`
+- News articles come from public RSS feeds you configure
+- Synthesis runs through the Anthropic API (no third-party sharing)
+- Delete `data/` to wipe all accumulated state
 
 ---
 
 ## Requirements
 
-- **Python**: 3.10 or newer
-- **Disk Space**: ~100MB for database and reports
-- **Internet**: Required for fetching news and AI analysis
-- **API Credits**: Anthropic API key with available credits (~$0.10-0.50 per briefing)
-
----
-
-## Next Steps
-
-Once you're comfortable with the basics, you can explore:
-- **[CLI Reference](docs/cli_reference.md)** - Command-line options for power users
-- **[Configuration Guide](docs/configuration_guide.md)** - Customize your profile and feeds
+- **Python:** 3.11 or newer
+- **Disk:** ~100MB for database
+- **Internet:** for RSS fetch and API calls
+- **API budget:** ~$0.20-0.40 per brief
