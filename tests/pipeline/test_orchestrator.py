@@ -254,23 +254,20 @@ class TestFilterContent:
     @pytest.mark.asyncio
     @patch("src.pipeline.orchestrator.ContentFilter")
     @patch("src.pipeline.orchestrator.get_user_profile")
-    @patch("src.database.connection.get_db_session")
+    @patch("src.database.connection.get_db")
     async def test_filter_content_returns_stats(
-        self, mock_session, mock_get_profile, mock_filter_class
+        self, mock_get_db, mock_get_profile, mock_filter_class
     ):
         """Should return filter stats when articles exist"""
         orchestrator = PipelineOrchestrator()
 
-        # Mock user profile
         mock_profile = MagicMock()
         mock_get_profile.return_value = mock_profile
 
-        # Mock database session
         mock_db = MagicMock()
-        mock_session.return_value = mock_db
+        mock_get_db.return_value.__enter__.return_value = mock_db
         mock_db.query.return_value.filter.return_value.all.return_value = []
 
-        # Mock content filter
         mock_filter = MagicMock()
         mock_filter_class.return_value = mock_filter
         mock_filter.filter_articles.return_value = ([], [])

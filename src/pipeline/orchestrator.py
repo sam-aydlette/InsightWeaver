@@ -226,11 +226,11 @@ class PipelineOrchestrator:
         """Run content filtering stage"""
         from datetime import timedelta
 
-        from src.database.connection import get_db_session
+        from src.database.connection import get_db
         from src.database.models import Article
+        from src.utils import utcnow
 
         if not self.content_filter:
-            # Load user profile and initialize filter
             try:
                 user_profile = get_user_profile()
                 self.content_filter = ContentFilter(user_profile)
@@ -238,16 +238,14 @@ class PipelineOrchestrator:
                 logger.error(f"User profile not found: {e}")
                 return {"skipped": True, "reason": "User profile not found", "error": str(e)}
 
-        # Get recent unfiltered articles
-        session = get_db_session()
-        try:
-            cutoff_time = datetime.now(UTC) - timedelta(hours=self.dedup_hours)
+        with get_db() as session:
+            cutoff_time = utcnow() - timedelta(hours=self.dedup_hours)
 
             articles = (
                 session.query(Article)
                 .filter(
                     Article.created_at >= cutoff_time,
-                    Article.filtered.is_(False),  # Only unfiltered articles
+                    Article.filtered.is_(False),
                 )
                 .all()
             )
@@ -261,13 +259,7 @@ class PipelineOrchestrator:
                     "reasons": {},
                 }
 
-            # Filter articles
-            kept, filtered = self.content_filter.filter_articles(articles)
-
-            # Commit changes to database
-            session.commit()
-
-            # Get statistics
+            self.content_filter.filter_articles(articles)
             stats = self.content_filter.get_filter_stats(articles)
 
             logger.info(
@@ -277,9 +269,6 @@ class PipelineOrchestrator:
                 logger.info(f"  - {reason}: {count} articles")
 
             return stats
-
-        finally:
-            session.close()
 
     async def _synthesize_narrative(self) -> dict[str, Any]:
         """

@@ -7,10 +7,10 @@ situations. This catches frame structure as a corpus property rather than
 just a per-cluster one.
 """
 
-import json
 import logging
 
 from ..prompts.meta_frames import META_FRAME_RECONCILIATION_PROMPT
+from ._json import parse_claude_json
 from .claude_client import ClaudeClient
 
 logger = logging.getLogger(__name__)
@@ -59,7 +59,7 @@ class CrossClusterReconciler:
             logger.warning(f"Reconciler LLM call failed; returning no meta-fractures: {e}")
             return []
 
-        parsed = self._parse_json(raw)
+        parsed = parse_claude_json(raw, label="reconciler response")
         result: list[dict] = []
         n = len(situations)
         for entry in parsed.get("meta_fractures", []):
@@ -102,18 +102,3 @@ class CrossClusterReconciler:
                 block.append(f"  fractures: {fractures}")
             lines.append("\n".join(block))
         return "\n\n".join(lines)
-
-    @staticmethod
-    def _parse_json(response: str) -> dict:
-        try:
-            text = response.strip()
-            if text.startswith("```json"):
-                text = text[7:]
-            if text.startswith("```"):
-                text = text[3:]
-            if text.endswith("```"):
-                text = text[:-3]
-            return json.loads(text.strip())
-        except json.JSONDecodeError as e:
-            logger.warning(f"Failed to parse reconciler response: {e}")
-            return {}

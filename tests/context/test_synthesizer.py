@@ -25,45 +25,6 @@ class TestSynthesizerConfiguration:
         mock_curator.assert_called_with(topic_filters=filters)
 
 
-class TestJsonParsing:
-    """Tests for Claude JSON response parsing"""
-
-    @patch("src.context.synthesizer.FrameManager")
-    @patch("src.context.synthesizer.ContextCurator")
-    @patch("src.context.synthesizer.ClaudeClient")
-    def test_parses_valid_json(self, mock_client, mock_curator, mock_frame_mgr):
-        """Valid JSON should be parsed correctly"""
-        synthesizer = NarrativeSynthesizer()
-        response = json.dumps({"clusters": [{"title": "Test", "article_ids": [1]}]})
-
-        result = synthesizer._parse_json_response(response)
-
-        assert result["clusters"][0]["title"] == "Test"
-
-    @patch("src.context.synthesizer.FrameManager")
-    @patch("src.context.synthesizer.ContextCurator")
-    @patch("src.context.synthesizer.ClaudeClient")
-    def test_strips_markdown_fences(self, mock_client, mock_curator, mock_frame_mgr):
-        """Should handle JSON wrapped in markdown code blocks"""
-        synthesizer = NarrativeSynthesizer()
-        response = '```json\n{"key": "value"}\n```'
-
-        result = synthesizer._parse_json_response(response)
-
-        assert result["key"] == "value"
-
-    @patch("src.context.synthesizer.FrameManager")
-    @patch("src.context.synthesizer.ContextCurator")
-    @patch("src.context.synthesizer.ClaudeClient")
-    def test_returns_empty_dict_on_invalid_json(self, mock_client, mock_curator, mock_frame_mgr):
-        """Invalid JSON should return empty dict, not crash"""
-        synthesizer = NarrativeSynthesizer()
-
-        result = synthesizer._parse_json_response("This is not JSON")
-
-        assert result == {}
-
-
 class TestCitationMap:
     """Tests for citation map building"""
 

@@ -8,7 +8,6 @@ Pass 2: For clusters with 3+ articles, produce examined situation narratives.
 
 import json
 import logging
-from datetime import datetime
 from typing import Any
 
 from ..database.connection import get_db
@@ -28,7 +27,9 @@ from ..prompts.synthesis import (
     SITUATION_SYNTHESIS_PROMPT,
     THIN_COVERAGE_PROMPT,
 )
+from ..utils import utcnow
 from ..utils.profiler import profile
+from ._json import parse_claude_json
 from .claude_client import ClaudeClient
 from .cross_cluster_reconciler import CrossClusterReconciler
 from .curator import ContextCurator
@@ -244,7 +245,7 @@ class NarrativeSynthesizer:
                         "clusters_analyzed": len(full_clusters),
                         "clusters_thin": len(thin_clusters),
                         "analysis_threshold": f"{ANALYSIS_THRESHOLD}+ articles",
-                        "generated_at": datetime.utcnow().isoformat(),
+                        "generated_at": utcnow().isoformat(),
                         "citation_map": citation_map,
                         "prediction_check": prediction_check,
                     },
@@ -306,7 +307,7 @@ class NarrativeSynthesizer:
             temperature=0.0,
         )
 
-        parsed = self._parse_json_response(response)
+        parsed = parse_claude_json(response, label="clustering response")
         return parsed.get("clusters", [])
 
     # =========================================================================
@@ -360,7 +361,7 @@ class NarrativeSynthesizer:
             temperature=1.0,
         )
 
-        situation = self._parse_json_response(response)
+        situation = parse_claude_json(response, label="situation analysis response")
 
         # Validate minimal structure
         if "title" not in situation and "narrative" not in situation:
@@ -400,7 +401,7 @@ class NarrativeSynthesizer:
             temperature=0.0,
         )
 
-        parsed = self._parse_json_response(response)
+        parsed = parse_claude_json(response, label="thin coverage response")
         return parsed.get("thin_coverage", [])
 
     # =========================================================================
@@ -419,24 +420,6 @@ class NarrativeSynthesizer:
             }
         return citation_map
 
-    def _parse_json_response(self, response: str) -> dict[str, Any]:
-        """Parse Claude's JSON response, stripping markdown fences."""
-        try:
-            response = response.strip()
-            if response.startswith("```json"):
-                response = response[7:]
-            if response.startswith("```"):
-                response = response[3:]
-            if response.endswith("```"):
-                response = response[:-3]
-
-            return json.loads(response.strip())
-
-        except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse JSON response: {e}")
-            logger.debug(f"Response was: {response[:500]}...")
-            return {}
-
     async def _store_synthesis(
         self,
         synthesis_data: dict[str, Any],
@@ -449,8 +432,8 @@ class NarrativeSynthesizer:
                 run = AnalysisRun(
                     run_type="situation_synthesis",
                     status="completed",
-                    started_at=datetime.utcnow(),
-                    completed_at=datetime.utcnow(),
+                    started_at=utcnow(),
+                    completed_at=utcnow(),
                     articles_processed=articles_count,
                     context_token_count=self._estimate_tokens(context) if context else None,
                     claude_model="claude-sonnet-4-20250514",
@@ -506,7 +489,7 @@ class NarrativeSynthesizer:
                     synthesis_data=synthesis_data,
                     executive_summary=exec_summary,
                     articles_analyzed=articles_count,
-                    generated_at=datetime.utcnow(),
+                    generated_at=utcnow(),
                 )
                 session.add(synthesis)
                 session.flush()
@@ -566,7 +549,7 @@ class NarrativeSynthesizer:
                     ]
                     if article_ids:
                         session.query(Article).filter(Article.id.in_(article_ids)).update(
-                            {"last_included_in_synthesis": datetime.utcnow()},
+                            {"last_included_in_synthesis": utcnow()},
                             synchronize_session=False,
                         )
 

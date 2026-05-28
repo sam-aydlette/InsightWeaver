@@ -5,12 +5,10 @@ Question graph: matches to existing open questions where appropriate,
 creates new Question records otherwise.
 """
 
-import json
 import logging
 import re
 import unicodedata
 from dataclasses import dataclass
-from datetime import datetime
 
 from sqlalchemy.orm import Session
 
@@ -20,6 +18,8 @@ from ..database.models import (
     Question,
 )
 from ..prompts.questions import QUESTION_MATCHING_PROMPT
+from ..utils import utcnow
+from ._json import parse_claude_json
 from .claude_client import ClaudeClient
 
 logger = logging.getLogger(__name__)
@@ -125,7 +125,7 @@ class QuestionMatcher:
             if prior:
                 previous_link[i] = prior[0]
 
-        now = datetime.utcnow()
+        now = utcnow()
         for i, q in enumerate(resolved):
             if q is not None:
                 continue
@@ -168,7 +168,7 @@ class QuestionMatcher:
             logger.warning(f"Question matcher LLM call failed; treating all as new: {e}")
             return {}
 
-        parsed = self._parse_json(raw)
+        parsed = parse_claude_json(raw, label="question matcher response")
         results: dict[int, int | None] = {}
         for entry in parsed.get("matches", []):
             idx = entry.get("proposed_index")
@@ -176,18 +176,3 @@ class QuestionMatcher:
             if isinstance(idx, int):
                 results[idx] = matched_id if isinstance(matched_id, int) else None
         return results
-
-    @staticmethod
-    def _parse_json(response: str) -> dict:
-        try:
-            text = response.strip()
-            if text.startswith("```json"):
-                text = text[7:]
-            if text.startswith("```"):
-                text = text[3:]
-            if text.endswith("```"):
-                text = text[:-3]
-            return json.loads(text.strip())
-        except json.JSONDecodeError as e:
-            logger.warning(f"Failed to parse matcher response: {e}")
-            return {}

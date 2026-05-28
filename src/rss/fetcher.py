@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from src.database.connection import get_db
 from src.database.models import Article, RSSFeed
+from src.utils import utcnow
 
 logger = logging.getLogger(__name__)
 
@@ -133,7 +134,7 @@ class RSSFetcher:
             success, feed_data, error = await self._fetch_with_retry(feed.url, feed.name)
 
             # Update feed status
-            feed.last_fetched = datetime.utcnow()
+            feed.last_fetched = utcnow()
 
             if not success:
                 feed.last_error = error

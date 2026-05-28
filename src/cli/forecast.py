@@ -5,7 +5,7 @@ synthesis has already committed to as falsifiable observables, organized
 by whether each one has resolved.
 """
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 import click
 
@@ -17,6 +17,7 @@ from ..database.models import (
     Prediction,
     Question,
 )
+from ..utils import utcnow
 from .colors import accent, header, muted, success, warning
 
 
@@ -30,7 +31,7 @@ from .colors import accent, header, muted, success, warning
 )
 def forecast_command(days):
     """Show open observables and the recently-resolved record."""
-    cutoff = datetime.utcnow() - timedelta(days=days)
+    cutoff = utcnow() - timedelta(days=days)
 
     with get_db() as session:
         open_preds = (

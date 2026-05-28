@@ -3,7 +3,7 @@ Predictions Command - Inspect the predictions ledger and the tool's own
 calibration track record.
 """
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 import click
 
@@ -15,6 +15,7 @@ from ..database.models import (
     PREDICTION_STATUS_TRIGGERED,
     Prediction,
 )
+from ..utils import utcnow
 from .colors import accent, header, muted, success, warning
 
 
@@ -25,7 +26,7 @@ def predictions_command():
 
 
 def _print_predictions(rows, show_resolution: bool):
-    now = datetime.utcnow()
+    now = utcnow()
     for p in rows:
         age_days = (now - p.made_at).days
         question_text = p.question.text if p.question else "(unknown question)"
@@ -104,7 +105,7 @@ def contradicted_predictions(limit):
 @click.option("--days", "-d", type=int, default=90, help="Window in days (default: 90).")
 def track_record(days):
     """Show the tool's calibration record over a rolling window."""
-    cutoff = datetime.utcnow() - timedelta(days=days)
+    cutoff = utcnow() - timedelta(days=days)
     with get_db() as session:
         window = session.query(Prediction).filter(Prediction.made_at >= cutoff)
         total = window.count()

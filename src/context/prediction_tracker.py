@@ -6,9 +6,8 @@ forward-looking statements auditable -- every observable it flagged gets
 checked against what later actually showed up in the feeds.
 """
 
-import json
 import logging
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from sqlalchemy.orm import Session
 
@@ -21,6 +20,8 @@ from ..database.models import (
     Prediction,
 )
 from ..prompts.predictions import PREDICTION_CHECK_PROMPT
+from ..utils import utcnow
+from ._json import parse_claude_json
 from .claude_client import ClaudeClient
 
 logger = logging.getLogger(__name__)
@@ -47,7 +48,7 @@ class PredictionTracker:
         status changes to the session but does not commit -- the caller owns
         the transaction.
         """
-        now = datetime.utcnow()
+        now = utcnow()
         summary = {
             "checked": 0,
             "triggered": 0,
@@ -152,7 +153,7 @@ class PredictionTracker:
             logger.warning(f"Prediction check LLM call failed; leaving all open: {e}")
             return {}
 
-        parsed = self._parse_json(raw)
+        parsed = parse_claude_json(raw, label="prediction check response")
         results: dict[int, tuple[str, str]] = {}
         valid = {"triggered", "contradicted", "open"}
         for entry in parsed.get("verdicts", []):
@@ -162,18 +163,3 @@ class PredictionTracker:
             if isinstance(pid, int) and verdict in valid:
                 results[pid] = (verdict, str(note))
         return results
-
-    @staticmethod
-    def _parse_json(response: str) -> dict:
-        try:
-            text = response.strip()
-            if text.startswith("```json"):
-                text = text[7:]
-            if text.startswith("```"):
-                text = text[3:]
-            if text.endswith("```"):
-                text = text[:-3]
-            return json.loads(text.strip())
-        except json.JSONDecodeError as e:
-            logger.warning(f"Failed to parse prediction check response: {e}")
-            return {}

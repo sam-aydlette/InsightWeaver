@@ -6,7 +6,6 @@ situation-to-decision routing happens, so the chain from coverage to
 decision stays centralized and inspectable.
 """
 
-import json
 import logging
 from dataclasses import dataclass
 
@@ -21,6 +20,7 @@ from ..database.models import (
     DecisionFactor,
 )
 from ..prompts.decisions import DECISION_ROUTING_PROMPT
+from ._json import parse_claude_json
 from .claude_client import ClaudeClient
 
 logger = logging.getLogger(__name__)
@@ -153,21 +153,6 @@ class DecisionRouter:
             logger.warning(f"Decision router LLM call failed; routing nothing: {e}")
             return []
 
-        parsed = self._parse_json(raw)
+        parsed = parse_claude_json(raw, label="decision router response")
         evidence = parsed.get("evidence", [])
         return evidence if isinstance(evidence, list) else []
-
-    @staticmethod
-    def _parse_json(response: str) -> dict:
-        try:
-            text = response.strip()
-            if text.startswith("```json"):
-                text = text[7:]
-            if text.startswith("```"):
-                text = text[3:]
-            if text.endswith("```"):
-                text = text[:-3]
-            return json.loads(text.strip())
-        except json.JSONDecodeError as e:
-            logger.warning(f"Failed to parse decision router response: {e}")
-            return {}

@@ -2,8 +2,6 @@
 Decisions Command - Manage the decision journal and inspect routed evidence.
 """
 
-from datetime import datetime
-
 import click
 
 from ..database.connection import get_db
@@ -14,6 +12,7 @@ from ..database.models import (
     DecisionEvidence,
     DecisionFactor,
 )
+from ..utils import utcnow
 from .colors import accent, header, muted, success, warning
 
 DECISION_TYPES = ["career", "housing", "education", "financial", "civic", "other"]
@@ -134,7 +133,7 @@ def resolve_decision(decision_id, note):
             click.echo(warning(f"D{d.id} is already {d.status}; not modifying."))
             return
         d.status = DECISION_STATUS_DECIDED
-        d.decided_at = datetime.utcnow()
+        d.decided_at = utcnow()
         d.notes = note
         session.commit()
         click.echo(success(f"D{d.id} marked decided."))

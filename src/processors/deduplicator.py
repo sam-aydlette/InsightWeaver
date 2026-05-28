@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from src.database.connection import get_db
 from src.database.models import Article
+from src.utils import utcnow
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +75,7 @@ class ArticleDeduplicator:
             article._content_hash = content_hash
 
         # Look for articles with same content hash within time window
-        time_cutoff = datetime.utcnow() - timedelta(hours=self.time_window_hours)
+        time_cutoff = utcnow() - timedelta(hours=self.time_window_hours)
 
         # Much more efficient: limit the query and only get necessary fields
         candidates = (
@@ -111,7 +112,7 @@ class ArticleDeduplicator:
             return []
 
         near_duplicates = []
-        time_cutoff = datetime.utcnow() - timedelta(hours=self.time_window_hours)
+        time_cutoff = utcnow() - timedelta(hours=self.time_window_hours)
 
         # Find articles with same URL (different feeds might have same URL)
         if article.url:
@@ -176,7 +177,7 @@ class ArticleDeduplicator:
             {
                 "is_duplicate": True,
                 "duplicate_of": original_article.id,
-                "duplicate_detected_at": datetime.utcnow().isoformat(),
+                "duplicate_detected_at": utcnow().isoformat(),
                 "duplicate_type": "exact"
                 if self._is_exact_duplicate(original_article, duplicate_article)
                 else "near",
@@ -339,7 +340,7 @@ class ArticleDeduplicator:
         Stage 2: Exact content hash matches
         Stage 3: Title similarity analysis
         """
-        time_cutoff = datetime.utcnow() - timedelta(hours=hours)
+        time_cutoff = utcnow() - timedelta(hours=hours)
 
         with get_db() as db:
             # Get recent articles that haven't been processed for duplicates

@@ -160,11 +160,3 @@ class TestClassifyArticlesToFrames:
         with _patch_db(session):
             written = await manager.classify_articles_to_frames(article_dicts, frames)
         assert written == 0
-
-
-class TestParseJson:
-    def test_strips_fences(self):
-        assert FrameManager._parse_json('```json\n{"a": 1}\n```') == {"a": 1}
-
-    def test_bad_json_returns_empty(self):
-        assert FrameManager._parse_json("not json") == {}

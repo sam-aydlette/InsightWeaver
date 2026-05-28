@@ -14,6 +14,7 @@ from ..prompts.frames import (
     FRAME_CLASSIFICATION_PROMPT,
     FRAME_DISCOVERY_PROMPT,
 )
+from ._json import parse_claude_json
 from .claude_client import ClaudeClient
 
 logger = logging.getLogger(__name__)
@@ -143,7 +144,7 @@ class FrameManager:
             logger.warning(f"Frame classification call failed; skipping: {e}")
             return 0
 
-        parsed = self._parse_json(raw)
+        parsed = parse_claude_json(raw, label="frame classification response")
         written = 0
         try:
             with get_db() as session:
@@ -222,28 +223,10 @@ class FrameManager:
                 user_message=prompt,
                 temperature=0.0,
             )
-            return self._parse_json(response)
+            return parse_claude_json(response, label="frame discovery response")
         except Exception as e:
             logger.error(f"Frame discovery failed for '{cluster.get('title', '')}': {e}")
             return None
-
-    @staticmethod
-    def _parse_json(response: str) -> dict[str, Any]:
-        """Parse a Claude JSON response, stripping markdown fences."""
-        import json
-
-        text = response.strip()
-        if text.startswith("```json"):
-            text = text[7:]
-        if text.startswith("```"):
-            text = text[3:]
-        if text.endswith("```"):
-            text = text[:-3]
-        try:
-            return json.loads(text.strip())
-        except json.JSONDecodeError as e:
-            logger.warning(f"Failed to parse frame JSON response: {e}")
-            return {}
 
     def store_discovered_frames(self, cluster: dict, discovery_result: dict) -> int | None:
         """

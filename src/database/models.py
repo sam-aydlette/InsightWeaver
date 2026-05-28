@@ -3,8 +3,6 @@ Optimized Database Models for Context Engineering
 Simplified schema focusing on context curation and synthesis outputs
 """
 
-from datetime import datetime
-
 from sqlalchemy import (
     JSON,
     Boolean,
@@ -20,6 +18,8 @@ from sqlalchemy import (
 )
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
+
+from ..utils import utcnow
 
 Base = declarative_base()
 
@@ -37,8 +37,8 @@ class RSSFeed(Base):
     last_fetched = Column(DateTime)
     last_error = Column(Text)
     error_count = Column(Integer, default=0)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow)
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
 
     articles = relationship("Article", back_populates="feed")
 
@@ -83,8 +83,8 @@ class Article(Base):
     filter_reason = Column(String(200))
 
     # Timestamps
-    fetched_at = Column(DateTime, default=datetime.utcnow)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    fetched_at = Column(DateTime, default=utcnow)
+    created_at = Column(DateTime, default=utcnow)
 
     feed = relationship("RSSFeed", back_populates="articles")
 
@@ -115,7 +115,7 @@ class AnalysisRun(Base):
     id = Column(Integer, primary_key=True)
     run_type = Column(String(50))  # 'narrative_synthesis'
     status = Column(String(50))  # 'started', 'completed', 'failed'
-    started_at = Column(DateTime, default=datetime.utcnow)
+    started_at = Column(DateTime, default=utcnow)
     completed_at = Column(DateTime)
     articles_processed = Column(Integer)
     context_token_count = Column(Integer)  # Approximate tokens sent to Claude
@@ -147,7 +147,7 @@ class NarrativeSynthesis(Base):
     # Metadata
     articles_analyzed = Column(Integer)
     temporal_scope = Column(String(100))  # "immediate,near,medium,long"
-    generated_at = Column(DateTime, default=datetime.utcnow)
+    generated_at = Column(DateTime, default=utcnow)
 
     __table_args__ = (
         Index("idx_narrative_generated_at", "generated_at"),
@@ -175,7 +175,7 @@ class ContextSnapshot(Base):
     historical_summaries = Column(Text)  # Memory context included
     instructions = Column(Text)  # Instructions sent to Claude
 
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow)
 
     __table_args__ = (Index("idx_context_created_at", "created_at"),)
 
@@ -201,7 +201,7 @@ class ProvenanceRecord(Base):
     alternative_interpretations = Column(JSON, default=list)
     reasoning_chain = Column(JSON)
 
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow)
 
     __table_args__ = (
         Index("idx_provenance_synthesis", "synthesis_id"),
@@ -226,7 +226,7 @@ class TopicCluster(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String(200), nullable=False)
     keywords = Column(JSON, nullable=False)  # List of keywords identifying this cluster
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow)
 
     frames = relationship("NarrativeFrame", back_populates="topic_cluster")
     gaps = relationship("FrameGap", back_populates="topic_cluster")
@@ -248,7 +248,7 @@ class NarrativeFrame(Base):
     label = Column(String(200), nullable=False)
     description = Column(Text)
     assumptions = Column(Text)  # What this frame takes for granted
-    first_seen = Column(DateTime, default=datetime.utcnow)
+    first_seen = Column(DateTime, default=utcnow)
     validated = Column(Boolean, default=False)  # User has reviewed and accepted
 
     topic_cluster = relationship("TopicCluster", back_populates="frames")
@@ -272,7 +272,7 @@ class ArticleFrame(Base):
     article_id = Column(Integer, ForeignKey("articles.id"), nullable=False)
     frame_id = Column(Integer, ForeignKey("narrative_frames.id"), nullable=False)
     confidence = Column(Float, nullable=False)  # 0.0-1.0
-    run_date = Column(DateTime, default=datetime.utcnow)
+    run_date = Column(DateTime, default=utcnow)
 
     frame = relationship("NarrativeFrame", back_populates="article_frames")
 
@@ -295,7 +295,7 @@ class FrameGap(Base):
     id = Column(Integer, primary_key=True)
     topic_cluster_id = Column(Integer, ForeignKey("topic_clusters.id"), nullable=False)
     frame_label = Column(String(200), nullable=False)  # May reference a NarrativeFrame or be novel
-    first_detected = Column(DateTime, default=datetime.utcnow)
+    first_detected = Column(DateTime, default=utcnow)
     occurrences = Column(Integer, default=1)
     feed_suggestion = Column(Text)  # Suggested feed type to fill this gap
 
@@ -336,7 +336,7 @@ class Question(Base):
     text = Column(Text, nullable=False)
     normalized_text = Column(Text, nullable=False)
 
-    first_asked_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    first_asked_at = Column(DateTime, default=utcnow, nullable=False)
     status = Column(String(20), nullable=False, default=QUESTION_STATUS_OPEN)
     resolved_at = Column(DateTime, nullable=True)
     resolution_note = Column(Text, nullable=True)
@@ -372,7 +372,7 @@ class QuestionSituation(Base):
     question_id = Column(Integer, ForeignKey("questions.id"), nullable=False)
     synthesis_id = Column(Integer, ForeignKey("narrative_syntheses.id"), nullable=False)
     situation_index = Column(Integer, nullable=False)
-    observed_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    observed_at = Column(DateTime, default=utcnow, nullable=False)
 
     question = relationship("Question", back_populates="situation_links")
 
@@ -421,7 +421,7 @@ class Prediction(Base):
     observable_text = Column(Text, nullable=False)
     trigger_condition = Column(Text, nullable=False)
 
-    made_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    made_at = Column(DateTime, default=utcnow, nullable=False)
     made_in_synthesis_id = Column(Integer, ForeignKey("narrative_syntheses.id"), nullable=False)
 
     status = Column(String(20), nullable=False, default=PREDICTION_STATUS_OPEN)
@@ -464,7 +464,7 @@ class Decision(Base):
     name = Column(String(300), nullable=False)
     decision_type = Column(String(50))  # career / housing / education / financial / civic / other
     status = Column(String(20), nullable=False, default=DECISION_STATUS_OPEN)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=utcnow, nullable=False)
     decided_at = Column(DateTime, nullable=True)
     notes = Column(Text, nullable=True)
 
@@ -514,7 +514,7 @@ class DecisionEvidence(Base):
     situation_excerpt = Column(Text, nullable=False)
     direction = Column(String(20), nullable=False, default=EVIDENCE_DIRECTION_NEUTRAL)
     epistemic_status = Column(String(30))  # reported_fact/single_source/consensus/speculation
-    observed_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    observed_at = Column(DateTime, default=utcnow, nullable=False)
 
     decision = relationship("Decision", back_populates="evidence")
     factor = relationship("DecisionFactor", back_populates="evidence")

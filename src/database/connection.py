@@ -27,8 +27,3 @@ def get_db() -> Session:
         raise
     finally:
         db.close()
-
-
-def get_db_session() -> Session:
-    """Get a database session (for dependency injection)"""
-    return SessionLocal()

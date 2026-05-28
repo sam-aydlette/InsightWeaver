@@ -94,45 +94,6 @@ class TestGetDb:
         assert session_ref is not None
 
 
-class TestGetDbSession:
-    """Tests for get_db_session function"""
-
-    def test_get_db_session_returns_session(self, test_engine, mocker):
-        """get_db_session should return a database session"""
-        from sqlalchemy.orm import sessionmaker
-
-        TestSession = sessionmaker(bind=test_engine)
-        mocker.patch("src.database.connection.SessionLocal", TestSession)
-
-        from src.database.connection import get_db_session
-
-        session = get_db_session()
-        try:
-            assert isinstance(session, Session)
-            # Session should be usable
-            result = session.execute(text("SELECT 1"))
-            assert result.scalar() == 1
-        finally:
-            session.close()
-
-    def test_get_db_session_returns_new_session_each_time(self, test_engine, mocker):
-        """Each call to get_db_session should return a new session"""
-        from sqlalchemy.orm import sessionmaker
-
-        TestSession = sessionmaker(bind=test_engine)
-        mocker.patch("src.database.connection.SessionLocal", TestSession)
-
-        from src.database.connection import get_db_session
-
-        session1 = get_db_session()
-        session2 = get_db_session()
-        try:
-            assert session1 is not session2
-        finally:
-            session1.close()
-            session2.close()
-
-
 class TestCreateTables:
     """Tests for create_tables function"""
 

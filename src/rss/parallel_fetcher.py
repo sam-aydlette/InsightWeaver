@@ -7,11 +7,11 @@ import asyncio
 import logging
 import time
 from dataclasses import dataclass
-from datetime import datetime
 
 from src.database.connection import get_db
 from src.database.models import RSSFeed
 from src.rss.fetcher import RSSFetcher
+from src.utils import utcnow
 
 logger = logging.getLogger(__name__)
 
@@ -176,7 +176,7 @@ class ParallelRSSFetcher:
             "error_summary": error_summary,
             "empty_feeds": [f.feed_name for f in empty_feeds],
             "failed_feeds_list": [f.feed_name for f in results if not f.success],
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": utcnow().isoformat(),
         }
 
     def _empty_results(self) -> dict[str, any]:
@@ -193,7 +193,7 @@ class ParallelRSSFetcher:
             "error_summary": {},
             "empty_feeds": [],
             "failed_feeds_list": [],
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": utcnow().isoformat(),
         }
 
 

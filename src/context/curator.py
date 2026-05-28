@@ -6,13 +6,14 @@ Implements token budget management following Anthropic's context engineering gui
 
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import Any
 
 from sqlalchemy.orm import Session
 
 from ..database.connection import get_db
 from ..database.models import Article, NarrativeSynthesis
+from ..utils import utcnow
 from ..utils.profile_loader import UserProfile, get_user_profile
 from ..utils.profiler import profile
 from .topic_matcher import TopicMatcher
@@ -133,7 +134,7 @@ class ContextCurator:
         Returns:
             List of articles (filtered by topic/scope if filters provided)
         """
-        cutoff_time = datetime.utcnow() - timedelta(hours=hours)
+        cutoff_time = utcnow() - timedelta(hours=hours)
 
         # Base query: recent, unfiltered articles
         query = session.query(Article).filter(

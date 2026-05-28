@@ -1,11 +1,12 @@
 import logging
 import re
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from bs4 import BeautifulSoup
 from sqlalchemy.orm import Session
 
 from src.database.models import Article
+from src.utils import utcnow
 
 logger = logging.getLogger(__name__)
 
@@ -120,7 +121,7 @@ class ArticleStorage:
         """
         Get articles from the last N hours
         """
-        cutoff_time = datetime.utcnow() - timedelta(hours=hours)
+        cutoff_time = utcnow() - timedelta(hours=hours)
         return (
             self.db.query(Article)
             .filter(Article.fetched_at >= cutoff_time)

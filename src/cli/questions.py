@@ -2,8 +2,6 @@
 Questions Command - Inspect and manage the persistent Question graph.
 """
 
-from datetime import datetime
-
 import click
 
 from ..database.connection import get_db
@@ -14,6 +12,7 @@ from ..database.models import (
     Question,
     QuestionSituation,
 )
+from ..utils import utcnow
 from .colors import accent, header, muted, success, warning
 
 
@@ -46,7 +45,7 @@ def list_questions(status, limit):
 
         click.echo(header(f"QUESTIONS ({status}, {len(rows)} shown)"))
         click.echo("=" * 80)
-        now = datetime.utcnow()
+        now = utcnow()
         for q in rows:
             age_days = (now - q.first_asked_at).days
             tag = success("open") if q.status == QUESTION_STATUS_OPEN else muted(q.status)
@@ -123,7 +122,7 @@ def resolve_question(question_id, note):
             return
 
         q.status = QUESTION_STATUS_RESOLVED
-        q.resolved_at = datetime.utcnow()
+        q.resolved_at = utcnow()
         q.resolution_note = note
         session.commit()
 
