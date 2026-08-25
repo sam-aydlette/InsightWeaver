@@ -1,29 +1,32 @@
-# Split brief rendering into one document model plus terminal, HTML, and email renderers, so the same brief can be delivered three ways.
+# Add a render-only path that replays a stored run, then split brief rendering into one document model plus terminal, HTML, and email renderers.
 REPO: InsightWeaver
 STATUS: QUEUED            # QUEUED | IN_PROGRESS | PARKED | DONE | FAILED
-ACCEPTANCE: `make check` passes, plus: a new `src/render/` package exposes a `BriefDocument` model and three renderers; `insightweaver brief` output is **byte-identical** to before this change (capture it first and diff, do not eyeball it); `insightweaver brief --format html` writes a self-contained HTML file that opens correctly with no network fetches; `insightweaver brief --format email` sends via the existing SMTP env vars; and new tests cover each renderer against a fixture `BriefDocument` without invoking the pipeline.
-OUT OF SCOPE: Any change to what the brief *says* — this is a pure refactor of how it is emitted, and the terminal output must not drift by a single character. Changing the pipeline, the graph, the prompts, or any processor. Adding new content sections (entity mentions, standing questions) — those are separate queued tasks that build on this one. Changing the database schema. Styling beyond a readable single-file HTML page; no CSS framework, no web fonts, no external assets. Retry/queue logic for email delivery — a failed send should report clearly and exit non-zero, not build an outbox.
-LANDMINES: The terminal output is the regression risk and it is not covered by a golden test today — capture `insightweaver brief > /tmp/before.txt` on a fixed database *before* touching anything, and diff against it at the end. Rendering is currently entangled with synthesis: `src/prompts/synthesis.py` and `src/context/` both do formatting work, so the seam is not obvious and finding it honestly is most of this task. The `.env` already carries `SMTP_SERVER`, `SMTP_PORT`, `EMAIL_USERNAME`, `EMAIL_PASSWORD`, `FROM_EMAIL`, `RECIPIENT_EMAIL` — email was anticipated and never built, so check whether dead code exists before writing new. **Never echo `EMAIL_PASSWORD` or `ANTHROPIC_API_KEY` into logs or output.** `.env` is gitignored; keep it that way. Local `main` is 11 commits ahead of `origin`; do not push.
+ACCEPTANCE: `make check` passes, plus all four: (1) `insightweaver brief --from-run <id>` renders a stored `narrative_syntheses` row **without invoking the pipeline** — prove it by running with `ANTHROPIC_API_KEY` unset and with no network, and showing it still renders; (2) rendering the same stored run twice produces **byte-identical** output (`diff` returns empty), which is the determinism the old `brief` command could never offer; (3) the refactored terminal renderer reproduces the pre-refactor output for that same stored run byte-for-byte — capture it through the old code path first, then diff; (4) `--format html` writes a self-contained file with no network fetches and `--format email` sends via the existing SMTP env vars. Plus tests covering each renderer against a fixture `BriefDocument` with no pipeline involvement.
+OUT OF SCOPE: Changing what the brief *says* — this is a refactor of how it is emitted and what it is emitted from, never the content or the analysis. Changing the pipeline, the graph, the prompts, or any processor. Adding new brief sections (entity mentions, standing questions) — separate queued tasks that build on this. Changing the database schema; `narrative_syntheses` already stores what you need. Making the *default* `insightweaver brief` stop running the pipeline — the live path stays exactly as it is, and `--from-run` is additive. Styling beyond a readable single-file HTML page: no CSS framework, no web fonts, no external assets. Email retry or outbox logic — a failed send reports clearly and exits non-zero.
+LANDMINES: **The original version of this spec was unachievable and was parked on 2026-08-25 for exactly this reason** — it demanded byte-identical output from `insightweaver brief`, which is the *pipeline*: `src/cli/brief.py` calls `run_pipeline()`, fetching RSS and re-synthesizing via Claude on every invocation. Output is non-deterministic by construction, so there was no stable baseline to diff against. The render-only path is what makes the rest of this task verifiable, so build it first and do not reorder. There are **28 stored runs** in `analysis_runs`/`narrative_syntheses` and ~51k articles — pick a run with rich content, not the newest, and name the id you used in the PR so the reviewer can reproduce the diff. Rendering is currently entangled with synthesis and with `src/cli/brief_formatter.py`; the seam is not obvious and finding it honestly is most of this work. **9 tests currently fail without `ANTHROPIC_API_KEY`** (queued separately as 008) — so `make check` passing locally does not mean CI passes; run `env -u ANTHROPIC_API_KEY .venv/bin/python -m pytest tests/ -q` and expect those 9, but **do not let your changes add a tenth**. `.env` holds real credentials: never echo `EMAIL_PASSWORD` or `ANTHROPIC_API_KEY` into logs, output, or a commit. `main` is protected — open a PR, do not push to it.
 ---
-This is step 1 of five for the US Public Sector Compliance beat, and it is deliberately first
-because it is the only one that is a pure refactor: no new inputs, no new schema, nothing
-speculative. It de-risks everything after it by proving the pipeline and the presentation are
-separable, and it delivers standalone value immediately — email and HTML for the brief that
-already exists.
+Step 1 of five for the US Public Sector Compliance beat, and deliberately first: it is the only
+one that adds no new inputs and no new schema, so it de-risks everything after it. It also
+delivers standalone value immediately — email and HTML for the brief that already exists.
+
+**Amended 2026-08-25** after the first run parked. The original acceptance assumed `brief` was a
+renderer. It is not; it is the whole pipeline. That is not a small correction — the render-only
+path it forces is arguably the more valuable half of this task, because re-sending last night's
+brief as email or regenerating its HTML should replay a stored run, not produce a *different*
+brief.
 
 Target shape:
 
 ```
 src/render/
   document.py    BriefDocument: sections, situations, questions, predictions, meta-fractures
-  terminal.py    TerminalRenderer  (must reproduce today's output exactly)
+  terminal.py    TerminalRenderer  (must reproduce today's output exactly, for a stored run)
   html.py        HTMLRenderer      (self-contained, no external assets)
   email.py       EmailRenderer     (wraps HTMLRenderer, sends via SMTP)
 ```
 
-The pipeline builds a `BriefDocument`; the CLI picks a renderer. That is the whole change.
-
-Do the terminal renderer first and get it byte-identical before writing the other two. If the
-seam turns out to be genuinely tangled — if synthesis is emitting formatted strings rather than
-structured data — say so and park it rather than half-extracting it. A partial split is worse
-than none, because it leaves two places that format.
+The pipeline builds a `BriefDocument` and stores it; `--from-run` loads one; the CLI picks a
+renderer. Do the render-only path and the terminal renderer first, and get the byte-identical diff
+green, before writing HTML or email. If the seam turns out to be genuinely tangled — if synthesis
+emits formatted strings rather than structured data — say so and park rather than half-extracting
+it. A partial split is worse than none, because it leaves two places that format.
