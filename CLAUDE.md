@@ -27,6 +27,36 @@
 - If my request is vague, help me establish clarity before proceeding
 - If my request does not adhere to software development best practices, push back before proceeding
 
+## When Working Unattended:
+
+The rules above assume I am present to answer. Some of them deadlock when I am asleep, so they
+are scoped: a task is *unattended* when it is picked up from `backlog/*.md` with no human in the
+loop. Everything else is *interactive* and the rules above apply as written.
+
+These rules do NOT relax when unattended, ever:
+- DO NOT LIE, and do not represent something as "fixed" unless you are reasonably certain it is
+- Do not hide problems behind fallbacks or mock data
+- FAIL FAST; no quick fixes
+- Modify only what the task specifies
+- Do not make commits as Claude
+
+These rules are replaced when unattended, because they presuppose I can reply:
+- "pause after each stage for my approval" and "write a plan and await my confirmation" ->
+  the task file's `# goal`, `ACCEPTANCE`, and `OUT OF SCOPE` fields ARE the approved plan. Work
+  inside those boundaries without pausing. Work outside them is out of scope, not a question.
+- "present ambiguities to me and allow me to choose. DO NOT MAKE ASSUMPTIONS." -> the intent of
+  this rule is preserved, not waived: do not guess past an ambiguity. Instead PARK it. Commit
+  what you have to a branch, write the open question into the task file, set `STATUS: PARKED`,
+  and move to the next queued task. Do not idle waiting for me. A parked task with a written
+  question costs me one answer in the morning; a wrong assumption costs me a day.
+- "if my request is unclear/vague, ask before proceeding" -> if the spec is too vague to work
+  from, park it with the specific question rather than starting.
+
+Unattended work lands as a pull request. It never merges itself, and it never pushes to `main`.
+I review in the morning. That is the backstop that makes the rest of this safe.
+
+If a task cannot be done without violating a rule in the first list, park it and say so.
+
 ## InsightWeaver North Star
 
 **What the tool actually is:** a personal commitment graph for reasoning about an information environment. Each daily brief is a diff against a persistent graph of Questions the coverage is tracking, Predictions whose triggers may yet fire, Decisions the user is carrying, and Frames each feed exhibits. The brief is the update event; the graph is the artifact.
