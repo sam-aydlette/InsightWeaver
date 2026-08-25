@@ -1,6 +1,6 @@
 # Add a render-only path that replays a stored run, then split brief rendering into one document model plus terminal, HTML, and email renderers.
 REPO: InsightWeaver
-STATUS: PARKED              # QUEUED | IN_PROGRESS | PARKED | DONE | FAILED
+STATUS: QUEUED            # QUEUED | IN_PROGRESS | PARKED | DONE | FAILED
 ACCEPTANCE: `make check` passes, plus all four: (1) `insightweaver brief --from-run <id>` renders a stored `narrative_syntheses` row **without invoking the pipeline** — prove it by running with `ANTHROPIC_API_KEY` unset and with no network, and showing it still renders; (2) rendering the same stored run twice produces **byte-identical** output (`diff` returns empty), which is the determinism the old `brief` command could never offer; (3) the refactored terminal renderer reproduces the pre-refactor output for that same stored run byte-for-byte — capture it through the old code path first, then diff; (4) `--format html` writes a self-contained file with no network fetches and `--format email` sends via the existing SMTP env vars. Plus tests covering each renderer against a fixture `BriefDocument` with no pipeline involvement.
 OUT OF SCOPE: Changing what the brief *says* — this is a refactor of how it is emitted and what it is emitted from, never the content or the analysis. Changing the pipeline, the graph, the prompts, or any processor. Adding new brief sections (entity mentions, standing questions) — separate queued tasks that build on this. Changing the database schema; `narrative_syntheses` already stores what you need. Making the *default* `insightweaver brief` stop running the pipeline — the live path stays exactly as it is, and `--from-run` is additive. Styling beyond a readable single-file HTML page: no CSS framework, no web fonts, no external assets. Email retry or outbox logic — a failed send reports clearly and exits non-zero.
 LANDMINES: **The original version of this spec was unachievable and was parked on 2026-08-25 for exactly this reason** — it demanded byte-identical output from `insightweaver brief`, which is the *pipeline*: `src/cli/brief.py` calls `run_pipeline()`, fetching RSS and re-synthesizing via Claude on every invocation. Output is non-deterministic by construction, so there was no stable baseline to diff against. The render-only path is what makes the rest of this task verifiable, so build it first and do not reorder. There are **28 stored runs** in `analysis_runs`/`narrative_syntheses` and ~51k articles — pick a run with rich content, not the newest, and name the id you used in the PR so the reviewer can reproduce the diff. Rendering is currently entangled with synthesis and with `src/cli/brief_formatter.py`; the seam is not obvious and finding it honestly is most of this work. **9 tests currently fail without `ANTHROPIC_API_KEY`** (queued separately as 008) — so `make check` passing locally does not mean CI passes; run `env -u ANTHROPIC_API_KEY .venv/bin/python -m pytest tests/ -q` and expect those 9, but **do not let your changes add a tenth**. `.env` holds real credentials: never echo `EMAIL_PASSWORD` or `ANTHROPIC_API_KEY` into logs, output, or a commit. `main` is protected — open a PR, do not push to it.
@@ -33,7 +33,8 @@ it. A partial split is worse than none, because it leaves two places that format
 
 ---
 
-**Done 2026-08-25.** Stored run used for the diff: **`narrative_syntheses.id = 176`**
+**Implementation notes, 2026-08-25** (status is for a reviewer to set, not the
+implementer). Stored run used for the diff: **`narrative_syntheses.id = 176`**
 (`analysis_run_id` 15, 50 articles, 9 situations, 78,832 bytes of `synthesis_data` --
 the only row rich enough to exercise the renderer; the other 27 hold ~1,600 bytes).
 
@@ -107,3 +108,25 @@ export VIRTUAL_ENV=/home/saydlette/workspace/InsightWeaver/venv
 export DATABASE_URL="sqlite:////home/saydlette/workspace/InsightWeaver/data/insightweaver.db"
 make check
 ```
+
+## Repair pass 2026-08-25 — gate is green
+
+The two type errors above are fixed in `load_stored_brief`: the single-column query
+result is bound to `list[Any]` and indexed, instead of being tuple-unpacked in a
+comprehension whose element type mypy infers as `Never`. Runtime behaviour is
+unchanged. No `# type: ignore`, no mypy-config change, nothing outside that branch.
+
+Verified with the toolchain provisioned as above:
+
+- `make typecheck` -> exit 0, `Success: no issues found in 73 source files`
+- `make lint` -> exit 0, `All checks passed!`
+- `make check` -> exit 0, `501 passed`, `All checks passed.` (needs `ANTHROPIC_API_KEY`
+  set to anything non-empty; with it unset the run is the backlog/008 condition,
+  `9 failed, 492 passed`, all nine in `tests/context/test_synthesizer.py`)
+- `env -u ANTHROPIC_API_KEY .venv/bin/python -m pytest tests/ -q` -> `9 failed, 492 passed`,
+  all nine pre-existing, no tenth
+- stored run 176 through the new terminal renderer is still **58,883 bytes** and still
+  byte-identical to a clean `git archive` of `7777e63`; the CLI path is 56,333 bytes and
+  still deterministic, HTML still 67,454 bytes and still deterministic
+
+Status set back to QUEUED: a reviewer decides DONE, not the implementer.

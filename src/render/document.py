@@ -237,14 +237,17 @@ def load_stored_brief(synthesis_id: int) -> BriefDocument:
             db.query(NarrativeSynthesis).filter(NarrativeSynthesis.id == synthesis_id).first()
         )
         if row is None:
-            available = [
-                stored_id
-                for (stored_id,) in db.query(NarrativeSynthesis.id)
+            # Bound to list[Any] rather than unpacked in the comprehension: the
+            # column arrives untyped for the same reason `row` does, so mypy
+            # infers the rows of a single-column query as Never and rejects the
+            # tuple unpack. Indexing an Any row keeps the runtime identical.
+            recent: list[Any] = (
+                db.query(NarrativeSynthesis.id)
                 .order_by(NarrativeSynthesis.id.desc())
                 .limit(10)
                 .all()
-            ]
-            raise StoredBriefNotFound(synthesis_id, available)
+            )
+            raise StoredBriefNotFound(synthesis_id, [int(entry[0]) for entry in recent])
 
         generated_at = row.generated_at.isoformat() if row.generated_at else None
         return BriefDocument.from_synthesis_data(
