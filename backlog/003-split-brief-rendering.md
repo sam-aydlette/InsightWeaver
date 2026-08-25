@@ -1,6 +1,6 @@
 # Add a render-only path that replays a stored run, then split brief rendering into one document model plus terminal, HTML, and email renderers.
 REPO: InsightWeaver
-STATUS: DONE              # QUEUED | IN_PROGRESS | PARKED | DONE | FAILED
+STATUS: PARKED              # QUEUED | IN_PROGRESS | PARKED | DONE | FAILED
 ACCEPTANCE: `make check` passes, plus all four: (1) `insightweaver brief --from-run <id>` renders a stored `narrative_syntheses` row **without invoking the pipeline** — prove it by running with `ANTHROPIC_API_KEY` unset and with no network, and showing it still renders; (2) rendering the same stored run twice produces **byte-identical** output (`diff` returns empty), which is the determinism the old `brief` command could never offer; (3) the refactored terminal renderer reproduces the pre-refactor output for that same stored run byte-for-byte — capture it through the old code path first, then diff; (4) `--format html` writes a self-contained file with no network fetches and `--format email` sends via the existing SMTP env vars. Plus tests covering each renderer against a fixture `BriefDocument` with no pipeline involvement.
 OUT OF SCOPE: Changing what the brief *says* — this is a refactor of how it is emitted and what it is emitted from, never the content or the analysis. Changing the pipeline, the graph, the prompts, or any processor. Adding new brief sections (entity mentions, standing questions) — separate queued tasks that build on this. Changing the database schema; `narrative_syntheses` already stores what you need. Making the *default* `insightweaver brief` stop running the pipeline — the live path stays exactly as it is, and `--from-run` is additive. Styling beyond a readable single-file HTML page: no CSS framework, no web fonts, no external assets. Email retry or outbox logic — a failed send reports clearly and exits non-zero.
 LANDMINES: **The original version of this spec was unachievable and was parked on 2026-08-25 for exactly this reason** — it demanded byte-identical output from `insightweaver brief`, which is the *pipeline*: `src/cli/brief.py` calls `run_pipeline()`, fetching RSS and re-synthesizing via Claude on every invocation. Output is non-deterministic by construction, so there was no stable baseline to diff against. The render-only path is what makes the rest of this task verifiable, so build it first and do not reorder. There are **28 stored runs** in `analysis_runs`/`narrative_syntheses` and ~51k articles — pick a run with rich content, not the newest, and name the id you used in the PR so the reviewer can reproduce the diff. Rendering is currently entangled with synthesis and with `src/cli/brief_formatter.py`; the seam is not obvious and finding it honestly is most of this work. **9 tests currently fail without `ANTHROPIC_API_KEY`** (queued separately as 008) — so `make check` passing locally does not mean CI passes; run `env -u ANTHROPIC_API_KEY .venv/bin/python -m pytest tests/ -q` and expect those 9, but **do not let your changes add a tenth**. `.env` holds real credentials: never echo `EMAIL_PASSWORD` or `ANTHROPIC_API_KEY` into logs, output, or a commit. `main` is protected — open a PR, do not push to it.
@@ -71,3 +71,39 @@ stub SMTP transport (starttls/login/send_message call order, port 465 implicit-T
 branch, failure -> `EmailDeliveryError` -> exit 1) and against real missing-variable
 handling, but no real message was sent, because that needs the live credentials in
 `.env` and is an irreversible external action. First real send should be eyeballed.
+
+---
+
+## PARKED 2026-08-25 — `make check` is RED against the pinned toolchain
+
+The task was marked DONE claiming `make check` passed with 501 tests. That claim does not hold.
+Run against `mypy==1.19.1` (the version pinned in `requirements-dev.txt` and used by CI):
+
+```
+src/render/document.py:240: error: "Never" object is not iterable  [misc]
+src/render/document.py:241: error: Cannot determine type of "stored_id"  [has-type]
+Found 2 errors in 1 file (checked 73 source files)
+make: *** [Makefile:90: typecheck] Error 1
+```
+
+Both are in `load_stored_brief`'s not-found branch: mypy cannot infer the element type of
+`db.query(NarrativeSynthesis.id)` when the ORM class is `Any`, so the tuple-unpack
+`for (stored_id,) in ...` yields `Never`.
+
+**Why it was not caught:** the worktree has no `venv`, so `make check` fell through the Makefile's
+resolution ladder to PATH, where `ruff` and `mypy` are not installed. The reviewer hit the same
+wall and returned `REQUEST_CHANGES` on the grounds that it could not witness the gate — which was
+the correct call, and the gate was in fact red.
+
+**Everything else in this task stands and was independently verified:** the render-only path
+short-circuits before the API-key check and before `run_pipeline`, and terminal output for stored
+run 176 is byte-identical pre- and post-refactor at 58,883 bytes, reproduced from a clean
+`git archive` of `7777e63`.
+
+**To resume:** fix the two type errors, then re-run with the environment provisioned:
+
+```bash
+export VIRTUAL_ENV=/home/saydlette/workspace/InsightWeaver/venv
+export DATABASE_URL="sqlite:////home/saydlette/workspace/InsightWeaver/data/insightweaver.db"
+make check
+```
