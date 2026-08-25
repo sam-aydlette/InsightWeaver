@@ -1,6 +1,6 @@
 # Add a render-only path that replays a stored run, then split brief rendering into one document model plus terminal, HTML, and email renderers.
 REPO: InsightWeaver
-STATUS: QUEUED            # QUEUED | IN_PROGRESS | PARKED | DONE | FAILED
+STATUS: DONE              # QUEUED | IN_PROGRESS | PARKED | DONE | FAILED
 ACCEPTANCE: `make check` passes, plus all four: (1) `insightweaver brief --from-run <id>` renders a stored `narrative_syntheses` row **without invoking the pipeline** — prove it by running with `ANTHROPIC_API_KEY` unset and with no network, and showing it still renders; (2) rendering the same stored run twice produces **byte-identical** output (`diff` returns empty), which is the determinism the old `brief` command could never offer; (3) the refactored terminal renderer reproduces the pre-refactor output for that same stored run byte-for-byte — capture it through the old code path first, then diff; (4) `--format html` writes a self-contained file with no network fetches and `--format email` sends via the existing SMTP env vars. Plus tests covering each renderer against a fixture `BriefDocument` with no pipeline involvement.
 OUT OF SCOPE: Changing what the brief *says* — this is a refactor of how it is emitted and what it is emitted from, never the content or the analysis. Changing the pipeline, the graph, the prompts, or any processor. Adding new brief sections (entity mentions, standing questions) — separate queued tasks that build on this. Changing the database schema; `narrative_syntheses` already stores what you need. Making the *default* `insightweaver brief` stop running the pipeline — the live path stays exactly as it is, and `--from-run` is additive. Styling beyond a readable single-file HTML page: no CSS framework, no web fonts, no external assets. Email retry or outbox logic — a failed send reports clearly and exits non-zero.
 LANDMINES: **The original version of this spec was unachievable and was parked on 2026-08-25 for exactly this reason** — it demanded byte-identical output from `insightweaver brief`, which is the *pipeline*: `src/cli/brief.py` calls `run_pipeline()`, fetching RSS and re-synthesizing via Claude on every invocation. Output is non-deterministic by construction, so there was no stable baseline to diff against. The render-only path is what makes the rest of this task verifiable, so build it first and do not reorder. There are **28 stored runs** in `analysis_runs`/`narrative_syntheses` and ~51k articles — pick a run with rich content, not the newest, and name the id you used in the PR so the reviewer can reproduce the diff. Rendering is currently entangled with synthesis and with `src/cli/brief_formatter.py`; the seam is not obvious and finding it honestly is most of this work. **9 tests currently fail without `ANTHROPIC_API_KEY`** (queued separately as 008) — so `make check` passing locally does not mean CI passes; run `env -u ANTHROPIC_API_KEY .venv/bin/python -m pytest tests/ -q` and expect those 9, but **do not let your changes add a tenth**. `.env` holds real credentials: never echo `EMAIL_PASSWORD` or `ANTHROPIC_API_KEY` into logs, output, or a commit. `main` is protected — open a PR, do not push to it.
@@ -30,3 +30,44 @@ renderer. Do the render-only path and the terminal renderer first, and get the b
 green, before writing HTML or email. If the seam turns out to be genuinely tangled — if synthesis
 emits formatted strings rather than structured data — say so and park rather than half-extracting
 it. A partial split is worse than none, because it leaves two places that format.
+
+---
+
+**Done 2026-08-25.** Stored run used for the diff: **`narrative_syntheses.id = 176`**
+(`analysis_run_id` 15, 50 articles, 9 situations, 78,832 bytes of `synthesis_data` --
+the only row rich enough to exercise the renderer; the other 27 hold ~1,600 bytes).
+
+Reproducing the byte-identical diff:
+
+```bash
+# capture.py -- replays what src/cli/brief.py did after the pipeline returned
+cat > /tmp/capture.py <<'PY'
+import json, sqlite3, sys, click
+from src.cli.brief_formatter import BriefFormatter
+con = sqlite3.connect("file:data/insightweaver.db?mode=ro", uri=True)
+blob, n = con.execute(
+    "select synthesis_data, articles_analyzed from narrative_syntheses where id=?",
+    (int(sys.argv[1]),)).fetchone()
+click.echo(BriefFormatter().format_report(
+    {"success": True, "articles_analyzed": n, "synthesis_data": json.loads(blob)}))
+PY
+
+# 1. pre-refactor tree (the commit this branch is based on)
+mkdir -p /tmp/pre && git archive 7777e63 | tar -x -C /tmp/pre
+PYTHONPATH=/tmp/pre python /tmp/capture.py 176 > /tmp/before.txt
+
+# 2. post-refactor render-only path, offline, no API key
+env -u ANTHROPIC_API_KEY unshare -rn insightweaver brief --from-run 176 > /tmp/after.txt
+
+diff /tmp/before.txt /tmp/after.txt      # empty; both are 56,333 bytes
+```
+
+Terminal and markdown output are byte-identical pre/post with ANSI escapes preserved
+(58,883 and 55,310 bytes respectively). Rendering 176 twice is byte-identical for
+terminal and HTML.
+
+One thing that was *not* verified end to end: `--format email` was exercised against a
+stub SMTP transport (starttls/login/send_message call order, port 465 implicit-TLS
+branch, failure -> `EmailDeliveryError` -> exit 1) and against real missing-variable
+handling, but no real message was sent, because that needs the live credentials in
+`.env` and is an irreversible external action. First real send should be eyeballed.

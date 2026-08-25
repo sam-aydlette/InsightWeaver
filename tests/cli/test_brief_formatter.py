@@ -4,12 +4,22 @@ Tests for brief_formatter — focused on the question-identity render integratio
 
 import re
 
-from src.cli.brief_formatter import (
-    BriefFormatter,
-    _decision_summary,
-    _prediction_check_line,
-    _question_lines,
-    _watch_items,
+from src.cli.brief_formatter import BriefFormatter
+
+# The formatting helpers moved to src/render/_text.py when brief rendering was
+# split out; BriefFormatter is now a thin adapter over the renderers. These
+# tests still exercise the same behaviour through the same public entry point.
+from src.render._text import (
+    decision_summary as _decision_summary,
+)
+from src.render._text import (
+    prediction_check_line as _prediction_check_line,
+)
+from src.render._text import (
+    question_lines as _question_lines,
+)
+from src.render._text import (
+    watch_items as _watch_items,
 )
 
 

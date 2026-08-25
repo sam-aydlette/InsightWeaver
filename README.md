@@ -130,6 +130,33 @@ See [GETTING_STARTED.md](GETTING_STARTED.md) for detailed setup instructions.
 
 ---
 
+## Re-rendering a Stored Brief
+
+`insightweaver brief` runs the whole pipeline: it fetches feeds and re-synthesizes,
+so two invocations never produce the same brief. When you want *last night's* brief
+again -- as HTML, as email, or just on screen -- render the stored run instead:
+
+```bash
+insightweaver brief --from-run 176                            # terminal
+insightweaver brief --from-run 176 --format html --output out.html  # self-contained page
+insightweaver brief --from-run 176 --format email             # send via SMTP
+insightweaver brief --from-run 176 --save brief.md            # markdown archive
+```
+
+The id is a `narrative_syntheses` row id; an unknown id lists the recent ones. This
+path is offline and deterministic -- no feeds, no Claude call, no `ANTHROPIC_API_KEY`
+required, and the same id always renders the same bytes. Email uses the SMTP
+variables in `.env` (`SMTP_SERVER`, `SMTP_PORT`, `EMAIL_USERNAME`, `EMAIL_PASSWORD`,
+`FROM_EMAIL`, `RECIPIENT_EMAIL`); a failed send reports why and exits non-zero,
+with no retry or outbox.
+
+Rendering lives in `src/render/`: one `BriefDocument` model plus a renderer per
+medium (`terminal.py`, `html.py`, `markdown.py`, `email.py`). The live pipeline path
+builds the same document and uses the same renderers, so there is exactly one place
+that decides what a brief looks like.
+
+---
+
 ## Requirements
 
 - Python 3.10+
