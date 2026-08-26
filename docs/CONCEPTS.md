@@ -18,6 +18,8 @@ A sixth concept, the **Beat**, is not a commitment but a *scope* over them: it s
 
 A **Question** is an unresolved epistemic thread the coverage is implicitly tracking. Most situations end with one — "Will the Fed cut rates in June?" — and that question persists across daily runs until it resolves.
 
+A Question has one of two origins. Most are **emergent**: the graph notices what coverage leaves unresolved. A beat can also **declare** one up front — see "Standing questions" below. Both are the same kind of row, and everything downstream (predictions, decision evidence, appearance counts) treats them identically.
+
 **When created.** Each situation's `unresolved_questions.primary` (and optional secondaries) is matched against the open question graph by a Haiku call. If today's question is the same underlying question as one already open, today's situation gets bound to that existing Question. Otherwise a new Question is created.
 
 **When resolved.** Manually, via `insightweaver questions resolve <id> --note "..."`. The tool never auto-resolves; deciding a thread has closed is editorial.
@@ -112,7 +114,7 @@ A **Beat** is a *subject* the tool runs briefs for, as opposed to the *person* t
 
 **Source selection reuses the feed `applicability` tags**, it does not invent a parallel selector. `feed_tags` is matched against a feed's `domain_tags` and `specialty_tags`; the optional `geo_tags` and `scope` narrow against the families of the same name. Within a family the match is ANY, across families it is ALL, and multiple `sources` entries union. A beat is deliberately *not* validated by `src/utils/profile_loader.py` — that validator enforces a person-shaped schema, and a beat is a different shape.
 
-**`coverage` declares the institutions the beat tracks; `standing_questions` is still reserved.** See "Institutional activity" below for what `coverage` does. `standing_questions` is validated for shape so it needs no migration later, but nothing reads it yet.
+**Neither `coverage` nor `standing_questions` is reserved any more.** `coverage` declares the institutions the beat tracks — see "Institutional activity" below. `standing_questions` declares the agenda it reports against — see "Standing questions" below.
 
 **Run recording.** `beats` holds one row per subject; `beat_runs` holds one row per brief run, carrying the `analysis_run_id`, the `synthesis_id`, the article count and the number of feeds the beat resolved to. A run is attributed in the same transaction that stores its synthesis, so a stored synthesis is either attributed or does not exist.
 
@@ -137,6 +139,50 @@ What stays **global**, deliberately:
 - **Decisions, DecisionFactors and DecisionEvidence.** A standing decision belongs to the user, not to a subject; the point of routing beat coverage into it is that a compliance development can move the user's career-timing factor. Scoping the decision journal per beat would break exactly the connection it exists to make.
 - **TopicClusters and NarrativeFrames.** A frame is a structural property of coverage, not of a subject. The same "national-security framing" appears in both the compliance beat and the general brief, and it is the same frame. Splitting the glossary per beat would fragment the frame vocabulary and weaken the `diet` signals, which depend on comparing feeds across the whole corpus.
 - **Article content filtering.** Stage 3 still filters articles against the person profile's `excluded_topics` before a beat brief selects from what remains. A beat scopes which *sources* are read, not who the brief is for.
+
+### Standing questions: the agenda a beat declares
+
+A brief is a delta against a standing intelligence agenda, not a summary of events. Emergent Questions give half of that: the graph notices what coverage leaves unresolved. `standing_questions` gives the other half — the human writes down what the beat is watching, and the beat carries it **whether or not any given run's coverage mentions it**.
+
+```json
+"standing_questions": [
+  "Does CMMC Phase 2 slip past its statutory date?",
+  "Which CSPs move to FedRAMP authorized, and at which impact level?"
+]
+```
+
+A list of strings, in the human's own agenda order. Duplicates are refused rather than deduplicated: two identical declarations mean the author lost track of the agenda, and collapsing them would hide that.
+
+**Seeding.** On the beat's first run each declaration becomes a real `Question` row, joined to the beat through `beat_standing_questions`. Seeding is idempotent by normalized text, and it happens at beat registration — before any coverage is read — because a declared question exists because a human declared it, not because an article mentioned it. If the beat is already raising that exact question emergently, the existing Question is *adopted* rather than duplicated, so its accumulated history survives the declaration.
+
+**Nothing is auto-retired.** Removing a question from the config stops it being declared; it does not close the Question. Closing one is editorial, and it stays a manual `questions resolve`.
+
+**Why a join table and not a `beat_id` column.** The derivation rule above places a Question by the runs it appeared in. A declared question can exist before — and without ever — appearing in a synthesis, so `beat_runs` alone cannot place it, and it would fall into the default scope and collide with the person brief's ledger. `beat_standing_questions` is a beat table in the same sense `beat_runs` is: the graph tables still carry no `beat_id`, and a beat's scope is still derived from a join.
+
+**A tighter binding threshold than emergent questions get.** Seeded questions enter the same matcher, so a run's coverage can bind to one. But a declared question is written before any coverage exists and is typically broad, and broad text is exactly what a similarity matcher over-matches. Binding one to unrelated coverage is worse than missing a real match, because a standing question that falsely reads "moved" destroys the only thing the agenda is for. So for declared questions the Haiku matcher's answer is treated as a *proposal*: it stands only if the proposed text also shares at least 60% of the shorter question's subject vocabulary (`STANDING_BINDING_MIN_OVERLAP`). A refused bind is not a failure — the proposed question becomes a new emergent Question and the standing question is reported unmoved, which is the honest answer when the coverage was about something else. Emergent matching is unchanged.
+
+**In the brief.** Every run reports movement against every declared question, in a `STANDING AGENDA` section ahead of the situations:
+
+```
+  [MOVED] Does CMMC Phase 2 slip past its statutory date?
+    Q1 (declared 2026-08-26, run 2)
+    Moved in: Situation 1: DoD signals CMMC Phase 2 timeline pressure[3]
+    Watching for: A DFARS class deviation naming CMMC Phase 2 -- published before the statutory date
+
+  [NO MOVEMENT] Which CSPs move to FedRAMP authorized, and at which impact level?
+    Q2 (declared 2026-08-26, never moved)
+    No coverage this run bore on this question, and none ever has.
+```
+
+The second entry is the point. **"No movement on CMMC Phase 2 this week" is itself information**, so a standing question with no coverage this run is reported as unmoved rather than filtered out as an empty section. That is the single failure mode this feature exists to prevent, and no layer — builder, stored payload, or renderer — is allowed to drop a quiet entry.
+
+The agenda is computed when the synthesis is stored, not when it is rendered, and lands in `synthesis_data.metadata.standing_agenda`. So `--from-run` replays the same agenda the live run reported, and no renderer needs database access.
+
+Standing questions need their own additive migration:
+
+```bash
+python -m src.database.migrations.add_standing_questions   # or: insightweaver brief setup
+```
 
 ### Reading the graph back out: `questions`, `predictions`, `forecast`
 
@@ -208,17 +254,17 @@ Each RSSFeed carries derived **calibration signals**, computed on demand from Ar
 
 ## How a daily brief flows through the graph
 
-With `--beat`, step 0 is registering the beat and resolving its sources; every graph read and write below is then confined to that beat's scope, and step 8 also writes the `beat_runs` row. Without `--beat` the run operates in the default scope, which on a database with no beat runs is the whole graph.
+With `--beat`, step 0 is registering the beat, seeding the standing questions it declares, and resolving its sources; every graph read and write below is then confined to that beat's scope, and step 8 also writes the `beat_runs` row. Without `--beat` the run operates in the default scope, which on a database with no beat runs is the whole graph.
 
 0. **Coverage pass** (beats with a `coverage` block only) — the run's items are matched against the beat's declared institutions and read against their trailing averages. Deterministic, no model call.
 1. **Prediction check** — open Predictions are graded against today's coverage. Resolutions written to the ledger.
 2. **Pass 1** — articles clustered into topic groups.
 3. **Pass 2** — each cluster gets a situation analysis (with frame-aware prompting if known frames exist) and its articles get tagged into ArticleFrame.
 4. **Pass 3** — cross-cluster reconciliation looks for meta-fractures.
-5. **Question matching** — situation `unresolved_questions` matched against the open Question graph; new Questions created or existing ones bound.
+5. **Question matching** — situation `unresolved_questions` matched against the open Question graph; new Questions created or existing ones bound. With `--beat`, this is also where the beat's declared standing questions can be bound, on the tighter threshold, and where the standing-agenda review is computed — including every declared question that did *not* move.
 6. **Prediction creation** — situation `what_to_watch` observables become new open Predictions keyed to the matched Questions.
 7. **Decision routing** — situations matched against open DecisionFactors; Evidence rows written for genuine connections.
-8. **Render** — the brief renders, surfacing question identity, the prediction-check summary, the decision routing, and any meta-fractures.
+8. **Render** — the brief renders, surfacing question identity, the prediction-check summary, the decision routing, the standing agenda and the institutional activity (both for a beat), and any meta-fractures.
 
 After this loop runs, the graph has accumulated:
 - new Questions or returning ones marked with appearance counts

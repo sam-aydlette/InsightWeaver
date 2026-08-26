@@ -130,3 +130,24 @@ class TestStoredBriefNotFound:
     def test_is_a_lookup_error(self):
         with pytest.raises(LookupError):
             raise StoredBriefNotFound(1, [])
+
+
+class TestStandingAgendaView:
+    """The named view the renderers read the declared agenda through."""
+
+    def test_absent_by_default(self, brief_document):
+        assert brief_document.standing_agenda == []
+
+    def test_carries_every_entry_including_unmoved(self, beat_document):
+        agenda = beat_document.standing_agenda
+        assert len(agenda) == 3
+        assert [entry["moved"] for entry in agenda] == [True, False, False]
+
+    def test_survives_a_payload_round_trip(self, beat_document):
+        """This is what makes --from-run replay the same agenda the run reported."""
+        replayed = BriefDocument.from_synthesis_data(beat_document.synthesis_data)
+        assert replayed.standing_agenda == beat_document.standing_agenda
+
+    def test_ignores_a_malformed_payload(self, brief_document):
+        doc = BriefDocument.from_synthesis_data({"metadata": {"standing_agenda": "not a list"}})
+        assert doc.standing_agenda == []

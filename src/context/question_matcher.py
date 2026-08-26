@@ -20,7 +20,7 @@ from ..database.models import (
 from ..prompts.questions import QUESTION_MATCHING_PROMPT
 from ..utils import utcnow
 from ._json import parse_claude_json
-from .beat_scope import question_scope_filter
+from .beat_scope import declared_standing_question_ids, question_scope_filter
 from .claude_client import ClaudeClient
 
 logger = logging.getLogger(__name__)
@@ -28,6 +28,41 @@ logger = logging.getLogger(__name__)
 MATCHER_MODEL = "claude-haiku-4-5-20251001"
 OPEN_QUESTION_LIMIT = 100
 MATCHER_MAX_TOKENS = 2048
+
+# How much subject vocabulary a proposed question must share with a *declared*
+# standing question before the matcher will bind them (added 2026-08-26,
+# backlog task 007).
+#
+# Emergent questions are matched on the LLM's judgement alone, and that stays
+# exactly as it was. A declared question is different in kind: it was written
+# by a human before any coverage existed, it is typically broad ("Which CSPs
+# move to FedRAMP authorized?"), and broad text is what a similarity matcher
+# over-matches. Binding it to unrelated coverage is worse than missing a real
+# match, because a standing question that falsely reads "moved" destroys the
+# one thing the agenda is for -- so the LLM's answer is treated as a proposal
+# and this lexical gate has a veto over it.
+#
+# Measured as overlap against the *shorter* question's content tokens rather
+# than Jaccard: the two texts are routinely different lengths (a declared
+# question is terser than a question drawn out of a week's coverage), and
+# Jaccard penalises that length difference rather than the topic drift the
+# gate is actually trying to catch.
+STANDING_BINDING_MIN_OVERLAP = 0.6
+
+# Function words carry no subject, so they would inflate every overlap score.
+# fmt: off
+_STOPWORDS = frozenset(
+    [
+        "a", "an", "and", "any", "are", "as", "at", "be", "been", "being", "but", "by", "can",
+        "could", "did", "do", "does", "doing", "for", "from", "had", "has", "have", "how", "i",
+        "if", "in", "into", "is", "it", "its", "may", "might", "must", "of", "on", "or",
+        "over", "should", "so", "some", "such", "than", "that", "the", "their", "them", "then",
+        "there", "these", "they", "this", "those", "to", "under", "up", "was", "were", "what",
+        "when", "where", "whether", "which", "while", "who", "whom", "why", "will", "with",
+        "within", "would", "you", "your",
+    ]
+)
+# fmt: on
 
 
 _PUNCT = re.compile(r"[^\w\s]+")
@@ -41,6 +76,40 @@ def normalize_question(text: str) -> str:
     folded = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode("ascii")
     stripped = _PUNCT.sub(" ", folded.lower())
     return _WHITESPACE.sub(" ", stripped).strip()
+
+
+def content_tokens(text: str) -> set[str]:
+    """
+    The subject-bearing words of a question: normalized, stopwords removed,
+    trailing plural ``s`` folded.
+
+    The plural fold is naive on purpose -- it is not stemming, it just stops
+    "deadline inside 90 days" and "a 90-day deadline" from reading as different
+    subjects. Both sides of a comparison go through it, so it can only merge
+    tokens, never invent an overlap that the words do not support.
+    """
+    tokens = set()
+    for token in normalize_question(text).split():
+        if token in _STOPWORDS:
+            continue
+        if len(token) > 3 and token.endswith("s") and not token.endswith("ss"):
+            token = token[:-1]
+        tokens.add(token)
+    return tokens
+
+
+def binding_overlap(proposed: str, candidate: str) -> float:
+    """
+    How much subject vocabulary two questions share, from 0.0 to 1.0.
+
+    The overlap coefficient: shared content tokens over the size of the smaller
+    token set. Returns 0.0 when either question has no content tokens at all,
+    which refuses the bind rather than guessing at it.
+    """
+    left, right = content_tokens(proposed), content_tokens(candidate)
+    if not left or not right:
+        return 0.0
+    return len(left & right) / min(len(left), len(right))
 
 
 @dataclass
@@ -74,11 +143,16 @@ class QuestionMatcher:
         run only ever binds to questions no beat has claimed. Without any beat
         runs on record the scope is the whole graph, i.e. the behaviour that
         predates beats.
+
+        Declared standing questions live in the same scope and enter the same
+        matcher, but bind on a tighter rule -- see
+        :data:`STANDING_BINDING_MIN_OVERLAP`. Emergent questions are unaffected.
         """
         if not proposed:
             return []
 
         scope = question_scope_filter(session, beat_id)
+        standing_ids = declared_standing_question_ids(session, beat_id)
         normalized = [normalize_question(p.text) for p in proposed]
         resolved: list[Question | None] = [None] * len(proposed)
 
@@ -116,7 +190,9 @@ class QuestionMatcher:
                     matched_id = llm_matches.get(slot)
                     if matched_id is not None:
                         matched = next((q for q in open_questions if q.id == matched_id), None)
-                        if matched:
+                        if matched and self._binding_allowed(
+                            proposed[original_idx].text, matched, standing_ids
+                        ):
                             resolved[original_idx] = matched
 
         previous_link: dict[int, int] = {}
@@ -155,6 +231,34 @@ class QuestionMatcher:
 
         session.flush()
         return resolved  # type: ignore[return-value]
+
+    @staticmethod
+    def _binding_allowed(proposed_text: str, matched: Question, standing_ids: set[int]) -> bool:
+        """
+        Whether an LLM-proposed match may stand.
+
+        Always yes for an emergent question -- that path is unchanged. For a
+        *declared* standing question the LLM's answer additionally has to clear
+        :data:`STANDING_BINDING_MIN_OVERLAP`, and a refused bind is not a
+        failure: the proposed question simply becomes a new emergent Question,
+        and the standing question is reported as unmoved, which is the honest
+        answer when the coverage was about something else.
+
+        Note the exact-normalized-text path above needs no gate: identical text
+        is already the tightest match there is.
+        """
+        if matched.id not in standing_ids:
+            return True
+
+        overlap = binding_overlap(proposed_text, matched.text)
+        if overlap >= STANDING_BINDING_MIN_OVERLAP:
+            return True
+
+        logger.info(
+            f"Refused to bind {proposed_text!r} to standing question Q{matched.id}: "
+            f"subject overlap {overlap:.2f} < {STANDING_BINDING_MIN_OVERLAP}"
+        )
+        return False
 
     async def _llm_match(
         self, proposed_texts: list[str], open_questions: list[Question]

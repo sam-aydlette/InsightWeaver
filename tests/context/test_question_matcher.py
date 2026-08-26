@@ -8,11 +8,16 @@ from datetime import datetime, timedelta
 
 import pytest
 
+from src.context.beat_scope import ensure_beat
 from src.context.question_matcher import (
+    STANDING_BINDING_MIN_OVERLAP,
     ProposedQuestion,
     QuestionMatcher,
+    binding_overlap,
+    content_tokens,
     normalize_question,
 )
+from src.context.standing_agenda import seed_standing_questions
 from src.context.synthesizer import NarrativeSynthesizer
 from src.database.models import (
     QUESTION_STATUS_OPEN,
@@ -172,6 +177,224 @@ class TestQuestionMatcher:
         # LLM failed; matcher fell back to creating a new question.
         assert result[0].id != existing.id
         assert result[0].text.startswith("Does the Fed pivot")
+
+
+class TestBindingOverlap:
+    """The lexical gate that declared standing questions bind through."""
+
+    def test_content_tokens_drop_function_words(self):
+        assert content_tokens("Does CMMC Phase 2 slip past its statutory date?") == {
+            "cmmc",
+            "phase",
+            "2",
+            "slip",
+            "past",
+            "statutory",
+            "date",
+        }
+
+    def test_identical_questions_score_one(self):
+        assert binding_overlap("Will CMMC Phase 2 slip?", "Will CMMC Phase 2 slip?") == 1.0
+
+    def test_restatement_clears_the_threshold(self):
+        score = binding_overlap(
+            "Will DoD let CMMC Phase 2 slip past the statutory date?",
+            "Does CMMC Phase 2 slip past its statutory date?",
+        )
+        assert score >= STANDING_BINDING_MIN_OVERLAP
+
+    def test_unrelated_compliance_question_does_not(self):
+        score = binding_overlap(
+            "Does the new CISA directive create a 90-day patching obligation?",
+            "Which CSPs move to FedRAMP authorized, and at which impact level?",
+        )
+        assert score < STANDING_BINDING_MIN_OVERLAP
+
+    def test_adjacent_but_different_subject_does_not(self):
+        """Same domain, different question -- the case the gate exists for."""
+        score = binding_overlap(
+            "Which agencies missed the FedRAMP continuous monitoring deadline?",
+            "Does CMMC Phase 2 slip past its statutory date?",
+        )
+        assert score < STANDING_BINDING_MIN_OVERLAP
+
+    def test_empty_text_refuses_to_bind(self):
+        assert binding_overlap("", "Does CMMC Phase 2 slip?") == 0.0
+        assert binding_overlap("Does it?", "Does CMMC Phase 2 slip?") == 0.0
+
+    def test_plural_fold_keeps_a_real_restatement_bindable(self):
+        """ "deadline inside 90 days" and "a 90-day deadline" are one subject."""
+        assert (
+            binding_overlap(
+                "Does the new CISA directive create a 90-day patching obligation?",
+                "Does any CISA BOD create a compliance obligation with a deadline inside 90 days?",
+            )
+            >= STANDING_BINDING_MIN_OVERLAP
+        )
+
+    @pytest.mark.parametrize(
+        "proposed",
+        [
+            "Will the shutdown delay agency budget appropriations?",
+            "Which agencies missed the FedRAMP continuous monitoring deadline?",
+            "Does the GSA schedule consolidation change small-business set-asides?",
+        ],
+    )
+    def test_shipped_agenda_refuses_unrelated_coverage(self, proposed):
+        """
+        Measured against the agenda the compliance beat actually declares, so
+        this catches a threshold change that would start over-binding it.
+        """
+        from src.config.beats import load_beat
+
+        declared = load_beat("us-public-sector-compliance").standing_questions
+        assert declared
+        best = max(binding_overlap(proposed, text) for text in declared)
+        assert best < STANDING_BINDING_MIN_OVERLAP, f"would bind to a standing question: {best}"
+
+    @pytest.mark.parametrize(
+        "proposed",
+        [
+            "Will DoD let CMMC Phase 2 slip past the statutory date?",
+            "How does TX-RAMP diverge from FedRAMP for a multi-state CSP?",
+        ],
+    )
+    def test_shipped_agenda_accepts_genuine_restatements(self, proposed):
+        from src.config.beats import load_beat
+
+        declared = load_beat("us-public-sector-compliance").standing_questions
+        best = max(binding_overlap(proposed, text) for text in declared)
+        assert best >= STANDING_BINDING_MIN_OVERLAP
+
+    def test_known_limitation_abbreviation_is_not_bridged(self):
+        """
+        Documented, not fixed: a lexical gate cannot expand "CSPs" into "cloud
+        service providers". The consequence is a *conservative* miss -- the
+        coverage becomes its own emergent Question and the standing question
+        reports unmoved -- which is the failure direction this gate prefers.
+        Bridging it needs a synonym table, which is a separate decision.
+        """
+        assert (
+            binding_overlap(
+                "Which cloud service providers reached FedRAMP High authorization?",
+                "Which CSPs move to FedRAMP authorized, and at which impact level?",
+            )
+            < STANDING_BINDING_MIN_OVERLAP
+        )
+
+
+class TestStandingQuestionBinding:
+    """
+    A declared standing question enters the same matcher as an emergent one,
+    but the LLM's answer only stands if it also clears the lexical gate.
+    """
+
+    @pytest.fixture
+    def matcher(self, mock_claude_client):
+        return QuestionMatcher(client=mock_claude_client)
+
+    @staticmethod
+    def _beat_with_standing(session, text):
+        from tests.context.test_beat_scope import make_beat_config
+
+        beat_id = ensure_beat(session, make_beat_config("compliance"))
+        session.flush()
+        seeded = seed_standing_questions(session, beat_id, (text,))
+        session.commit()
+        return beat_id, seeded[0]
+
+    @pytest.mark.asyncio
+    async def test_spurious_llm_match_is_refused(self, matcher, test_session, mock_claude_client):
+        beat_id, standing = self._beat_with_standing(
+            test_session, "Which CSPs move to FedRAMP authorized, and at which impact level?"
+        )
+        # The matcher is told, wrongly, that unrelated coverage is this question.
+        mock_claude_client.analyze.return_value = json.dumps(
+            {"matches": [{"proposed_index": 0, "matched_id": standing.id, "reasoning": "same"}]}
+        )
+
+        proposed = [
+            ProposedQuestion(
+                "Does the new CISA directive create a 90-day patching obligation?", True
+            )
+        ]
+        result = await matcher.resolve_questions(proposed, test_session, beat_id=beat_id)
+        test_session.commit()
+
+        assert result[0].id != standing.id, "declared question was bound to unrelated coverage"
+        assert result[0].text.startswith("Does the new CISA directive")
+
+    @pytest.mark.asyncio
+    async def test_genuine_restatement_still_binds(self, matcher, test_session, mock_claude_client):
+        beat_id, standing = self._beat_with_standing(
+            test_session, "Does CMMC Phase 2 slip past its statutory date?"
+        )
+        mock_claude_client.analyze.return_value = json.dumps(
+            {"matches": [{"proposed_index": 0, "matched_id": standing.id, "reasoning": "same"}]}
+        )
+
+        proposed = [
+            ProposedQuestion("Will DoD let CMMC Phase 2 slip past the statutory date?", True)
+        ]
+        result = await matcher.resolve_questions(proposed, test_session, beat_id=beat_id)
+        test_session.commit()
+
+        assert result[0].id == standing.id
+
+    @pytest.mark.asyncio
+    async def test_exact_restatement_binds_without_the_llm(
+        self, matcher, test_session, mock_claude_client
+    ):
+        """Identical text is already the tightest match there is."""
+        text = "Does CMMC Phase 2 slip past its statutory date?"
+        beat_id, standing = self._beat_with_standing(test_session, text)
+
+        result = await matcher.resolve_questions(
+            [ProposedQuestion(text, True)], test_session, beat_id=beat_id
+        )
+        test_session.commit()
+
+        assert result[0].id == standing.id
+        mock_claude_client.analyze.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_emergent_questions_keep_the_looser_rule(
+        self, matcher, test_session, mock_claude_client
+    ):
+        """
+        The same low-overlap pair that is refused for a declared question is
+        still accepted for an emergent one. That contrast is the feature.
+        """
+        from tests.context.test_beat_scope import make_beat_config
+
+        ensure_beat(test_session, make_beat_config("compliance"))
+        emergent = Question(
+            text="Which CSPs move to FedRAMP authorized, and at which impact level?",
+            normalized_text=("which csps move to fedramp authorized and at which impact level"),
+            status=QUESTION_STATUS_OPEN,
+        )
+        test_session.add(emergent)
+        test_session.commit()
+
+        assert (
+            binding_overlap(
+                "Does the new CISA directive create a 90-day patching obligation?", emergent.text
+            )
+            < STANDING_BINDING_MIN_OVERLAP
+        )
+
+        mock_claude_client.analyze.return_value = json.dumps(
+            {"matches": [{"proposed_index": 0, "matched_id": emergent.id, "reasoning": "same"}]}
+        )
+        proposed = [
+            ProposedQuestion(
+                "Does the new CISA directive create a 90-day patching obligation?", True
+            )
+        ]
+        result = await matcher.resolve_questions(proposed, test_session)
+        test_session.commit()
+
+        assert result[0].id == emergent.id
 
 
 class TestSynthesizerCollectAndEnrich:

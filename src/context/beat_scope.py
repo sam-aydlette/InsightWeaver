@@ -24,11 +24,18 @@ from __future__ import annotations
 
 import logging
 
-from sqlalchemy import func, inspect, select, true
+from sqlalchemy import and_, func, inspect, or_, select, true
 from sqlalchemy.orm import Session
 
 from ..config.beats import BeatConfig
-from ..database.models import Beat, BeatRun, Prediction, Question, QuestionSituation
+from ..database.models import (
+    Beat,
+    BeatRun,
+    BeatStandingQuestion,
+    Prediction,
+    Question,
+    QuestionSituation,
+)
 from ..utils import utcnow
 
 logger = logging.getLogger(__name__)
@@ -48,27 +55,40 @@ class BeatNotRecorded(LookupError):
         super().__init__(f"No beat named '{name}' has recorded a run. Beats with runs: {available}")
 
 
+# Which migration creates each beat table, for the "you have not migrated"
+# message. beat_standing_questions arrived later than the other two (2026-08-26,
+# backlog task 007), so a database can legitimately have one and not the other.
+_BEAT_TABLE_MIGRATIONS = {
+    Beat.__tablename__: "add_beats",
+    BeatRun.__tablename__: "add_beats",
+    BeatStandingQuestion.__tablename__: "add_standing_questions",
+}
+
+
 def require_beat_tables(bind) -> None:
     """
     Fail if this database has no beats at all.
 
     On the write side: without ``beats``/``beat_runs`` a run would have nowhere
     to be attributed, and an unattributed beat run is indistinguishable from
-    the default brief -- so it must not start. On the read side: there is no
-    beat ledger to show, and an empty listing would read as "this beat has
-    nothing", which is a wrong answer rather than a missing one.
+    the default brief -- so it must not start. Without
+    ``beat_standing_questions`` a declared agenda would have nowhere to be
+    recorded, and a standing question that cannot be recorded must not be
+    silently skipped -- that is the failure this feature exists to prevent. On
+    the read side: there is no beat ledger to show, and an empty listing would
+    read as "this beat has nothing", which is a wrong answer rather than a
+    missing one.
     """
     inspector = inspect(bind)
-    missing = [
-        name
-        for name in (Beat.__tablename__, BeatRun.__tablename__)
-        if not inspector.has_table(name)
-    ]
+    missing = [name for name in _BEAT_TABLE_MIGRATIONS if not inspector.has_table(name)]
     if missing:
+        migrations = sorted({_BEAT_TABLE_MIGRATIONS[name] for name in missing})
+        commands = " and ".join(
+            f"'python -m src.database.migrations.{module}'" for module in migrations
+        )
         raise BeatTablesMissing(
-            f"This database has no {' or '.join(missing)} table, so it holds no beats "
-            f"yet. Run 'python -m src.database.migrations.add_beats' "
-            f"(or 'insightweaver brief setup') once, then retry."
+            f"This database has no {' or '.join(missing)} table, so it cannot record "
+            f"beats yet. Run {commands} (or 'insightweaver brief setup') once, then retry."
         )
 
 
@@ -96,7 +116,7 @@ def ensure_beat(session: Session, config: BeatConfig) -> int:
     return int(row.id)
 
 
-def _beat_synthesis_ids(beat_id: int):
+def beat_synthesis_ids(beat_id: int):
     """Select of every synthesis id attributed to one beat."""
     return select(BeatRun.synthesis_id).where(
         BeatRun.beat_id == beat_id,
@@ -126,28 +146,71 @@ def _beat_runs_recorded(session: Session) -> bool:
     return inspect(session.get_bind()).has_table(BeatRun.__tablename__)
 
 
+def _standing_questions_recorded(session: Session) -> bool:
+    """
+    Whether this database can hold declared standing questions.
+
+    Same reasoning as :func:`_beat_runs_recorded`: a database that predates
+    backlog task 007 has no ``beat_standing_questions`` table, and "the table
+    does not exist" and "the table is empty" are the same statement -- no beat
+    has declared anything.
+    """
+    return inspect(session.get_bind()).has_table(BeatStandingQuestion.__tablename__)
+
+
 def question_scope_filter(session: Session, beat_id: int | None):
     """
     A criterion restricting a ``Question`` query to one scope.
 
+    A question is in a beat's scope when it appeared in one of that beat's
+    syntheses **or** when that beat declared it as a standing question. The
+    second clause is what keeps a declared question that no coverage has yet
+    touched inside the beat rather than in the default scope: it has no
+    situation links to derive a beat from, so without it the person brief's
+    matcher could bind to a compliance beat's agenda item.
+
     ``beat_id=None`` yields the default scope: questions that have never
-    appeared in any beat's synthesis. A question with no situation links at all
-    (one created earlier in this same transaction) is in the default scope,
-    which is harmless because such a question is not a match candidate anyway.
+    appeared in any beat's synthesis and that no beat has declared. A question
+    with no links at all (one created earlier in this same transaction) is in
+    the default scope, which is harmless because such a question is not a match
+    candidate anyway.
     """
-    if beat_id is None and not _beat_runs_recorded(session):
+    runs_possible = _beat_runs_recorded(session)
+    standing_possible = _standing_questions_recorded(session)
+
+    if beat_id is None and not runs_possible and not standing_possible:
         return true()
 
-    linked_to_beat = select(QuestionSituation.question_id).where(
-        QuestionSituation.synthesis_id.in_(_any_beat_synthesis_ids())
-    )
     if beat_id is None:
-        return Question.id.not_in(linked_to_beat)
+        excluded = []
+        if runs_possible:
+            excluded.append(
+                Question.id.not_in(
+                    select(QuestionSituation.question_id).where(
+                        QuestionSituation.synthesis_id.in_(_any_beat_synthesis_ids())
+                    )
+                )
+            )
+        if standing_possible:
+            excluded.append(Question.id.not_in(select(BeatStandingQuestion.question_id)))
+        return and_(*excluded)
 
-    linked_to_this_beat = select(QuestionSituation.question_id).where(
-        QuestionSituation.synthesis_id.in_(_beat_synthesis_ids(beat_id))
-    )
-    return Question.id.in_(linked_to_this_beat)
+    included = [
+        Question.id.in_(
+            select(QuestionSituation.question_id).where(
+                QuestionSituation.synthesis_id.in_(beat_synthesis_ids(beat_id))
+            )
+        )
+    ]
+    if standing_possible:
+        included.append(
+            Question.id.in_(
+                select(BeatStandingQuestion.question_id).where(
+                    BeatStandingQuestion.beat_id == beat_id
+                )
+            )
+        )
+    return or_(*included)
 
 
 def prediction_scope_filter(session: Session, beat_id: int | None):
@@ -184,7 +247,7 @@ def scoped_appearance_count(session: Session, question_id: int | None, beat_id: 
         if _beat_runs_recorded(session):
             stmt = stmt.where(QuestionSituation.synthesis_id.not_in(_any_beat_synthesis_ids()))
     else:
-        stmt = stmt.where(QuestionSituation.synthesis_id.in_(_beat_synthesis_ids(beat_id)))
+        stmt = stmt.where(QuestionSituation.synthesis_id.in_(beat_synthesis_ids(beat_id)))
 
     return int(session.execute(stmt).scalar() or 0)
 
@@ -206,23 +269,57 @@ def beat_id_by_name(session: Session, name: str) -> int:
     return int(row.id)
 
 
-def owning_beat_names(session: Session, question_id: int | None) -> list[str]:
+def declared_standing_question_ids(session: Session, beat_id: int | None) -> set[int]:
     """
-    Which beats, if any, a question has appeared under.
+    The Question ids one beat has declared as standing questions.
 
-    Used by the id-addressed commands to disclose the scope a row belongs to.
-    An empty list means the question belongs to the default scope.
+    ``beat_id=None`` returns an empty set: the default brief is a person, not a
+    subject, and only a beat can declare an agenda.
     """
-    if question_id is None or not _beat_runs_recorded(session):
-        return []
+    if beat_id is None or not _standing_questions_recorded(session):
+        return set()
 
     rows = (
-        session.query(Beat.name)
-        .join(BeatRun, BeatRun.beat_id == Beat.id)
-        .join(QuestionSituation, QuestionSituation.synthesis_id == BeatRun.synthesis_id)
-        .filter(QuestionSituation.question_id == question_id)
-        .distinct()
-        .order_by(Beat.name)
+        session.query(BeatStandingQuestion.question_id)
+        .filter(BeatStandingQuestion.beat_id == beat_id)
         .all()
     )
-    return [entry[0] for entry in rows]
+    return {int(entry[0]) for entry in rows}
+
+
+def owning_beat_names(session: Session, question_id: int | None) -> list[str]:
+    """
+    Which beats, if any, a question has appeared under or been declared by.
+
+    Used by the id-addressed commands to disclose the scope a row belongs to.
+    An empty list means the question belongs to the default scope. A declared
+    standing question that has never moved still names its beat here, because
+    it belongs to that ledger from the moment it is declared.
+    """
+    if question_id is None:
+        return []
+
+    names: set[str] = set()
+
+    if _beat_runs_recorded(session):
+        appeared = (
+            session.query(Beat.name)
+            .join(BeatRun, BeatRun.beat_id == Beat.id)
+            .join(QuestionSituation, QuestionSituation.synthesis_id == BeatRun.synthesis_id)
+            .filter(QuestionSituation.question_id == question_id)
+            .distinct()
+            .all()
+        )
+        names.update(entry[0] for entry in appeared)
+
+    if _standing_questions_recorded(session):
+        declared = (
+            session.query(Beat.name)
+            .join(BeatStandingQuestion, BeatStandingQuestion.beat_id == Beat.id)
+            .filter(BeatStandingQuestion.question_id == question_id)
+            .distinct()
+            .all()
+        )
+        names.update(entry[0] for entry in declared)
+
+    return sorted(names)

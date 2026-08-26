@@ -102,11 +102,12 @@ class TestLoadingAValidBeat:
         assert beat.standing_questions == ()
         assert beat.channels == ("terminal",)
 
-    def test_coverage_round_trips_and_standing_questions_stay_reserved(self, beats_dir):
+    def test_coverage_and_standing_questions_both_round_trip(self, beats_dir):
         """
-        ``coverage`` is now read (task 006) and also round-trips verbatim, so
-        nothing downstream has to reconstruct the file. ``standing_questions``
-        is still validated for shape only -- task 007 owns it.
+        Neither block is reserved any more. ``coverage`` is read by task 006
+        and round-trips verbatim, so nothing downstream has to reconstruct the
+        file; ``standing_questions`` is read by task 007 as the beat's declared
+        agenda. This pins that loading one does not disturb the other.
         """
         write_beat(
             beats_dir,
@@ -122,6 +123,24 @@ class TestLoadingAValidBeat:
 
         assert beat.coverage == {"orgs": ["CISA"]}
         assert beat.standing_questions == ("Will the rule land?",)
+
+    def test_standing_questions_keep_declaration_order(self, beats_dir):
+        """Order is the human's agenda order, and the brief reports it that way."""
+        declared = [
+            "Does CMMC Phase 2 slip past its statutory date?",
+            "Which CSPs move to FedRAMP authorized?",
+            "Does any CISA BOD create an obligation inside 90 days?",
+        ]
+        write_beat(beats_dir, "ordered", valid_payload("ordered", standing_questions=declared))
+
+        assert load_beat("ordered", beats_dir).standing_questions == tuple(declared)
+
+    def test_standing_questions_are_stripped(self, beats_dir):
+        write_beat(
+            beats_dir, "spacey", valid_payload("spacey", standing_questions=["  Will it?  "])
+        )
+
+        assert load_beat("spacey", beats_dir).standing_questions == ("Will it?",)
 
     def test_available_beats_lists_files(self, beats_dir):
         write_beat(beats_dir, "b-beat", valid_payload("b-beat"))
@@ -241,6 +260,38 @@ class TestMalformedBeatFiles:
 
         with pytest.raises(BeatValidationError, match="'standing_questions' must be a list"):
             load_beat("badsq", beats_dir)
+
+    def test_standing_question_must_be_a_non_empty_string(self, beats_dir):
+        write_beat(beats_dir, "blanksq", valid_payload("blanksq", standing_questions=["  "]))
+
+        with pytest.raises(
+            BeatValidationError, match=r"standing_questions\[0\] must be a non-empty"
+        ):
+            load_beat("blanksq", beats_dir)
+
+    def test_standing_question_must_not_be_an_object(self, beats_dir):
+        write_beat(
+            beats_dir, "objsq", valid_payload("objsq", standing_questions=[{"question": "x"}])
+        )
+
+        with pytest.raises(
+            BeatValidationError, match=r"standing_questions\[0\] must be a non-empty"
+        ):
+            load_beat("objsq", beats_dir)
+
+    def test_duplicate_standing_questions_are_refused(self, beats_dir):
+        """
+        Refused, not deduplicated: two identical declarations mean the author
+        lost track of the agenda, and collapsing them would hide that.
+        """
+        write_beat(
+            beats_dir,
+            "dupsq",
+            valid_payload("dupsq", standing_questions=["Will it land?", "will it land?"]),
+        )
+
+        with pytest.raises(BeatValidationError, match="duplicates an earlier standing question"):
+            load_beat("dupsq", beats_dir)
 
     def test_unknown_channel(self, beats_dir):
         write_beat(beats_dir, "badchan", valid_payload("badchan", channels=["carrier-pigeon"]))

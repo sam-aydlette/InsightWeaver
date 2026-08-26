@@ -159,16 +159,18 @@ class BeatConfig:
 
     ``coverage`` is the raw block as written; ``entities`` is the same block
     parsed into :class:`CoverageEntity` values, which is what the institutional
-    activity pass reads. ``standing_questions`` is still reserved: it is
-    validated for shape so that backlog task 007 needs no schema migration, but
-    nothing reads it yet.
+    activity pass reads.
+
+    ``standing_questions`` are the questions this beat declares it is watching,
+    whether or not any given run's coverage mentions them. They are read by
+    ``src/context/standing_agenda.py`` (backlog task 007).
     """
 
     name: str
     description: str
     sources: tuple[BeatSource, ...]
     coverage: dict[str, Any]
-    standing_questions: tuple[Any, ...]
+    standing_questions: tuple[str, ...]
     channels: tuple[str, ...]
     config_path: str
     entities: tuple[CoverageEntity, ...] = ()
@@ -251,11 +253,7 @@ def load_beat(name: str, beats_dir: Path | str | None = None) -> BeatConfig:
         raise BeatValidationError(path, "'coverage' must be an object")
     entities = _parse_coverage(path, coverage)
 
-    standing_questions = raw.get("standing_questions", [])
-    if not isinstance(standing_questions, list):
-        raise BeatValidationError(
-            path, "'standing_questions' must be a list (reserved for task 007)"
-        )
+    standing_questions = _parse_standing_questions(path, raw.get("standing_questions", []))
 
     channels = _parse_channels(path, raw.get("channels", ["terminal"]))
 
@@ -404,6 +402,36 @@ def _parse_sources(path: Path, raw_sources: Any) -> tuple[BeatSource, ...]:
             )
         )
 
+    return tuple(parsed)
+
+
+def _parse_standing_questions(path: Path, raw_questions: Any) -> tuple[str, ...]:
+    """
+    Validate the ``standing_questions`` block into a tuple of question texts.
+
+    A standing question is declared by a human, deliberately (added 2026-08-26
+    for backlog task 007). This loader therefore never invents one and never
+    drops one it cannot parse. Duplicates are refused rather than silently
+    deduplicated: two identical declarations mean the author has lost track of
+    the agenda, and collapsing them would hide that.
+    """
+    if not isinstance(raw_questions, list):
+        raise BeatValidationError(path, "'standing_questions' must be a list of strings")
+
+    parsed: list[str] = []
+    seen: set[str] = set()
+    for index, entry in enumerate(raw_questions):
+        where = f"standing_questions[{index}]"
+        if not isinstance(entry, str) or not entry.strip():
+            raise BeatValidationError(path, f"{where} must be a non-empty string, got {entry!r}")
+        text = entry.strip()
+        key = text.casefold()
+        if key in seen:
+            raise BeatValidationError(
+                path, f"{where} duplicates an earlier standing question: {text!r}"
+            )
+        seen.add(key)
+        parsed.append(text)
     return tuple(parsed)
 
 

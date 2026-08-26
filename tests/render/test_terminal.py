@@ -162,3 +162,105 @@ class TestInstitutionalActivity:
     def test_is_deterministic(self, activity_document):
         renderer = TerminalRenderer()
         assert renderer.render(activity_document) == renderer.render(activity_document)
+
+
+class TestStandingAgenda:
+    """
+    The section that makes the brief a delta against a declared agenda.
+
+    Note what every one of these asserts: the quiet questions are present.
+    A renderer that dropped them would still pass every other test in this
+    file, which is why these exist (added 2026-08-26, backlog task 007).
+    """
+
+    def test_section_absent_without_a_declared_agenda(self, brief_document):
+        assert "STANDING AGENDA" not in strip_ansi(TerminalRenderer().render(brief_document))
+
+    def test_every_declared_question_appears(self, beat_document):
+        out = strip_ansi(TerminalRenderer().render(beat_document))
+        assert "STANDING AGENDA" in out
+        for entry in beat_document.standing_agenda:
+            assert entry["text"] in out
+
+    def test_moved_question_names_its_situation(self, beat_document):
+        out = strip_ansi(TerminalRenderer().render(beat_document))
+        assert "[MOVED] Does CMMC Phase 2 slip past its statutory date?" in out
+        assert "Moved in: Situation 1: Procurement rule change lands[1]" in out
+        assert "Q31 (declared 2026-05-02, run 4)" in out
+
+    def test_previously_moved_question_says_when_it_last_moved(self, beat_document):
+        out = strip_ansi(TerminalRenderer().render(beat_document))
+        assert "[NO MOVEMENT] Which CSPs move to FedRAMP authorized" in out
+        assert "No coverage this run bore on this question. Last moved 2026-05-08." in out
+        assert "Q32 (declared 2026-05-02, 2 prior run(s), last moved 2026-05-08)" in out
+
+    def test_never_moved_question_says_so_explicitly(self, beat_document):
+        out = strip_ansi(TerminalRenderer().render(beat_document))
+        assert "[NO MOVEMENT] Where do GovRAMP and TX-RAMP diverge" in out
+        assert "No coverage this run bore on this question, and none ever has." in out
+        assert "Q33 (declared 2026-05-02, never moved)" in out
+
+    def test_open_observable_is_shown(self, beat_document):
+        out = strip_ansi(TerminalRenderer().render(beat_document))
+        assert "Watching for: DFARS class deviation -- published before the statutory date" in out
+
+    def test_agenda_precedes_the_situations(self, beat_document):
+        out = strip_ansi(TerminalRenderer().render(beat_document))
+        assert out.index("STANDING AGENDA") < out.index("SITUATION 1:")
+
+    def test_is_deterministic(self, beat_document):
+        renderer = TerminalRenderer()
+        assert renderer.render(beat_document) == renderer.render(beat_document)
+
+
+class TestBeatSectionsCompose:
+    """
+    Both beat sections in one brief.
+
+    Tasks 006 and 007 extended the same render path from the same base. These
+    assert the merged behaviour neither task could have tested alone: both
+    sections present, in a fixed order, with nothing lost from either.
+    """
+
+    def test_both_sections_render(self, full_beat_document):
+        out = strip_ansi(TerminalRenderer().render(full_beat_document))
+        assert "STANDING AGENDA" in out
+        assert "INSTITUTIONAL ACTIVITY" in out
+
+    def test_standing_agenda_leads_and_activity_follows_the_situations(self, full_beat_document):
+        """
+        The declared agenda is what the beat committed to watching before any
+        coverage arrived, so it leads. The activity reading is a measurement
+        over the same items the situations are drawn from, so it follows them
+        as supporting evidence rather than as the agenda.
+        """
+        out = strip_ansi(TerminalRenderer().render(full_beat_document))
+        assert (
+            out.index("STANDING AGENDA")
+            < out.index("SITUATION 1:")
+            < out.index("INSTITUTIONAL ACTIVITY")
+            < out.index("THIN COVERAGE")
+        )
+
+    def test_neither_section_loses_its_quiet_entries(self, full_beat_document):
+        """
+        Both features exist to report absence. Rendering them together must not
+        drop either one's silent rows.
+        """
+        out = strip_ansi(TerminalRenderer().render(full_beat_document))
+        # 007: a standing question no coverage touched.
+        assert "No coverage this run bore on this question, and none ever has." in out
+        # 006: an office that has been active and said nothing this run.
+        assert "OMB appeared in 0 items this run" in out
+
+    def test_each_section_still_renders_alone(self, beat_document, activity_document):
+        agenda_only = strip_ansi(TerminalRenderer().render(beat_document))
+        activity_only = strip_ansi(TerminalRenderer().render(activity_document))
+        assert "STANDING AGENDA" in agenda_only
+        assert "INSTITUTIONAL ACTIVITY" not in agenda_only
+        assert "INSTITUTIONAL ACTIVITY" in activity_only
+        assert "STANDING AGENDA" not in activity_only
+
+    def test_is_deterministic(self, full_beat_document):
+        renderer = TerminalRenderer()
+        assert renderer.render(full_beat_document) == renderer.render(full_beat_document)

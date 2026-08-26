@@ -137,3 +137,34 @@ class TestInstitutionalActivity:
 
     def test_is_deterministic(self, activity_document):
         assert HTMLRenderer().render(activity_document) == HTMLRenderer().render(activity_document)
+
+
+class TestStandingAgendaHTML:
+    """Every declared question, moved or not, survives into the HTML copy."""
+
+    def test_section_absent_without_a_declared_agenda(self, brief_document):
+        assert "<h2>Standing agenda</h2>" not in HTMLRenderer().render(brief_document)
+
+    def test_every_declared_question_appears(self, beat_document):
+        out = HTMLRenderer().render(beat_document)
+        assert "<h2>Standing agenda</h2>" in out
+        assert "[MOVED] Does CMMC Phase 2 slip past its statutory date?" in out
+        assert "[NO MOVEMENT] Which CSPs move to FedRAMP authorized" in out
+        assert "[NO MOVEMENT] Where do GovRAMP and TX-RAMP diverge" in out
+
+    def test_never_moved_question_says_so_explicitly(self, beat_document):
+        out = HTMLRenderer().render(beat_document)
+        assert "No coverage this run bore on this question, and none ever has." in out
+
+
+class TestBeatSectionsComposeHTML:
+    def test_both_sections_render_in_order(self, full_beat_document):
+        out = HTMLRenderer().render(full_beat_document)
+        assert "<h2>Standing agenda</h2>" in out
+        assert "<h2>Institutional activity</h2>" in out
+        assert out.index("<h2>Standing agenda</h2>") < out.index("<h2>Institutional activity</h2>")
+
+    def test_neither_section_loses_its_quiet_entries(self, full_beat_document):
+        out = HTMLRenderer().render(full_beat_document)
+        assert "No coverage this run bore on this question, and none ever has." in out
+        assert "OMB appeared in 0 items this run" in out

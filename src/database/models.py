@@ -594,6 +594,43 @@ class BeatRun(Base):
     )
 
 
+class BeatStandingQuestion(Base):
+    """
+    A Question a beat *declared* it is watching, rather than one coverage raised.
+
+    Added 2026-08-26 for backlog task 007. This is a beat table, in the same
+    sense beat_runs is: the graph tables still carry no beat_id column, and a
+    beat's scope is still derived from a join rather than stamped on a row.
+    The join is needed because a declared question can exist before -- and
+    without ever -- appearing in a synthesis, so beat_runs alone cannot place
+    it. Without this row such a question would fall into the default scope and
+    collide with the person brief's ledger, which is exactly what the
+    derivation rule exists to prevent.
+
+    ``declared_text`` is the config file's wording, kept verbatim so an edit to
+    the beat file is visible as a difference rather than silently adopted;
+    ``questions.text`` is what the graph shows.
+    """
+
+    __tablename__ = "beat_standing_questions"
+
+    id = Column(Integer, primary_key=True)
+    beat_id = Column(Integer, ForeignKey("beats.id"), nullable=False)
+    question_id = Column(Integer, ForeignKey("questions.id"), nullable=False)
+
+    declared_text = Column(Text, nullable=False)
+    normalized_text = Column(Text, nullable=False)
+    declared_at = Column(DateTime, default=utcnow, nullable=False)
+
+    question = relationship("Question")
+
+    __table_args__ = (
+        Index("idx_bsq_beat", "beat_id"),
+        Index("idx_bsq_question", "question_id"),
+        UniqueConstraint("beat_id", "normalized_text", name="_beat_standing_question_uc"),
+    )
+
+
 # ============================================================================
 # Institutional activity
 # What a beat's declared institutions did this run, against what they usually

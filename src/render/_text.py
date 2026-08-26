@@ -163,6 +163,79 @@ def activity_footnote(block: dict) -> str:
     return f"{withheld} declared entities have never been mentioned and are not listed."
 
 
+def standing_agenda(metadata: dict) -> list[dict]:
+    """
+    Pull this beat's standing-agenda review out of synthesis metadata.
+
+    Returns every entry the run recorded, including the ones that did not move.
+    Renderers must not filter this list: an unmoved standing question is the
+    finding, and dropping it is the failure the standing agenda exists to
+    prevent (added 2026-08-26, backlog task 007).
+    """
+    agenda = metadata.get("standing_agenda")
+    if not isinstance(agenda, list):
+        return []
+    return [entry for entry in agenda if isinstance(entry, dict)]
+
+
+def standing_agenda_status(entry: dict) -> str:
+    """The short label for how one standing question moved: MOVED or NO MOVEMENT."""
+    return "MOVED" if entry.get("moved") else "NO MOVEMENT"
+
+
+def standing_agenda_provenance(entry: dict) -> str:
+    """
+    The identity line under a standing question: which Q it is, how many runs
+    of this beat have moved it, and when it last did.
+    """
+    parts = [f"Q{entry.get('question_id', '?')}"]
+    declared = entry.get("declared_at")
+    if declared:
+        parts.append(f"declared {declared}")
+
+    count = entry.get("appearance_count") or 0
+    if entry.get("moved"):
+        parts.append(f"run {count}")
+    elif count:
+        last = entry.get("last_moved_at")
+        parts.append(
+            f"{count} prior run(s), last moved {last}" if last else f"{count} prior run(s)"
+        )
+    else:
+        parts.append("never moved")
+
+    status = entry.get("status")
+    if status and status != "open":
+        parts.append(str(status))
+    return f"{parts[0]} ({', '.join(parts[1:])})" if len(parts) > 1 else parts[0]
+
+
+def standing_agenda_movement(entry: dict) -> list[str]:
+    """
+    What moved this standing question in this run, one line per situation.
+
+    Empty when nothing moved -- the caller says so explicitly rather than
+    rendering nothing.
+    """
+    lines: list[str] = []
+    for item in entry.get("moved_in") or []:
+        if not isinstance(item, dict):
+            continue
+        index = item.get("situation_index")
+        title = clean_citations(str(item.get("title") or "")).strip()
+        label = f"Situation {index}" if index is not None else "This run"
+        lines.append(f"{label}: {title}" if title else label)
+    return lines
+
+
+def standing_agenda_no_movement(entry: dict) -> str:
+    """The sentence shown when a standing question did not move this run."""
+    last = entry.get("last_moved_at")
+    if last:
+        return f"No coverage this run bore on this question. Last moved {last}."
+    return "No coverage this run bore on this question, and none ever has."
+
+
 def watch_items(futures: dict) -> list[str]:
     """Extract what_to_watch observables. Handles the list-of-objects shape
     and the legacy single-string shape."""

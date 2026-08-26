@@ -43,6 +43,7 @@ from .frame_manager import FrameManager
 from .institutional_activity import observe_activity, record_mentions
 from .prediction_tracker import PredictionTracker
 from .question_matcher import ProposedQuestion, QuestionMatcher
+from .standing_agenda import build_standing_agenda, seed_standing_questions
 
 logger = logging.getLogger(__name__)
 
@@ -524,6 +525,21 @@ class NarrativeSynthesizer:
                 else:
                     resolved = []
 
+                # Report movement against this beat's declared agenda. Computed
+                # here, before the synthesis row is built, so it is stored in
+                # the payload and replays identically under --from-run. Every
+                # declared question gets an entry whether or not it moved --
+                # "nothing moved on this" is the finding, not an empty section.
+                if self.beat_id is not None:
+                    synthesis_data.setdefault("metadata", {})["standing_agenda"] = (
+                        build_standing_agenda(
+                            session,
+                            self.beat_id,
+                            situations,
+                            self._question_movement(question_plan, resolved),
+                        )
+                    )
+
                 # Route situation evidence into open decision factors. Done
                 # before the synthesis row write so the routing summary lands
                 # in the stored synthesis_data blob.
@@ -652,15 +668,39 @@ class NarrativeSynthesizer:
     @staticmethod
     def _register_beat(beat: BeatConfig) -> int:
         """
-        Get or create this beat's ``beats`` row and return its id.
+        Get or create this beat's ``beats`` row and return its id, seeding the
+        standing questions it declares in the same transaction.
 
         Deliberately not caught: without a beat id the run cannot be scoped,
-        and an unscoped beat run would corrupt the default brief's graph.
+        and an unscoped beat run would corrupt the default brief's graph. The
+        seeding is here, before any coverage is read, because a declared
+        question exists because a human declared it -- not because an article
+        mentioned it.
         """
         with get_db() as session:
             beat_id = ensure_beat(session, beat)
+            seed_standing_questions(session, beat_id, beat.standing_questions)
             session.commit()
             return beat_id
+
+    @staticmethod
+    def _question_movement(
+        plan: list[tuple[int, str, ProposedQuestion]], resolved: list[Question]
+    ) -> dict[int, list[int]]:
+        """
+        Map each Question id this run bound to the situations that bound to it.
+
+        Keys are Question ids, values are zero-based situation indices. This is
+        the same binding the QuestionSituation rows record; it is read off the
+        plan rather than the database because the join rows need a synthesis id
+        that does not exist yet at this point in the transaction.
+        """
+        movement: dict[int, set[int]] = {}
+        for (sit_idx, _slot, _pq), question in zip(plan, resolved, strict=True):
+            # A set, not a list: one question can fill both the primary and a
+            # secondary slot of the same situation, and that is one movement.
+            movement.setdefault(int(question.id), set()).add(sit_idx)
+        return {question_id: sorted(indices) for question_id, indices in movement.items()}
 
     def _observe_institutional_activity(self, articles: list[dict]) -> dict | None:
         """

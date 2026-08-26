@@ -12,6 +12,9 @@ import pytest
 
 from src.render.document import BriefDocument
 
+# Annotated because the renderers take an untyped synthesis payload: without
+# it mypy infers a narrow value type from the literal and rejects reusing the
+# fixture to build a variant (added 2026-08-26).
 SYNTHESIS_DATA: dict[str, Any] = {
     "situations": [
         {
@@ -222,4 +225,93 @@ def hostile_document() -> BriefDocument:
             ],
             "metadata": {"articles_analyzed": 1},
         }
+    )
+
+
+# A realistic standing agenda for a compliance beat: one question the week's
+# coverage moved, one that has moved before but not this run, and one that has
+# never moved at all. The last two are the reason this fixture exists (added
+# 2026-08-26, backlog task 007).
+STANDING_AGENDA = [
+    {
+        "question_id": 31,
+        "text": "Does CMMC Phase 2 slip past its statutory date?",
+        "status": "open",
+        "declared_at": "2026-05-02",
+        "moved": True,
+        "moved_in": [
+            {"situation_index": 1, "title": "Procurement rule change lands^[1]"},
+        ],
+        "appearance_count": 4,
+        "last_moved_at": "2026-05-08",
+        "watching": ["DFARS class deviation -- published before the statutory date"],
+    },
+    {
+        "question_id": 32,
+        "text": "Which CSPs move to FedRAMP authorized, and at which impact level?",
+        "status": "open",
+        "declared_at": "2026-05-02",
+        "moved": False,
+        "moved_in": [],
+        "appearance_count": 2,
+        "last_moved_at": "2026-05-08",
+        "watching": [],
+    },
+    {
+        "question_id": 33,
+        "text": (
+            "Where do GovRAMP and TX-RAMP diverge from FedRAMP in ways that "
+            "matter to a multi-state CSP?"
+        ),
+        "status": "open",
+        "declared_at": "2026-05-02",
+        "moved": False,
+        "moved_in": [],
+        "appearance_count": 0,
+        "last_moved_at": None,
+        "watching": [],
+    },
+]
+
+
+@pytest.fixture
+def beat_document() -> BriefDocument:
+    """A beat run's document, carrying a declared standing agenda."""
+    data = {
+        **SYNTHESIS_DATA,
+        "metadata": {**SYNTHESIS_DATA["metadata"], "standing_agenda": STANDING_AGENDA},
+    }
+    return BriefDocument.from_synthesis_data(
+        data,
+        articles_analyzed=42,
+        synthesis_id=177,
+        analysis_run_id=16,
+        generated_at="2026-05-15T10:43:37.873249",
+    )
+
+
+@pytest.fixture
+def full_beat_document() -> BriefDocument:
+    """
+    A beat run carrying *both* beat sections at once.
+
+    Tasks 006 and 007 each added a section to the same render path and were
+    built from the same base, so nothing before this fixture ever rendered them
+    together. This is what pins that they compose rather than one silently
+    winning (added 2026-08-26 when 007 was rebased onto 006).
+    """
+    data = {
+        **SYNTHESIS_DATA,
+        "metadata": {
+            **SYNTHESIS_DATA["metadata"],
+            "standing_agenda": STANDING_AGENDA,
+            "institutional_activity": INSTITUTIONAL_ACTIVITY,
+        },
+    }
+    return BriefDocument.from_synthesis_data(
+        data,
+        articles_analyzed=42,
+        synthesis_id=178,
+        analysis_run_id=17,
+        generated_at="2026-05-15T10:43:37.873249",
     )

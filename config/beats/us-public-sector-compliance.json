@@ -43,6 +43,11 @@
       { "name": "Notice of Proposed Rulemaking", "aliases": ["NPRM"] }
     ]
   },
-  "standing_questions": [],
+  "standing_questions": [
+    "Does CMMC Phase 2 slip past its statutory date?",
+    "Which CSPs move to FedRAMP authorized, and at which impact level?",
+    "Does any CISA BOD create a compliance obligation with a deadline inside 90 days?",
+    "Where do GovRAMP and TX-RAMP diverge from FedRAMP in ways that matter to a multi-state CSP?"
+  ],
   "channels": ["terminal"]
 }
