@@ -37,7 +37,7 @@ SUPPORTED_ADAPTERS = frozenset({"rss"})
 SUPPORTED_CHANNELS = frozenset({"terminal", "markdown", "html", "email"})
 
 BEAT_KEYS = frozenset(
-    {"name", "description", "sources", "watchlist", "standing_questions", "channels"}
+    {"name", "description", "sources", "coverage", "standing_questions", "channels"}
 )
 REQUIRED_BEAT_KEYS = frozenset({"name", "sources"})
 SOURCE_KEYS = frozenset({"adapter", "feed_tags", "geo_tags", "scope"})
@@ -95,7 +95,7 @@ class BeatConfig:
     """
     A loaded, validated beat definition.
 
-    ``watchlist`` and ``standing_questions`` are reserved: they are validated
+    ``coverage`` and ``standing_questions`` are reserved: they are validated
     for shape so that backlog tasks 006 and 007 need no schema migration, but
     nothing in this codebase reads them yet.
     """
@@ -103,7 +103,7 @@ class BeatConfig:
     name: str
     description: str
     sources: tuple[BeatSource, ...]
-    watchlist: dict[str, Any]
+    coverage: dict[str, Any]
     standing_questions: tuple[Any, ...]
     channels: tuple[str, ...]
     config_path: str
@@ -181,9 +181,22 @@ def load_beat(name: str, beats_dir: Path | str | None = None) -> BeatConfig:
 
     sources = _parse_sources(path, raw["sources"])
 
-    watchlist = raw.get("watchlist", {})
-    if not isinstance(watchlist, dict):
-        raise BeatValidationError(path, "'watchlist' must be an object (reserved for task 006)")
+    coverage = raw.get("coverage", {})
+    if not isinstance(coverage, dict):
+        raise BeatValidationError(path, "'coverage' must be an object (reserved for task 006)")
+    # A beat tracks institutions, not people. `coverage` will hold orgs, programs and
+    # document types (task 006); a `people` key is refused here rather than ignored so
+    # the boundary is enforced by the loader and cannot be reintroduced by convention.
+    # This repository is public and covers a domain the operator works in: a per-person
+    # activity ledger would read as surveillance of colleagues regardless of the
+    # mechanism, and offices are the better signal anyway since personnel rotate.
+    if "people" in coverage:
+        raise BeatValidationError(
+            path,
+            "'coverage.people' is not supported: a beat tracks organizations, programs "
+            "and document types, never individuals. A named person may appear as an "
+            "attribute of a specific document, never as an accumulated record.",
+        )
 
     standing_questions = raw.get("standing_questions", [])
     if not isinstance(standing_questions, list):
@@ -197,7 +210,7 @@ def load_beat(name: str, beats_dir: Path | str | None = None) -> BeatConfig:
         name=beat_name,
         description=description,
         sources=sources,
-        watchlist=watchlist,
+        coverage=coverage,
         standing_questions=tuple(standing_questions),
         channels=channels,
         config_path=str(path),

@@ -47,7 +47,7 @@ def valid_payload(name="test-beat", **overrides):
         "name": name,
         "description": "A test beat.",
         "sources": [{"adapter": "rss", "feed_tags": ["regulatory"], "geo_tags": ["usa"]}],
-        "watchlist": {},
+        "coverage": {},
         "standing_questions": [],
         "channels": ["terminal"],
     }
@@ -95,11 +95,11 @@ class TestLoadingAValidBeat:
         beat = load_beat("minimal", beats_dir)
 
         assert beat.description == ""
-        assert beat.watchlist == {}
+        assert beat.coverage == {}
         assert beat.standing_questions == ()
         assert beat.channels == ("terminal",)
 
-    def test_watchlist_and_standing_questions_are_reserved_not_read(self, beats_dir):
+    def test_coverage_and_standing_questions_are_reserved_not_read(self, beats_dir):
         """
         Task 006 and 007 own these. They round-trip so those tasks need no
         migration, but nothing in this codebase consumes them yet.
@@ -109,14 +109,14 @@ class TestLoadingAValidBeat:
             "reserved",
             valid_payload(
                 name="reserved",
-                watchlist={"entities": ["CISA"]},
+                coverage={"entities": ["CISA"]},
                 standing_questions=["Will the rule land?"],
             ),
         )
 
         beat = load_beat("reserved", beats_dir)
 
-        assert beat.watchlist == {"entities": ["CISA"]}
+        assert beat.coverage == {"entities": ["CISA"]}
         assert beat.standing_questions == ("Will the rule land?",)
 
     def test_available_beats_lists_files(self, beats_dir):
@@ -226,10 +226,10 @@ class TestMalformedBeatFiles:
         with pytest.raises(BeatValidationError, match=r"sources\[0\] has unknown key\(s\): wat"):
             load_beat("extrakey", beats_dir)
 
-    def test_watchlist_wrong_shape(self, beats_dir):
-        write_beat(beats_dir, "badwatch", valid_payload("badwatch", watchlist=["CISA"]))
+    def test_coverage_wrong_shape(self, beats_dir):
+        write_beat(beats_dir, "badwatch", valid_payload("badwatch", coverage=["CISA"]))
 
-        with pytest.raises(BeatValidationError, match="'watchlist' must be an object"):
+        with pytest.raises(BeatValidationError, match="'coverage' must be an object"):
             load_beat("badwatch", beats_dir)
 
     def test_standing_questions_wrong_shape(self, beats_dir):
@@ -317,3 +317,47 @@ class TestShippedBeat:
         beat = load_beat(SHIPPED_BEAT)
 
         assert beat.resolve_feed_urls() == [feed.url for feed in beat.resolve_feeds()]
+
+
+class TestPeopleAreNotTrackable:
+    """A beat tracks institutions, never individuals.
+
+    This is enforced by the loader rather than by convention, because the
+    repository is public and covers a domain the operator works in: a
+    per-person activity ledger would read as surveillance of colleagues
+    regardless of the mechanism. Offices are also the better signal --
+    personnel rotate, so a name goes silently dark on reassignment and the
+    absence reads as inactivity, which is a wrong answer that looks like a
+    real one. See backlog/006-institutional-activity.md.
+    """
+
+    def test_a_coverage_block_with_people_is_rejected(self, tmp_path):
+        beat = tmp_path / "surveil.json"
+        beat.write_text(
+            json.dumps(
+                {
+                    "name": "surveil",
+                    "sources": [{"adapter": "rss", "feed_tags": ["general_news"]}],
+                    "coverage": {"people": ["Some Official"], "orgs": ["GSA"]},
+                }
+            )
+        )
+        with pytest.raises(BeatValidationError) as exc:
+            load_beat("surveil", beats_dir=tmp_path)
+        message = str(exc.value)
+        assert "people" in message
+        assert "never individuals" in message
+
+    def test_a_coverage_block_without_people_still_loads(self, tmp_path):
+        beat = tmp_path / "fine.json"
+        beat.write_text(
+            json.dumps(
+                {
+                    "name": "fine",
+                    "sources": [{"adapter": "rss", "feed_tags": ["general_news"]}],
+                    "coverage": {"orgs": ["GSA"], "programs": ["FedRAMP 20x"]},
+                }
+            )
+        )
+        loaded = load_beat("fine", beats_dir=tmp_path)
+        assert loaded.coverage == {"orgs": ["GSA"], "programs": ["FedRAMP 20x"]}

@@ -177,7 +177,7 @@ A beat lives in `config/beats/<name>.json` and selects its feeds through the sam
   "sources": [
     { "adapter": "rss", "feed_tags": ["regulatory", "federal_policy"], "geo_tags": ["usa"] }
   ],
-  "watchlist": {},
+  "coverage": {},
   "standing_questions": [],
   "channels": ["terminal"]
 }

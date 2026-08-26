@@ -290,7 +290,7 @@ class TestBeatRunIsRecorded:
             name="test-beat",
             description="A test beat.",
             sources=(BeatSource(adapter="rss", feed_tags=("regulatory",)),),
-            watchlist={},
+            coverage={},
             standing_questions=(),
             channels=("terminal",),
             config_path="config/beats/test-beat.json",

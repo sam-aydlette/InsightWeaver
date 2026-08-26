@@ -82,7 +82,7 @@ def beat_on_disk(tmp_path, monkeypatch):
                 "name": "test-beat",
                 "description": "A test beat.",
                 "sources": [{"adapter": "rss", "feed_tags": ["regulatory"]}],
-                "watchlist": {},
+                "coverage": {},
                 "standing_questions": [],
                 "channels": ["terminal"],
             }

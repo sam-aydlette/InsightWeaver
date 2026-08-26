@@ -275,7 +275,7 @@ class TestBeatScopedArticleSelection:
             sources=(
                 BeatSource(adapter="rss", feed_tags=tuple(feed_tags), geo_tags=tuple(geo_tags)),
             ),
-            watchlist={},
+            coverage={},
             standing_questions=(),
             channels=("terminal",),
             config_path="config/beats/test-beat.json",

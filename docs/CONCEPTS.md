@@ -104,7 +104,7 @@ A **Beat** is a *subject* the tool runs briefs for, as opposed to the *person* t
   "sources": [
     { "adapter": "rss", "feed_tags": ["regulatory", "federal_policy"], "geo_tags": ["usa"] }
   ],
-  "watchlist": {},
+  "coverage": {},
   "standing_questions": [],
   "channels": ["terminal"]
 }
@@ -112,7 +112,7 @@ A **Beat** is a *subject* the tool runs briefs for, as opposed to the *person* t
 
 **Source selection reuses the feed `applicability` tags**, it does not invent a parallel selector. `feed_tags` is matched against a feed's `domain_tags` and `specialty_tags`; the optional `geo_tags` and `scope` narrow against the families of the same name. Within a family the match is ANY, across families it is ALL, and multiple `sources` entries union. A beat is deliberately *not* validated by `src/utils/profile_loader.py` — that validator enforces a person-shaped schema, and a beat is a different shape.
 
-**`watchlist` and `standing_questions` are reserved.** They are validated for shape so that entity watchlists and standing questions need no migration later, but nothing reads them yet.
+**`coverage` and `standing_questions` are reserved.** They are validated for shape so that entity coverages and standing questions need no migration later, but nothing reads them yet.
 
 **Run recording.** `beats` holds one row per subject; `beat_runs` holds one row per brief run, carrying the `analysis_run_id`, the `synthesis_id`, the article count and the number of feeds the beat resolved to. A run is attributed in the same transaction that stores its synthesis, so a stored synthesis is either attributed or does not exist.
 
