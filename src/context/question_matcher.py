@@ -174,7 +174,7 @@ class QuestionMatcher:
             raw = await self.client.analyze(
                 system_prompt="You match unresolved questions across runs. Be conservative.",
                 user_message=prompt,
-                temperature=0.0,
+                effort="low",
                 max_tokens=MATCHER_MAX_TOKENS,
             )
         except Exception as e:

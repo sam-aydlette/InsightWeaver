@@ -146,7 +146,7 @@ class DecisionRouter:
                     "Be conservative; most situations route nowhere."
                 ),
                 user_message=prompt,
-                temperature=0.0,
+                effort="low",
                 max_tokens=ROUTER_MAX_TOKENS,
             )
         except Exception as e:

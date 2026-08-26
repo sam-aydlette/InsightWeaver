@@ -156,7 +156,7 @@ class PredictionTracker:
                     "Be conservative; 'open' is the default."
                 ),
                 user_message=prompt,
-                temperature=0.0,
+                effort="low",
                 max_tokens=CHECK_MAX_TOKENS,
             )
         except Exception as e:

@@ -137,7 +137,7 @@ class FrameManager:
             raw = await classifier.analyze(
                 system_prompt="You tag articles with the narrative frame they most exhibit.",
                 user_message=prompt,
-                temperature=0.0,
+                effort="low",
                 max_tokens=CLASSIFIER_MAX_TOKENS,
             )
         except Exception as e:
@@ -221,7 +221,7 @@ class FrameManager:
             response = await self.client.analyze(
                 system_prompt="You are a media frame analyst. Identify narrative frames in news coverage.",
                 user_message=prompt,
-                temperature=0.0,
+                effort="low",
             )
             return parse_claude_json(response, label="frame discovery response")
         except Exception as e:

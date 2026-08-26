@@ -350,7 +350,7 @@ class NarrativeSynthesizer:
         response = await self.client.analyze(
             system_prompt="You are a news article classifier. Group articles by topic.",
             user_message=prompt,
-            temperature=0.0,
+            effort="low",
         )
 
         parsed = parse_claude_json(response, label="clustering response")
@@ -404,7 +404,7 @@ class NarrativeSynthesizer:
         response = await self.client.analyze_with_context(
             context=context,
             task=prompt,
-            temperature=1.0,
+            effort="high",
         )
 
         situation = parse_claude_json(response, label="situation analysis response")
@@ -444,7 +444,7 @@ class NarrativeSynthesizer:
         response = await self.client.analyze(
             system_prompt="You are summarizing news topics with thin coverage.",
             user_message=prompt,
-            temperature=0.0,
+            effort="low",
         )
 
         parsed = parse_claude_json(response, label="thin coverage response")
@@ -483,7 +483,12 @@ class NarrativeSynthesizer:
                     completed_at=utcnow(),
                     articles_processed=articles_count,
                     context_token_count=self._estimate_tokens(context) if context else None,
-                    claude_model="claude-sonnet-4-20250514",
+                    # Read from the client rather than hardcoded. Changed 2026-08-26:
+                    # this field is provenance -- it records which model produced the
+                    # synthesis -- and a literal here records whatever was true when the
+                    # line was written, not what actually ran. It had said
+                    # claude-sonnet-4-20250514 since that model was retired.
+                    claude_model=self.client.model,
                 )
                 session.add(run)
                 session.flush()

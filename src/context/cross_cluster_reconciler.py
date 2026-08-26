@@ -52,7 +52,7 @@ class CrossClusterReconciler:
                     "Be conservative; empty results are common."
                 ),
                 user_message=prompt,
-                temperature=0.0,
+                effort="low",
                 max_tokens=RECONCILER_MAX_TOKENS,
             )
         except Exception as e:
