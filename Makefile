@@ -77,6 +77,7 @@ coverage:
 
 lint:
 	$(RUFF) check src/ tests/
+	$(RUFF) format --check src/ tests/
 
 format:
 	$(RUFF) format src/ tests/
