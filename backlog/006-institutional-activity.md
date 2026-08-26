@@ -58,8 +58,13 @@ row accumulates into a file on someone.
 ```
 
 Note `coverage`, not `watchlist`. The rename is not cosmetic — the schema **must reject** a `people`
-key rather than ignore it, so the boundary is enforced by the loader and not by convention. Task 004
-reserved a `watchlist` field in the beat schema; rename it and update the validator accordingly.
+key rather than ignore it, so the boundary is enforced by the loader and not by convention.
+
+**This part is already done.** Task 004 originally reserved a field named `watchlist`; it was renamed
+to `coverage` and the `people` rejection was added before 004 merged, so the word never entered the
+repository's permanent history. `tests/config/test_beats.py::TestPeopleAreNotTrackable` pins it and
+was verified to fail when the rejection is removed. This task inherits an enforced boundary rather
+than having to establish one.
 
 ## Rendering
 
