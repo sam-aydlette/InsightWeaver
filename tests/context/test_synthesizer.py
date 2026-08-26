@@ -3,11 +3,41 @@ Tests for Two-Pass Narrative Synthesizer
 """
 
 import json
+from contextlib import contextmanager
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from sqlalchemy.orm import sessionmaker
 
 from src.context.synthesizer import NarrativeSynthesizer
+
+
+@pytest.fixture
+def isolated_db(test_engine):
+    """Point the synthesizer's get_db at the throwaway per-test SQLite file.
+
+    Added 2026-08-25. Without this, any test that runs synthesize() end to end
+    persists AnalysisRun / ContextSnapshot / NarrativeSynthesis rows into
+    whatever DATABASE_URL names -- which in a developer shell is the real
+    database, not a fixture. test_engine comes from tests/conftest.py and is
+    already schema-complete.
+    """
+    Session = sessionmaker(bind=test_engine)
+
+    @contextmanager
+    def _get_db():
+        db = Session()
+        try:
+            yield db
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()
+
+    with patch("src.context.synthesizer.get_db", _get_db):
+        yield
 
 
 class TestSynthesizerConfiguration:
@@ -15,12 +45,11 @@ class TestSynthesizerConfiguration:
 
     @patch("src.context.synthesizer.FrameManager")
     @patch("src.context.synthesizer.ContextCurator")
-    @patch("src.context.synthesizer.ClaudeClient")
-    def test_topic_filters_are_applied_to_curation(self, mock_client, mock_curator, mock_frame_mgr):
+    def test_topic_filters_are_applied_to_curation(self, mock_curator, mock_frame_mgr):
         """Topic filters should affect which articles are included in synthesis"""
         filters = {"topics": ["cybersecurity"]}
 
-        NarrativeSynthesizer(topic_filters=filters)
+        NarrativeSynthesizer(topic_filters=filters, client=MagicMock())
 
         mock_curator.assert_called_with(topic_filters=filters)
 
@@ -28,18 +57,14 @@ class TestSynthesizerConfiguration:
 class TestCitationMap:
     """Tests for citation map building"""
 
-    @patch("src.context.synthesizer.FrameManager")
-    @patch("src.context.synthesizer.ContextCurator")
-    @patch("src.context.synthesizer.ClaudeClient")
-    def test_builds_citation_map_from_articles(self, mock_client, mock_curator, mock_frame_mgr):
+    def test_builds_citation_map_from_articles(self):
         """Citation map should index articles by 1-based position"""
-        synthesizer = NarrativeSynthesizer()
         articles = [
             {"id": 10, "title": "Article A", "source": "Source A", "url": "https://a.com"},
             {"id": 20, "title": "Article B", "source": "Source B", "url": "https://b.com"},
         ]
 
-        result = synthesizer._build_citation_map(articles)
+        result = NarrativeSynthesizer._build_citation_map(articles)
 
         assert result["1"]["title"] == "Article A"
         assert result["1"]["article_id"] == 10
@@ -50,26 +75,17 @@ class TestCitationMap:
 class TestEstimateTokens:
     """Tests for token estimation"""
 
-    @patch("src.context.synthesizer.FrameManager")
-    @patch("src.context.synthesizer.ContextCurator")
-    @patch("src.context.synthesizer.ClaudeClient")
-    def test_estimate_tokens_basic(self, mock_client, mock_curator, mock_frame_mgr):
+    def test_estimate_tokens_basic(self):
         """Should estimate tokens from context"""
-        synthesizer = NarrativeSynthesizer()
         context = {"articles": [{"content": "a" * 100}], "memory": "b" * 100}
 
-        result = synthesizer._estimate_tokens(context)
+        result = NarrativeSynthesizer._estimate_tokens(context)
 
         assert result > 0
 
-    @patch("src.context.synthesizer.FrameManager")
-    @patch("src.context.synthesizer.ContextCurator")
-    @patch("src.context.synthesizer.ClaudeClient")
-    def test_estimate_tokens_empty_context(self, mock_client, mock_curator, mock_frame_mgr):
+    def test_estimate_tokens_empty_context(self):
         """Should handle empty context"""
-        synthesizer = NarrativeSynthesizer()
-
-        result = synthesizer._estimate_tokens({})
+        result = NarrativeSynthesizer._estimate_tokens({})
 
         assert result >= 0
 
@@ -77,38 +93,24 @@ class TestEstimateTokens:
 class TestHashProfile:
     """Tests for profile hashing"""
 
-    @patch("src.context.synthesizer.FrameManager")
-    @patch("src.context.synthesizer.ContextCurator")
-    @patch("src.context.synthesizer.ClaudeClient")
-    def test_hash_profile_consistent(self, mock_client, mock_curator, mock_frame_mgr):
+    def test_hash_profile_consistent(self):
         """Same profile should produce same hash"""
-        synthesizer = NarrativeSynthesizer()
         profile = {"location": "Fairfax", "domains": ["cyber"]}
 
-        assert synthesizer._hash_profile(profile) == synthesizer._hash_profile(profile)
+        assert NarrativeSynthesizer._hash_profile(profile) == NarrativeSynthesizer._hash_profile(
+            profile
+        )
 
-    @patch("src.context.synthesizer.FrameManager")
-    @patch("src.context.synthesizer.ContextCurator")
-    @patch("src.context.synthesizer.ClaudeClient")
-    def test_hash_profile_different_for_different_profiles(
-        self, mock_client, mock_curator, mock_frame_mgr
-    ):
+    def test_hash_profile_different_for_different_profiles(self):
         """Different profiles should produce different hashes"""
-        synthesizer = NarrativeSynthesizer()
-
-        hash1 = synthesizer._hash_profile({"location": "Fairfax"})
-        hash2 = synthesizer._hash_profile({"location": "Arlington"})
+        hash1 = NarrativeSynthesizer._hash_profile({"location": "Fairfax"})
+        hash2 = NarrativeSynthesizer._hash_profile({"location": "Arlington"})
 
         assert hash1 != hash2
 
-    @patch("src.context.synthesizer.FrameManager")
-    @patch("src.context.synthesizer.ContextCurator")
-    @patch("src.context.synthesizer.ClaudeClient")
-    def test_hash_profile_none_returns_none(self, mock_client, mock_curator, mock_frame_mgr):
+    def test_hash_profile_none_returns_none(self):
         """None profile should return 'none'"""
-        synthesizer = NarrativeSynthesizer()
-
-        assert synthesizer._hash_profile(None) == "none"
+        assert NarrativeSynthesizer._hash_profile(None) == "none"
 
 
 class TestSynthesizeNoArticles:
@@ -117,8 +119,7 @@ class TestSynthesizeNoArticles:
     @pytest.mark.asyncio
     @patch("src.context.synthesizer.FrameManager")
     @patch("src.context.synthesizer.ContextCurator")
-    @patch("src.context.synthesizer.ClaudeClient")
-    async def test_returns_no_articles_status(self, mock_client, mock_curator, mock_frame_mgr):
+    async def test_returns_no_articles_status(self, mock_curator, mock_frame_mgr, isolated_db):
         """Should return no_articles when curator finds nothing"""
         mock_curator_instance = MagicMock()
         mock_curator.return_value = mock_curator_instance
@@ -126,7 +127,7 @@ class TestSynthesizeNoArticles:
             return_value={"articles": []}
         )
 
-        synthesizer = NarrativeSynthesizer()
+        synthesizer = NarrativeSynthesizer(client=MagicMock())
         result = await synthesizer.synthesize()
 
         assert result["status"] == "no_articles"
@@ -139,9 +140,8 @@ class TestSynthesizeTwoPass:
     @pytest.mark.asyncio
     @patch("src.context.synthesizer.FrameManager")
     @patch("src.context.synthesizer.ContextCurator")
-    @patch("src.context.synthesizer.ClaudeClient")
     async def test_clusters_articles_then_synthesizes(
-        self, mock_client, mock_curator, mock_frame_mgr
+        self, mock_curator, mock_frame_mgr, isolated_db
     ):
         """Should run clustering (Pass 1) then situation synthesis (Pass 2)"""
         # Setup curator with test articles
@@ -164,9 +164,9 @@ class TestSynthesizeTwoPass:
         mock_curator_instance._format_user_profile = MagicMock(return_value={})
         mock_curator_instance._get_synthesis_instructions = MagicMock(return_value="")
 
-        # Setup Claude responses
+        # Setup Claude responses. The client is injected, so no real
+        # ClaudeClient (and therefore no ANTHROPIC_API_KEY) is ever needed.
         mock_client_instance = MagicMock()
-        mock_client.return_value = mock_client_instance
 
         # Pass 1: clustering response
         clustering_response = json.dumps(
@@ -234,7 +234,7 @@ class TestSynthesizeTwoPass:
         mock_frame_mgr_instance.find_matching_cluster.return_value = None
         mock_frame_mgr_instance.discover_frames = AsyncMock(return_value=None)
 
-        synthesizer = NarrativeSynthesizer()
+        synthesizer = NarrativeSynthesizer(client=mock_client_instance)
         result = await synthesizer.synthesize(hours=24, max_articles=10)
 
         assert result["status"] == "success"
