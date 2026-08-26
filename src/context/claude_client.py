@@ -13,6 +13,31 @@ from ..config.settings import settings
 logger = logging.getLogger(__name__)
 
 
+def _response_text(response) -> str:
+    """Pull the assistant's text out of a response.
+
+    Added 2026-08-26. ``content[0].text`` was correct when the model did not
+    think: the first block was always the text. This model thinks by default,
+    so ``content[0]`` is a ThinkingBlock and indexing it raises AttributeError
+    -- which is what happened on the first live run after the model migration.
+    The block list is heterogeneous; select by type rather than by position.
+
+    A refusal is raised rather than returned. Returning empty string would let
+    a refused analysis flow downstream as if the model had simply found
+    nothing to say, which is a different and much quieter failure.
+    """
+    if getattr(response, "stop_reason", None) == "refusal":
+        details = getattr(response, "stop_details", None)
+        category = getattr(details, "category", None) if details else None
+        raise RuntimeError(f"Model declined the request (category: {category})")
+
+    parts = [b.text for b in response.content if getattr(b, "type", None) == "text"]
+    if not parts:
+        kinds = [getattr(b, "type", "?") for b in response.content]
+        raise RuntimeError(f"No text block in response; got blocks: {kinds}")
+    return "".join(parts)
+
+
 class ClaudeClient:
     """Minimal Claude API client for context-driven analysis"""
 
@@ -72,7 +97,7 @@ class ClaudeClient:
                 messages=[{"role": "user", "content": user_message}],
             )
 
-            return response.content[0].text
+            return _response_text(response)
 
         except Exception as e:
             logger.error(f"Claude API error: {e}")
@@ -111,7 +136,7 @@ class ClaudeClient:
                 messages=messages,
             )
 
-            return response.content[0].text
+            return _response_text(response)
 
         except Exception as e:
             logger.error(f"Claude API error: {e}")
