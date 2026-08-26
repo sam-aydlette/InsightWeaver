@@ -20,6 +20,7 @@ from ..database.models import (
 from ..prompts.questions import QUESTION_MATCHING_PROMPT
 from ..utils import utcnow
 from ._json import parse_claude_json
+from .beat_scope import question_scope_filter
 from .claude_client import ClaudeClient
 
 logger = logging.getLogger(__name__)
@@ -57,17 +58,27 @@ class QuestionMatcher:
         self.client = client or ClaudeClient(model=MATCHER_MODEL)
 
     async def resolve_questions(
-        self, proposed: list[ProposedQuestion], session: Session
+        self,
+        proposed: list[ProposedQuestion],
+        session: Session,
+        beat_id: int | None = None,
     ) -> list[Question]:
         """
         Map each proposed question to a Question row (existing or new).
 
         Returns a list parallel to ``proposed``: each Question is either an
         existing row or a newly added one (session.add). The caller commits.
+
+        ``beat_id`` selects the scope questions are matched within: a beat's
+        run only ever binds to that beat's questions, and the default (no-beat)
+        run only ever binds to questions no beat has claimed. Without any beat
+        runs on record the scope is the whole graph, i.e. the behaviour that
+        predates beats.
         """
         if not proposed:
             return []
 
+        scope = question_scope_filter(session, beat_id)
         normalized = [normalize_question(p.text) for p in proposed]
         resolved: list[Question | None] = [None] * len(proposed)
 
@@ -79,6 +90,7 @@ class QuestionMatcher:
                 .filter(
                     Question.status == QUESTION_STATUS_OPEN,
                     Question.normalized_text == norm,
+                    scope,
                 )
                 .first()
             )
@@ -89,7 +101,7 @@ class QuestionMatcher:
         if remaining_idx:
             open_questions = (
                 session.query(Question)
-                .filter(Question.status == QUESTION_STATUS_OPEN)
+                .filter(Question.status == QUESTION_STATUS_OPEN, scope)
                 .order_by(Question.first_asked_at.desc())
                 .limit(OPEN_QUESTION_LIMIT)
                 .all()
@@ -118,6 +130,7 @@ class QuestionMatcher:
                 .filter(
                     Question.status == QUESTION_STATUS_RESOLVED,
                     Question.normalized_text == norm,
+                    scope,
                 )
                 .order_by(Question.resolved_at.desc())
                 .first()

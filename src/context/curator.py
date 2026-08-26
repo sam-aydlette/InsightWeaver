@@ -9,10 +9,12 @@ import logging
 from datetime import timedelta
 from typing import Any
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ..config.beats import BeatConfig
 from ..database.connection import get_db
-from ..database.models import Article, NarrativeSynthesis
+from ..database.models import Article, NarrativeSynthesis, RSSFeed
 from ..utils import utcnow
 from ..utils.profile_loader import UserProfile, get_user_profile
 from ..utils.profiler import profile
@@ -41,6 +43,7 @@ class ContextCurator:
         self,
         user_profile: UserProfile | None = None,
         topic_filters: dict | None = None,
+        beat: BeatConfig | None = None,
     ):
         """
         Initialize context curator
@@ -49,6 +52,10 @@ class ContextCurator:
             user_profile: User profile for personalization
             perspective_id: Perspective to use for analysis framing (defaults to user preference or daily_intelligence_brief)
             topic_filters: Optional topic/scope filters dict (e.g., {'topics': ['cybersecurity'], 'scopes': ['local']})
+            beat: Optional beat. When given, article selection is restricted to
+                that beat's configured sources and nothing else. The user
+                profile is still used to frame the analysis -- a beat scopes
+                which sources are read, not who the brief is for.
         """
         try:
             self.user_profile = user_profile or get_user_profile()
@@ -59,6 +66,18 @@ class ContextCurator:
         # Topic filtering
         self.topic_filters = topic_filters or {}
         self.topic_matcher = TopicMatcher() if self.topic_filters else None
+
+        # Beat scoping. Resolved once here so the feed set a run used is fixed
+        # for that run even if config/beats/ changes mid-flight.
+        self.beat = beat
+        self.beat_feed_urls: list[str] = beat.resolve_feed_urls() if beat else []
+        if beat:
+            logger.info(f"Beat '{beat.name}' selects {len(self.beat_feed_urls)} configured feed(s)")
+            if not self.beat_feed_urls:
+                logger.warning(
+                    f"Beat '{beat.name}' matched no feeds in config/feeds/. "
+                    f"Its brief will have no articles to analyze."
+                )
 
     async def curate_for_narrative_synthesis(
         self, hours: int = 48, max_articles: int = 50
@@ -141,11 +160,21 @@ class ContextCurator:
             Article.fetched_at >= cutoff_time, Article.filtered.is_(False)
         )
 
+        # Beat scoping. This is the hard boundary that makes a beat's brief
+        # "drawn only from that beat's sources": articles from any other feed
+        # are excluded before topic filters or limits are considered. A beat
+        # whose feeds are not yet in rss_feeds simply yields nothing, rather
+        # than silently falling back to the full corpus.
+        if self.beat is not None:
+            beat_feed_ids = select(RSSFeed.id).where(RSSFeed.url.in_(self.beat_feed_urls))
+            query = query.filter(Article.feed_id.in_(beat_feed_ids))
+
         # If no topic filters, use existing logic
         if not self.topic_filters:
             articles = query.order_by(Article.fetched_at.desc()).limit(max_articles).all()
 
-            logger.info(f"Curated {len(articles)} articles from last {hours} hours (no filters)")
+            scope_note = f"beat '{self.beat.name}'" if self.beat else "no filters"
+            logger.info(f"Curated {len(articles)} articles from last {hours} hours ({scope_note})")
             return articles
 
         # Fetch 2x candidates for filtering buffer

@@ -8,6 +8,7 @@ import logging
 from datetime import UTC, datetime
 from typing import Any
 
+from src.config.beats import BeatConfig
 from src.config.settings import settings
 from src.context.synthesizer import NarrativeSynthesizer
 from src.processors.content_filter import ContentFilter
@@ -30,6 +31,7 @@ class PipelineOrchestrator:
         prioritize_hours: int = 48,
         prioritize_limit: int | None = None,
         topic_filters: dict | None = None,
+        beat: BeatConfig | None = None,
     ):
         """
         Initialize pipeline orchestrator
@@ -41,6 +43,8 @@ class PipelineOrchestrator:
             prioritize_hours: Hours to look back for prioritization
             prioritize_limit: Max articles to prioritize (None = all)
             topic_filters: Optional topic/scope filters for article selection
+            beat: Optional beat to scope synthesis to. None is the default
+                person-profile brief and leaves every stage unchanged.
         """
         self.max_concurrent_feeds = max_concurrent_feeds
         self.rate_limit = rate_limit
@@ -48,6 +52,7 @@ class PipelineOrchestrator:
         self.prioritize_hours = prioritize_hours
         self.prioritize_limit = prioritize_limit
         self.topic_filters = topic_filters or {}
+        self.beat = beat
         self.content_filter = None
 
     def _should_skip_rss_fetch(self, max_age_minutes: int = 60) -> tuple:
@@ -278,7 +283,7 @@ class PipelineOrchestrator:
         Pass 2: Examined narratives for clusters with 3+ articles,
                 thin coverage summaries for the rest.
         """
-        synthesizer = NarrativeSynthesizer(topic_filters=self.topic_filters)
+        synthesizer = NarrativeSynthesizer(topic_filters=self.topic_filters, beat=self.beat)
         return await synthesizer.synthesize(hours=self.prioritize_hours, max_articles=50)
 
     def _generate_summary(self, results: dict[str, Any]) -> dict[str, Any]:
@@ -322,6 +327,7 @@ async def run_pipeline(
     prioritize_hours: int = 48,
     prioritize_limit: int | None = None,
     topic_filters: dict | None = None,
+    beat: BeatConfig | None = None,
 ) -> dict[str, Any]:
     """
     Convenience function to run the complete pipeline
@@ -333,6 +339,7 @@ async def run_pipeline(
         prioritize_hours: Hours to look back for prioritization
         prioritize_limit: Max articles to prioritize (None = all)
         topic_filters: Optional topic/scope filters for article selection
+        beat: Optional beat to scope synthesis to (None = default brief)
 
     Returns:
         Pipeline execution results
@@ -344,6 +351,7 @@ async def run_pipeline(
         prioritize_hours=prioritize_hours,
         prioritize_limit=prioritize_limit,
         topic_filters=topic_filters,
+        beat=beat,
     )
 
     return await orchestrator.run_full_pipeline()

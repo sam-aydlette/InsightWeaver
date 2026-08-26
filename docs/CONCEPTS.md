@@ -10,6 +10,8 @@ InsightWeaver is built around a small graph of **commitments** — things the sy
 
 The graph has five primary entity types. Everything in the CLI is either creating one of these, updating one, or reading the graph back out.
 
+A sixth concept, the **Beat**, is not a commitment but a *scope* over them: it says which sources a run reads and which slice of the graph that run accumulates into. See "Beats" below.
+
 ---
 
 ## Questions
@@ -22,7 +24,7 @@ A **Question** is an unresolved epistemic thread the coverage is implicitly trac
 
 **Reappearance.** When a previously resolved Question's text appears again in fresh coverage, a *new* Question is created with `previous_question_id` pointing at the resolved one. Resolution is never silently undone.
 
-**CLI.** `questions list | show <id> | resolve <id> --note ...`
+**CLI.** `questions list [--beat NAME] | show <id> | resolve <id> --note ...`
 
 **In the brief.** Returning questions surface their identity inline: `Q47 (run 4, asked 2026-03-12)` for repeat appearances, `Q47 (new)` for first ones.
 
@@ -38,7 +40,7 @@ A **Prediction** is a falsifiable observable the synthesis committed to watching
 
 **Why it matters.** This makes the tool's forward-looking statements auditable. The `predictions track-record` command shows the calibration: of N predictions resolved in the last 90 days, what fraction triggered vs. were contradicted.
 
-**CLI.** `predictions open | triggered | contradicted | track-record`
+**CLI.** `predictions open | triggered | contradicted | track-record`, each taking `--beat NAME`
 
 **In the brief.** A transparency line at the top of each brief reports the check results: "Prediction check: 8 open observables graded — 1 triggered, 0 contradicted, 7 still open."
 
@@ -89,6 +91,78 @@ Most days have none. When one appears, it's structural insight: the same disagre
 
 ---
 
+## Beats
+
+A **Beat** is a *subject* the tool runs briefs for, as opposed to the *person* the user profile models. `config/user_profile.json` describes a location, a profession, a voting context and a set of civic interests; `config/beats/<name>.json` describes a topic and the sources that cover it. The two coexist. The person path is unchanged and `insightweaver brief` with no `--beat` behaves exactly as it always has.
+
+**Shape.** A beat file is small on purpose:
+
+```json
+{
+  "name": "us-public-sector-compliance",
+  "description": "...",
+  "sources": [
+    { "adapter": "rss", "feed_tags": ["regulatory", "federal_policy"], "geo_tags": ["usa"] }
+  ],
+  "coverage": {},
+  "standing_questions": [],
+  "channels": ["terminal"]
+}
+```
+
+**Source selection reuses the feed `applicability` tags**, it does not invent a parallel selector. `feed_tags` is matched against a feed's `domain_tags` and `specialty_tags`; the optional `geo_tags` and `scope` narrow against the families of the same name. Within a family the match is ANY, across families it is ALL, and multiple `sources` entries union. A beat is deliberately *not* validated by `src/utils/profile_loader.py` — that validator enforces a person-shaped schema, and a beat is a different shape.
+
+**`coverage` and `standing_questions` are reserved.** They are validated for shape so that entity coverages and standing questions need no migration later, but nothing reads them yet.
+
+**Run recording.** `beats` holds one row per subject; `beat_runs` holds one row per brief run, carrying the `analysis_run_id`, the `synthesis_id`, the article count and the number of feeds the beat resolved to. A run is attributed in the same transaction that stores its synthesis, so a stored synthesis is either attributed or does not exist.
+
+**CLI.** `brief --beat NAME`. `--beat` and `--from-run` are mutually exclusive: a stored run replays exactly as recorded.
+
+**Expect a beat to be thin.** RSS is the only adapter today, and specialist domains publish little of it. The shipped `us-public-sector-compliance` beat resolves to eight feeds. That thinness is a finding about the source layer, not a defect in the beat.
+
+### Scoping decision: the graph is scoped by derivation, not by a `beat_id` column
+
+Questions, Predictions and their join rows carry **no `beat_id` column**. A row's beat is derived from `beat_runs`: a synthesis belongs to a beat when a `beat_runs` row says so; a Question belongs to a beat when it appeared in one of that beat's syntheses; a Prediction inherits the beat of the Question it keys off. Two scopes exist — a beat's scope, and the **default scope**, which is everything no beat run ever touched.
+
+This is scoping, not collision-acceptance. The question matcher only ever binds within one scope, the prediction check only grades and expires within one scope, and — the load-bearing part — **appearance counts are counted within a scope**, so `Q47 (run 4, asked 2026-03-12)` means "the fourth time *this subject* raised it".
+
+Why derivation rather than a column:
+
+- **A Question's beat is not an independent fact.** It is discovered from coverage, and the only thing that knows which subject surfaced it is the run. A `beat_id` column would be a second, denormalized copy of something `beat_runs` already determines, and the two could disagree.
+- **The same question can legitimately belong to two scopes.** A CISA directive can be both a compliance question and a personal-news question. A column forces a duplicate Question row and severs the link between them; derivation keeps one Question with an independent appearance count in each scope.
+- **It is additive.** No existing table is altered, so an unmigrated database keeps working for every non-beat command, and the migration cannot lose data. On a database with no `beat_runs` rows — every database that predates this feature — the default scope is the whole graph and every scope filter is an identity filter. That is what makes the no-beat path provably unchanged rather than merely believed to be.
+
+What stays **global**, deliberately:
+
+- **Decisions, DecisionFactors and DecisionEvidence.** A standing decision belongs to the user, not to a subject; the point of routing beat coverage into it is that a compliance development can move the user's career-timing factor. Scoping the decision journal per beat would break exactly the connection it exists to make.
+- **TopicClusters and NarrativeFrames.** A frame is a structural property of coverage, not of a subject. The same "national-security framing" appears in both the compliance beat and the general brief, and it is the same frame. Splitting the glossary per beat would fragment the frame vocabulary and weaken the `diet` signals, which depend on comparing feeds across the whole corpus.
+- **Article content filtering.** Stage 3 still filters articles against the person profile's `excluded_topics` before a beat brief selects from what remains. A beat scopes which *sources* are read, not who the brief is for.
+
+### Reading the graph back out: `questions`, `predictions`, `forecast`
+
+Scoping the write path is only half the boundary. `brief` writes the graph; `questions`, `predictions` and `forecast` read it back out, and an unscoped read would surface a beat's ledger as though it were the user's own. That is the same silent-wrong-answer failure the scoping exists to prevent, so these commands answer the same way `brief` does:
+
+**No `--beat` means your own ledger, `--beat NAME` means that subject's.** One flag, the same meaning everywhere.
+
+| Command | Scoped? |
+| --- | --- |
+| `questions list` | yes |
+| `predictions open` / `triggered` / `contradicted` | yes |
+| `predictions track-record` | yes |
+| `forecast` | yes |
+| `questions show <id>` | no -- id-addressed, discloses its ledger |
+| `questions resolve <id> --note ...` | no -- id-addressed, reports its ledger |
+
+`track-record` is the case that matters most. A calibration figure is only meaningful within one ledger: folding a compliance beat's resolved observables into the user's personal hit rate would corrupt the single number the tool exists to be honest about. `forecast` is a derived view over the predictions ledger, so it inherits the ledger's scoping rather than defining its own.
+
+**The two exceptions are deliberate, and they are not "left global by omission".** `questions show 47` and `questions resolve 47` name one specific row. Refusing to find it because it belongs to another ledger would be obstructive, and silently scoping the lookup would make a valid id look nonexistent — addressing a row by id is an explicit act, not a browse. So both operate on the whole graph, and both **disclose** the ledger the row belongs to: `show` prints a `Ledger:` line, and `resolve` names the beat in its confirmation. The appearance history inside `show` is likewise unscoped, because it is the full history of the row the user asked about. Scoping is thereby always either applied or stated, never assumed.
+
+**`--beat` on the read side resolves against the `beats` table, not `config/beats/`.** A ledger you have already accumulated stays readable after its config file is edited or deleted; reading is about what ran, not about what is currently configured to run. An unrecognised name is an error naming the beats that have runs, rather than an empty result that would read as "you have nothing here".
+
+On a database with no `beat_runs` rows these commands behave exactly as they always have, for the same reason the brief does: the default scope is the whole graph.
+
+---
+
 ## Sources
 
 Each RSSFeed carries derived **calibration signals**, computed on demand from ArticleFrame and FrameGap data. No new schema for this — purely a view:
@@ -101,6 +175,8 @@ Each RSSFeed carries derived **calibration signals**, computed on demand from Ar
 ---
 
 ## How a daily brief flows through the graph
+
+With `--beat`, step 0 is registering the beat and resolving its sources; every graph read and write below is then confined to that beat's scope, and step 8 also writes the `beat_runs` row. Without `--beat` the run operates in the default scope, which on a database with no beat runs is the whole graph.
 
 1. **Prediction check** — open Predictions are graded against today's coverage. Resolutions written to the ledger.
 2. **Pass 1** — articles clustered into topic groups.
