@@ -1,0 +1,190 @@
+{
+    "description": "Documents published from 08/17/2026 to 08/21/2026 and from Federal Acquisition Regulation System, Defense Acquisition Regulations System, General Services Administration, Management and Budget Office, National Institute of Standards and Technology, National Archives and Records Administration, Personnel Management Office, and Office of the National Cyber Director",
+    "count": 6,
+    "total_pages": 1,
+    "results": [
+        {
+            "document_number": "2026-17082",
+            "title": "Traffic and Conduct on the Grounds of Certain National Institute of Standards and Technology Sites",
+            "abstract": "By this rule, NIST amends its regulations governing traffic and conduct at its sites in Gaithersburg, Maryland, and Boulder and Fort Collins, Colorado. This rule amends those regulations by removing excessive and redundant restrictions on personal conduct, updating or removing sections with outdated references or requirements, and broadening an exception regarding the use of service dogs. This action is necessary to ensure that NIST's regulations conform to the scope of the underlying statutory authorities and to reduce regulatory complexity, redundancy, and burden. This action is intended to promote statutory conformity, administrative efficiency, and accessibility for people with disabilities, without imposing any new obligations or costs on the public.",
+            "html_url": "https://www.federalregister.gov/documents/2026/08/21/2026-17082/traffic-and-conduct-on-the-grounds-of-certain-national-institute-of-standards-and-technology-sites",
+            "publication_date": "2026-08-21",
+            "type": "Rule",
+            "agencies": [
+                {
+                    "raw_name": "DEPARTMENT OF COMMERCE",
+                    "name": "Commerce Department",
+                    "id": 54,
+                    "url": "https://www.federalregister.gov/agencies/commerce-department",
+                    "json_url": "https://www.federalregister.gov/api/v1/agencies/54",
+                    "parent_id": null,
+                    "slug": "commerce-department"
+                },
+                {
+                    "raw_name": "National Institute of Standards and Technology",
+                    "name": "National Institute of Standards and Technology",
+                    "id": 352,
+                    "url": "https://www.federalregister.gov/agencies/national-institute-of-standards-and-technology",
+                    "json_url": "https://www.federalregister.gov/api/v1/agencies/352",
+                    "parent_id": 54,
+                    "slug": "national-institute-of-standards-and-technology"
+                }
+            ],
+            "topics": [
+                "Government property",
+                "Penalties",
+                "Safety"
+            ],
+            "action": "Final rule.",
+            "docket_ids": [
+                "Docket No. 260804-0183"
+            ],
+            "comments_close_on": null,
+            "effective_on": "2026-08-21",
+            "citation": "91 FR 54214"
+        },
+        {
+            "document_number": "2026-16980",
+            "title": "Privacy Act of 1974; System of Records",
+            "abstract": "Pursuant to the provisions of the Privacy Act of 1974, notice is given that the General Services Administration (GSA) is providing an update to the system of records entitled Contracted Travel Services Program, GSA/GOVT-4, a system designed to provide efficient and secure travel management services for government agencies, including the General Services Administration (GSA), by integrating advanced technology with high-quality customer service.",
+            "html_url": "https://www.federalregister.gov/documents/2026/08/20/2026-16980/privacy-act-of-1974-system-of-records",
+            "publication_date": "2026-08-20",
+            "type": "Notice",
+            "agencies": [
+                {
+                    "raw_name": "GENERAL SERVICES ADMINISTRATION",
+                    "name": "General Services Administration",
+                    "id": 210,
+                    "url": "https://www.federalregister.gov/agencies/general-services-administration",
+                    "json_url": "https://www.federalregister.gov/api/v1/agencies/210",
+                    "parent_id": null,
+                    "slug": "general-services-administration"
+                }
+            ],
+            "topics": [],
+            "action": "Notice of a modified system of records.",
+            "docket_ids": [
+                "Notice-IEB-2026-04",
+                "Docket No. 2026-0002",
+                "Sequence No. 07"
+            ],
+            "comments_close_on": "2026-09-21",
+            "effective_on": null,
+            "citation": "91 FR 53864"
+        },
+        {
+            "document_number": "2026-16941",
+            "title": "Submission for Review: 3206-0156, Application for Death Benefits Under the Civil Service Retirement System, (SF 2800); Documentation in Support of Application for Death Benefits When Deceased was an Employee at the Time of Death, (SF 2800A) and Applying for Death Benefits Under CSRS Pamphlet, (SF 2800-1)",
+            "abstract": "Office of Personnel Management (OPM) offers the general public and other federal agencies the opportunity to comment on the reinstatement of an expired information collection request (ICR), Application for Death Benefits/Documentation and Elections in Support of Application for Death Benefits When Deceased Was an Employee at the Time of Death (CSRS).",
+            "html_url": "https://www.federalregister.gov/documents/2026/08/20/2026-16941/submission-for-review-3206-0156-application-for-death-benefits-under-the-civil-service-retirement",
+            "publication_date": "2026-08-20",
+            "type": "Notice",
+            "agencies": [
+                {
+                    "raw_name": "OFFICE OF PERSONNEL MANAGEMENT",
+                    "name": "Personnel Management Office",
+                    "id": 406,
+                    "url": "https://www.federalregister.gov/agencies/personnel-management-office",
+                    "json_url": "https://www.federalregister.gov/api/v1/agencies/406",
+                    "parent_id": null,
+                    "slug": "personnel-management-office"
+                }
+            ],
+            "topics": [],
+            "action": "60-Day notice and request for comments.",
+            "docket_ids": [],
+            "comments_close_on": "2026-10-19",
+            "effective_on": null,
+            "citation": "91 FR 53905"
+        },
+        {
+            "document_number": "2026-16940",
+            "title": "Submission for Review: 3206-0275, Application for Court-Ordered Benefits for Former Spouses, Standard Form 3119",
+            "abstract": "Retirement Services offers the general public and other federal agencies the opportunity to comment on the reinstatement of an expired information collection request (ICR), Application for Court- Ordered Benefits for Former Spouses, Standard Form 3119.",
+            "html_url": "https://www.federalregister.gov/documents/2026/08/20/2026-16940/submission-for-review-3206-0275-application-for-court-ordered-benefits-for-former-spouses-standard",
+            "publication_date": "2026-08-20",
+            "type": "Notice",
+            "agencies": [
+                {
+                    "raw_name": "OFFICE OF PERSONNEL MANAGEMENT",
+                    "name": "Personnel Management Office",
+                    "id": 406,
+                    "url": "https://www.federalregister.gov/agencies/personnel-management-office",
+                    "json_url": "https://www.federalregister.gov/api/v1/agencies/406",
+                    "parent_id": null,
+                    "slug": "personnel-management-office"
+                }
+            ],
+            "topics": [],
+            "action": "60-Day notice and request for comments.",
+            "docket_ids": [],
+            "comments_close_on": "2026-10-19",
+            "effective_on": null,
+            "citation": "91 FR 53905"
+        },
+        {
+            "document_number": "2026-16849",
+            "title": "Privacy Act of 1974; Re-Established Matching Program",
+            "abstract": "In accordance with the Privacy Act of 1974, as amended, and Office of Management and Budget (OMB) Circular A-108, the U.S. Office of Personnel Management (OPM) is providing notice of the re- establishment of a matching program between OPM and the Social Security Administration (SSA) under Computer Matching Agreement (CMA) No. 1045. The purpose of the matching program is to enable SSA to disclose wage and self-employment income information to OPM for use in determining continued eligibility for certain retirement and survivor benefits subject to statutory earnings limitations.",
+            "html_url": "https://www.federalregister.gov/documents/2026/08/19/2026-16849/privacy-act-of-1974-re-established-matching-program",
+            "publication_date": "2026-08-19",
+            "type": "Notice",
+            "agencies": [
+                {
+                    "raw_name": "OFFICE OF PERSONNEL MANAGEMENT",
+                    "name": "Personnel Management Office",
+                    "id": 406,
+                    "url": "https://www.federalregister.gov/agencies/personnel-management-office",
+                    "json_url": "https://www.federalregister.gov/api/v1/agencies/406",
+                    "parent_id": null,
+                    "slug": "personnel-management-office"
+                }
+            ],
+            "topics": [],
+            "action": "Notice of a re-established matching program.",
+            "docket_ids": [
+                "Docket ID: OPM-2024-0003"
+            ],
+            "comments_close_on": "2026-10-20",
+            "effective_on": null,
+            "citation": "91 FR 53675"
+        },
+        {
+            "document_number": "2026-16682",
+            "title": "Information Collection Requirement; Defense Federal Acquisition Regulation Supplement (DFARS), DoD Mentor-Prot\u00e9g\u00e9 Program",
+            "abstract": "In compliance with the Paperwork Reduction Act of 1995, DoD announces the proposed extension of a public information collection requirement and seeks public comment on the provisions thereof. DoD invites comments on: whether the proposed collection of information is necessary for the proper performance of the functions of DoD, including whether the information will have practical utility; the accuracy of DoD's estimate of the burden of the proposed information collection; ways to enhance the quality, utility, and clarity of the information to be collected; and ways to minimize the burden of the information collection on respondents, including through the use of automated collection techniques or other forms of information technology. The Office of Management and Budget (OMB) has approved this information collection for use under Control Number 0704-0332 through November 30, 2026. DoD proposes that OMB approve an extension of the information collection requirement, to expire three years after the approval date.",
+            "html_url": "https://www.federalregister.gov/documents/2026/08/17/2026-16682/information-collection-requirement-defense-federal-acquisition-regulation-supplement-dfars-dod",
+            "publication_date": "2026-08-17",
+            "type": "Notice",
+            "agencies": [
+                {
+                    "raw_name": "DEPARTMENT OF DEFENSE",
+                    "name": "Defense Department",
+                    "id": 103,
+                    "url": "https://www.federalregister.gov/agencies/defense-department",
+                    "json_url": "https://www.federalregister.gov/api/v1/agencies/103",
+                    "parent_id": null,
+                    "slug": "defense-department"
+                },
+                {
+                    "raw_name": "Defense Acquisition Regulations System",
+                    "name": "Defense Acquisition Regulations System",
+                    "id": 97,
+                    "url": "https://www.federalregister.gov/agencies/defense-acquisition-regulations-system",
+                    "json_url": "https://www.federalregister.gov/api/v1/agencies/97",
+                    "parent_id": 103,
+                    "slug": "defense-acquisition-regulations-system"
+                }
+            ],
+            "topics": [],
+            "action": "Notice and request for comments regarding a proposed extension of an approved information collection requirement.",
+            "docket_ids": [
+                "Docket Number DARS-2026-0364",
+                "OMB Control Number 0704-0332"
+            ],
+            "comments_close_on": "2026-10-16",
+            "effective_on": null,
+            "citation": "91 FR 53239"
+        }
+    ]
+}

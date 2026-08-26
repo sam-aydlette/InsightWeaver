@@ -339,6 +339,19 @@ def brief_group(
             pipeline_summary = result.get("pipeline", {}).get("summary", {})
             report_result = result.get("report", {})
 
+            # A source that failed or went quiet is reported before the brief,
+            # not buried in a log. Added 2026-08-26 for backlog task 005: a
+            # thin brief with no stated cause is the failure mode this whole
+            # adapter layer exists to prevent.
+            source_alerts = pipeline_summary.get("source_alerts") or []
+            if source_alerts:
+                click.echo("\n" + warning("!" * 80))
+                click.echo(warning("SOURCE ALERT - THIS BRIEF MAY BE INCOMPLETE"))
+                click.echo(warning("!" * 80))
+                for alert in source_alerts:
+                    click.echo(warning(f"  {alert}"))
+                click.echo("=" * 80)
+
             # Check if filters resulted in 0 articles
             articles_analyzed = report_result.get("articles_analyzed", 0)
             articles_fetched = pipeline_summary.get("articles_fetched", 0)

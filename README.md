@@ -204,8 +204,8 @@ Run attribution lives in the `beats` and `beat_runs` tables -- no existing table
 grew a `beat_id` column. See `docs/CONCEPTS.md` for the scoping rationale and for
 what stays deliberately global (the decision journal, the frame glossary).
 
-RSS is the only adapter today, so the first beats are thin. That thinness is a
-finding about the source layer, not a defect in the beat.
+RSS was the only adapter until 2026-08-26, and the first beats were thin because
+of it. See "Source adapters" below for what changed.
 
 Running your first beat needs the two new tables:
 
@@ -216,6 +216,49 @@ python -m src.database.migrations.add_beats     # or: insightweaver brief setup
 The migration is additive and reversible (`... add_beats down`). Until you run it,
 `--beat` stops with a clear error and every other command -- including plain
 `insightweaver brief` -- carries on exactly as before.
+
+---
+
+## Source adapters: ingestion beyond RSS
+
+Added 2026-08-26. The `us-public-sector-compliance` beat resolved eight RSS feeds
+and only two of them carried any articles at all -- 346 of 50,983 in the corpus.
+The regulatory sources that matter most (CISA advisories, Federal Register public
+inspection, the White House, the Department of Education) returned zero rows.
+The domain does not publish enough usable RSS to support a brief.
+
+`src/sources/` fixes that without touching the pipeline. An adapter answers one
+question -- "what has this upstream published since `<when>`?" -- and answers it
+in the same normalized article row `src/rss/fetcher.py` has always produced.
+Clustering, frames, questions, predictions and synthesis are unaware adapters
+exist.
+
+| Adapter | Reads |
+| --- | --- |
+| `rss` | Any RSS or Atom feed. The default for every source in `config/feeds/`. |
+| `federal_register` | The Federal Register documents API, filtered server-side by the named queries in `config/sources/federal_register.json`. |
+
+Three properties are the point of the layer, and each is tested rather than
+assumed:
+
+- **Unreachable is not empty.** An adapter that cannot reach or cannot
+  understand its upstream raises; it never returns an empty list. An empty list
+  means "reachable, nothing new".
+- **A source that goes quiet says so.** An adapter returning zero items when it
+  has produced articles before logs an error and the brief prints a
+  `SOURCE ALERT` banner. A thin brief with no stated cause is the failure this
+  layer exists to prevent.
+- **Identity is content, not URL.** The same Federal Register document is
+  reachable at several URLs, so items are keyed by a content hash. Re-running an
+  adapter over unchanged upstream content inserts zero new articles.
+
+Which sources may be retrieved at all, and on what basis, is recorded in
+[`SOURCES.md`](SOURCES.md). A source with no recorded basis does not ship.
+
+To add a source that is not RSS: give its `config/feeds/` entry an `"adapter"`
+key, register a factory in `src/sources/runner.py`, add its row to `SOURCES.md`,
+and add the adapter name to `SUPPORTED_ADAPTERS` in `src/config/beats.py` so a
+beat can select it.
 
 ---
 

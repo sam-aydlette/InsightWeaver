@@ -72,4 +72,13 @@ You are working on InsightWeaver, a CLI tool that processes RSS feeds into exami
 
 **The architectural through-line:** Questions are the join key. Predictions key off Questions. DecisionEvidence keys off Questions. The forecast command is a derived view over the predictions ledger, not a separate engine. There is no "unknown unknowns" bucket -- the tool does not fabricate observables it cannot ground.
 
-Reference `docs/CONCEPTS.md` for the entity-by-entity model. RSS is the only input source.
+Reference `docs/CONCEPTS.md` for the entity-by-entity model.
+
+Input sources arrive through the adapter layer in `src/sources/`, not through RSS alone. That rule
+was relaxed deliberately on 2026-08-26 (backlog task 005) because the US public sector compliance
+domain does not publish enough RSS to support a brief: of the eight feeds that beat resolves, two
+carried articles. An adapter changes *ingestion only* -- every adapter emits the same normalized
+article row the RSS path produces, so clustering, frames, questions, predictions and synthesis are
+unaware adapters exist. If a change to ingestion requires editing `src/processors/` or
+`src/prompts/`, the seam is in the wrong place. Every source must have a recorded basis for use in
+`SOURCES.md`; a source with no recorded basis does not ship.

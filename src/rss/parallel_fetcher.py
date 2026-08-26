@@ -211,6 +211,24 @@ async def fetch_all_active_feeds(
             .all()
         )
 
+    # Sources read by a non-RSS adapter live in the same table (it is the
+    # sources table in everything but name) but must not be handed to
+    # feedparser: a JSON API endpoint would fail to parse every run and be
+    # auto-deactivated after ten attempts. Added 2026-08-26 for backlog task
+    # 005; with no such sources configured this filters nothing and behaviour
+    # is byte-identical to before.
+    from src.sources.runner import non_rss_source_urls
+
+    adapter_urls = non_rss_source_urls()
+    if adapter_urls:
+        skipped = [f.name for f in active_feeds_data if f.url in adapter_urls]
+        active_feeds_data = [f for f in active_feeds_data if f.url not in adapter_urls]
+        if skipped:
+            logger.info(
+                f"Skipping {len(skipped)} non-RSS source(s) in the RSS fetch stage "
+                f"(handled by src/sources adapters): {', '.join(skipped)}"
+            )
+
     if not active_feeds_data:
         logger.warning("No active feeds found in database")
         return ParallelRSSFetcher()._empty_results()

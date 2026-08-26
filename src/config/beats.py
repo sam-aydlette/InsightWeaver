@@ -28,10 +28,14 @@ from .feed_matcher import Feed, FeedMatcher
 # Where beat definitions live, relative to the project root.
 DEFAULT_BEATS_DIR = Path(__file__).parent.parent.parent / "config" / "beats"
 
-# Only the RSS adapter exists today. Other adapters are backlog task 005; an
-# unknown adapter is an error rather than a silently skipped source, so a beat
-# written against a future adapter fails loudly on this version.
-SUPPORTED_ADAPTERS = frozenset({"rss"})
+# Ingestion adapters a beat source may name. An unknown adapter is an error
+# rather than a silently skipped source, so a beat written against a future
+# adapter fails loudly on this version.
+#
+# "federal_register" added 2026-08-26 (backlog task 005) alongside
+# src/sources/federal_register.py. HTML scraping adapters are deliberately
+# still absent -- see SOURCES.md.
+SUPPORTED_ADAPTERS = frozenset({"rss", "federal_register"})
 
 # Render channels a beat may request. These mirror src/render/.
 SUPPORTED_CHANNELS = frozenset({"terminal", "markdown", "html", "email"})
@@ -73,6 +77,11 @@ class BeatSource:
     and ``scope`` are optional narrowing constraints matched against the
     families of the same name. Within a family the match is ANY; across
     families it is ALL. An omitted family constrains nothing.
+
+    ``adapter`` is the one family that is not optional and not a tag: a source
+    declaration selects sources of one ingestion kind. Added 2026-08-26 with
+    backlog task 005 -- before it, every configured source was RSS and the
+    field was decoration.
     """
 
     adapter: str
@@ -82,6 +91,8 @@ class BeatSource:
 
     def matches(self, feed: Feed) -> bool:
         """True when ``feed`` satisfies every family this source constrains."""
+        if feed.adapter != self.adapter:
+            return False
         subject_tags = set(feed.domain_tags) | set(feed.specialty_tags)
         if not subject_tags & set(self.feed_tags):
             return False

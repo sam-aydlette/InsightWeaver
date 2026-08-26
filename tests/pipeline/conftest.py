@@ -3,9 +3,28 @@ Pipeline-specific test fixtures
 """
 
 from datetime import UTC, datetime, timedelta
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+
+from src.sources.runner import AdapterRunSummary
+
+
+@pytest.fixture(autouse=True)
+def no_live_source_adapters(monkeypatch):
+    """Never let a pipeline test reach a real source, or a real database.
+
+    Added 2026-08-26 with backlog task 005, after an unguarded run of
+    ``_fetch_feeds`` in this file fetched the live Federal Register API and
+    wrote 18 articles into whatever DATABASE_URL named. The fetch stage now has
+    a second half that does I/O, so the default for every test in this
+    directory is that the second half does nothing. A test that wants to
+    exercise it patches ``run_configured_adapters`` itself.
+    """
+    monkeypatch.setattr(
+        "src.pipeline.orchestrator.run_configured_adapters",
+        AsyncMock(return_value=AdapterRunSummary()),
+    )
 
 
 @pytest.fixture

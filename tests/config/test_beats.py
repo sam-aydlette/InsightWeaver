@@ -13,6 +13,7 @@ import json
 import pytest
 
 from src.config.beats import (
+    SUPPORTED_ADAPTERS,
     BeatConfig,
     BeatNotFound,
     BeatSource,
@@ -276,6 +277,25 @@ class TestSourceMatching:
         assert source.matches(make_feed(domain_tags=["regulatory"], scope=["national"]))
         assert not source.matches(make_feed(domain_tags=["regulatory"], scope=["local"]))
 
+    def test_adapter_narrows_as_well(self):
+        """Added 2026-08-26 (task 005): a source selects one ingestion kind.
+
+        Without this, an RSS source declaration would silently select the
+        Federal Register API endpoint and the RSS fetcher would be handed a
+        JSON URL.
+        """
+        rss_source = BeatSource(adapter="rss", feed_tags=("regulatory",))
+        api_source = BeatSource(adapter="federal_register", feed_tags=("regulatory",))
+
+        assert rss_source.matches(make_feed(adapter="rss"))
+        assert not rss_source.matches(make_feed(adapter="federal_register"))
+        assert api_source.matches(make_feed(adapter="federal_register"))
+        assert not api_source.matches(make_feed(adapter="rss"))
+
+    def test_a_feed_without_an_adapter_key_is_rss(self):
+        """Every pre-2026-08-26 feed entry keeps its exact behaviour."""
+        assert BeatSource(adapter="rss", feed_tags=("regulatory",)).matches(make_feed())
+
 
 class TestShippedBeat:
     """
@@ -289,7 +309,12 @@ class TestShippedBeat:
 
         assert beat.name == SHIPPED_BEAT
         assert beat.channels == ("terminal",)
-        assert all(source.adapter == "rss" for source in beat.sources)
+        # Was "every source is rss" until 2026-08-26. Backlog task 005 added the
+        # Federal Register adapter because the RSS half of this beat is nearly
+        # empty; the assertion is now that every declared adapter is one this
+        # build actually implements, which is the property that mattered.
+        assert {source.adapter for source in beat.sources} == {"rss", "federal_register"}
+        assert all(source.adapter in SUPPORTED_ADAPTERS for source in beat.sources)
 
     def test_resolves_to_a_small_us_federal_feed_set(self):
         feeds = load_beat(SHIPPED_BEAT).resolve_feeds()
@@ -301,9 +326,16 @@ class TestShippedBeat:
         assert 0 < len(feeds) <= 12
         assert "Federal Register - Public Inspection" in names
         assert "CISA Cybersecurity Advisories" in names
+        # Added 2026-08-26 (task 005). The RSS half of this beat is nearly
+        # empty; the API source is the reason the beat has content at all.
+        assert "Federal Register - Documents API" in names
 
-        # And nothing from outside the beat's subject.
+        # And nothing from outside the beat's subject. The two commercial wires
+        # are asserted by name: SOURCES.md records that they must never be
+        # selected into a beat whose output is published, and this is where
+        # that rule is enforced rather than merely written down.
         assert "Associated Press" not in names
+        assert "Reuters" not in names
         assert "Krebs on Security" not in names
         assert "ARLnow - Arlington Local News" not in names
 

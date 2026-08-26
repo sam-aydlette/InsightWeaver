@@ -231,6 +231,66 @@ class TestFetchFeeds:
 
         mock_fetch.assert_called_once_with(max_concurrent=5, rate_limit=1.5)
 
+    @pytest.mark.asyncio
+    @patch("src.pipeline.orchestrator.fetch_all_active_feeds")
+    async def test_adapter_results_are_added_to_the_rss_totals(self, mock_fetch, monkeypatch):
+        """Non-RSS sources are the same stage, so they are the same totals.
+
+        Added 2026-08-26 for backlog task 005.
+        """
+        from src.sources.runner import AdapterRunSummary, IngestResult
+
+        mock_fetch.return_value = {
+            "total_feeds": 10,
+            "successful_feeds": 8,
+            "failed_feeds": 2,
+            "total_articles": 50,
+        }
+        monkeypatch.setattr(
+            "src.pipeline.orchestrator.run_configured_adapters",
+            AsyncMock(
+                return_value=AdapterRunSummary(
+                    results=[IngestResult(source="Fed Reg", fetched=24, inserted=7)]
+                )
+            ),
+        )
+
+        results = await PipelineOrchestrator()._fetch_feeds()
+
+        assert results["total_feeds"] == 11
+        assert results["successful_feeds"] == 9
+        assert results["total_articles"] == 57
+        assert results["adapters"]["sources"][0]["source"] == "Fed Reg"
+        assert results["source_alerts"] == []
+
+    @pytest.mark.asyncio
+    @patch("src.pipeline.orchestrator.fetch_all_active_feeds")
+    async def test_a_silent_source_reaches_the_pipeline_summary(self, mock_fetch, monkeypatch):
+        """A source that went quiet must not be absorbed into a healthy total."""
+        from src.sources.runner import AdapterRunSummary, IngestResult
+
+        mock_fetch.return_value = {
+            "total_feeds": 10,
+            "successful_feeds": 10,
+            "failed_feeds": 0,
+            "total_articles": 50,
+        }
+        monkeypatch.setattr(
+            "src.pipeline.orchestrator.run_configured_adapters",
+            AsyncMock(
+                return_value=AdapterRunSummary(
+                    results=[IngestResult(source="Fed Reg", went_silent=True)]
+                )
+            ),
+        )
+
+        orchestrator = PipelineOrchestrator()
+        fetch_results = await orchestrator._fetch_feeds()
+        summary = orchestrator._generate_summary({"stages": {"fetch": fetch_results}})
+
+        assert summary["source_alerts"]
+        assert "RETURNED ZERO ITEMS" in summary["source_alerts"][0]
+
 
 class TestDeduplicateArticles:
     """Tests for deduplication stage"""

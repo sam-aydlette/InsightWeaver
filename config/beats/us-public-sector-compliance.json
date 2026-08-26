@@ -11,6 +11,11 @@
       "adapter": "rss",
       "feed_tags": ["cybersecurity"],
       "geo_tags": ["usa"]
+    },
+    {
+      "adapter": "federal_register",
+      "feed_tags": ["regulatory", "federal_policy", "cybersecurity"],
+      "geo_tags": ["usa"]
     }
   ],
   "coverage": {},

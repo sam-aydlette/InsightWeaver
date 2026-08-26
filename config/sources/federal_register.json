@@ -1,0 +1,81 @@
+{
+  "_comment": [
+    "Server-side filter for the Federal Register documents API adapter",
+    "(src/sources/federal_register.py). Every query is an AND of its own",
+    "conditions and an OR against the others; results are merged and",
+    "deduplicated by content hash before storage.",
+    "",
+    "Tuned 2026-08-26 against the publication week Mon 2026-08-17 to Fri",
+    "2026-08-21. That week the API reports 469 documents unfiltered and 24",
+    "through this filter (5.1%), roughly five business-day documents. Named",
+    "documents that MUST survive the filter, all of which do:",
+    "  - DFARS information collection requirement (Defense Acquisition",
+    "    Regulations System, 2026-08-17)",
+    "  - OFCCP final rules modifying Section 503 of the Rehabilitation Act and",
+    "    VEVRAA -- direct federal contractor obligations (2026-08-21)",
+    "  - Education Department proposed rule, 'Accreditation, Innovation, and",
+    "    Modernization: The Secretary's Recognition of Accrediting Agencies'",
+    "    (2026-08-20)",
+    "  - GSA Privacy Act system of records and OPM Privacy Act matching",
+    "    program (2026-08-20, 2026-08-19)",
+    "  - DHS information collection on emergency communications cybersecurity",
+    "    (2026-08-19)",
+    "Known noise that also survives: ITC patent complaints containing the word",
+    "'cybersecurity', and Sunshine Act meeting notices. That is deliberate.",
+    "There is no client-side title denylist, because a denylist is the",
+    "mechanism that silently hides the document that mattered."
+  ],
+  "per_page": 100,
+  "max_pages": 5,
+  "queries": [
+    {
+      "name": "federal-management-and-acquisition",
+      "rationale": "Agencies whose entire Federal Register output is about what federal bodies and their contractors must do. Low volume, so no term narrowing is applied -- six documents in the tuning week.",
+      "agencies": [
+        "federal-acquisition-regulation-system",
+        "defense-acquisition-regulations-system",
+        "general-services-administration",
+        "management-and-budget-office",
+        "national-institute-of-standards-and-technology",
+        "national-archives-and-records-administration",
+        "personnel-management-office",
+        "office-of-the-national-cyber-director"
+      ]
+    },
+    {
+      "name": "education-department",
+      "rationale": "Title IV, EDGAR and accreditation rulemaking are compliance obligations for public sector education bodies. Six documents in the tuning week.",
+      "agencies": ["education-department"]
+    },
+    {
+      "name": "cybersecurity-government-wide",
+      "rationale": "CISA has no Federal Register agency slug of its own; it publishes under the Homeland Security Department, whose unfiltered output is dominated by Coast Guard safety zones and FEMA flood determinations. Narrowing by term rather than by agency reaches CISA without that volume, and reaches every other agency's cybersecurity rulemaking at the same time. Eight documents in the tuning week.",
+      "term": "cybersecurity"
+    },
+    {
+      "name": "fedramp",
+      "rationale": "Cloud authorization obligations for federal systems. One document in the tuning week.",
+      "term": "FedRAMP"
+    },
+    {
+      "name": "federal-acquisition-regulation",
+      "rationale": "FAR and FAR-implementing rulemaking published by agencies other than the FAR Council itself, such as OFCCP contractor rules. Four documents in the tuning week.",
+      "term": "\"Federal Acquisition Regulation\""
+    },
+    {
+      "name": "fisma",
+      "rationale": "Federal information security management obligations. Two documents in the tuning week.",
+      "term": "FISMA"
+    },
+    {
+      "name": "controlled-unclassified-information",
+      "rationale": "CUI marking and safeguarding obligations (32 CFR 2002, NARA ISOO). Zero documents in the tuning week -- kept because a CUI rulemaking is exactly the low-frequency, high-consequence document this beat exists to catch. Per-query hit counts are logged every run, so a query that never fires is visible.",
+      "term": "\"controlled unclassified information\""
+    },
+    {
+      "name": "zero-trust",
+      "rationale": "Federal zero trust architecture mandates. Zero documents in the tuning week; kept for the same reason as controlled-unclassified-information.",
+      "term": "\"zero trust\""
+    }
+  ]
+}

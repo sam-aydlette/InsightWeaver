@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class Feed:
-    """Represents an RSS feed with applicability metadata"""
+    """Represents a configured source with applicability metadata"""
 
     name: str
     url: str
@@ -24,6 +24,10 @@ class Feed:
     specialty_tags: list[str]  # threat_intelligence, education, etc.
     relevance_score: float  # 0-1, how generally useful
     source_file: str  # which JSON file it came from
+    # Which ingestion adapter reads this source (backlog task 005, 2026-08-26).
+    # Defaults to "rss" so every pre-existing entry keeps its exact behaviour;
+    # see src/sources/ for the adapters and SOURCES.md for the basis of use.
+    adapter: str = "rss"
 
 
 class FeedMatcher:
@@ -64,6 +68,7 @@ class FeedMatcher:
                         specialty_tags=applicability.get("specialty_tags", []),
                         relevance_score=feed_data.get("relevance_score", 0.5),
                         source_file=str(json_file.relative_to(self.feeds_dir)),
+                        adapter=feed_data.get("adapter", "rss"),
                     )
                     self.all_feeds.append(feed)
 
