@@ -7,10 +7,15 @@ A move of the former ``BriefFormatter.format_markdown``, unchanged in output.
 from __future__ import annotations
 
 from ._text import (
+    ACTIVITY_NOTE,
+    activity_footnote,
+    activity_sentence,
     clean_citations,
     decision_summary,
+    institutional_activity,
     prediction_check_line,
     question_lines,
+    split_activity,
     watch_items,
 )
 from .document import BriefDocument
@@ -85,6 +90,8 @@ class MarkdownRenderer:
                     lines.append(f"**Shared point:** {mf['shared_point']}")
                 lines.append("")
 
+        lines.extend(self._institutional_activity(metadata))
+
         if thin_coverage:
             lines.append("## Thin coverage")
             lines.append("")
@@ -101,6 +108,26 @@ class MarkdownRenderer:
             lines.append("")
 
         return "\n".join(lines)
+
+    def _institutional_activity(self, metadata: dict) -> list[str]:
+        """Institutional activity as markdown, or nothing when none was recorded."""
+        block = institutional_activity(metadata)
+        moved, steady = split_activity(block)
+        if not moved and not steady:
+            return []
+
+        lines = ["## Institutional activity", "", f"_{ACTIVITY_NOTE}_", ""]
+        for entry in moved:
+            lines.append(f"- {activity_sentence(entry)}")
+        for entry in steady:
+            lines.append(f"- _{activity_sentence(entry)}_")
+
+        footnote = activity_footnote(block)
+        if footnote:
+            lines.append("")
+            lines.append(f"_{footnote}_")
+        lines.append("")
+        return lines
 
     def _render_situation(self, situation: dict, index: int) -> list[str]:
         """Render a single situation as markdown."""

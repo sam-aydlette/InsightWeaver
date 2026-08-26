@@ -119,3 +119,21 @@ class TestEscaping:
         # The fixture actor name is literally `<img src=x onerror=1>`; escaped,
         # it is inert text, so the page still references no external resource.
         assert external_resource_hits(HTMLRenderer().render(hostile_document)) == []
+
+
+class TestInstitutionalActivity:
+    def test_absent_when_the_run_recorded_none(self, brief_document):
+        assert "Institutional activity" not in HTMLRenderer().render(brief_document)
+
+    def test_section_carries_movement_and_steady_lines(self, activity_document):
+        html = HTMLRenderer().render(activity_document)
+        assert "<h2>Institutional activity</h2>" in html
+        assert (
+            "<li>FedRAMP PMO appeared in 6 items this run, "
+            "against a trailing average of 1.</li>" in html
+        )
+        assert '<li class="muted">CMMC appeared in 0, unchanged.</li>' in html
+        assert "3 declared entities have never been mentioned and are not listed." in html
+
+    def test_is_deterministic(self, activity_document):
+        assert HTMLRenderer().render(activity_document) == HTMLRenderer().render(activity_document)

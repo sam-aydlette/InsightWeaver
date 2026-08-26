@@ -388,3 +388,190 @@ class TestBeatRunIsRecorded:
 
         assert test_session.query(Beat).count() == 1
         assert test_session.query(BeatRun).count() == 2
+
+
+class TestInstitutionalActivityIsRecorded:
+    """
+    A beat that declares coverage entities gets a mention row per entity per
+    run and an activity block in the stored synthesis metadata; a beat that
+    declares none gets neither, and neither does the default brief.
+
+    The counting itself is deterministic alias matching -- no Claude call is
+    made on this path, which is why the mocked client below is never asked for
+    one beyond the two calls the synthesis already makes.
+
+    Added 2026-08-26 with institutional activity (backlog task 006).
+    """
+
+    CLUSTERING = TestBeatRunIsRecorded.CLUSTERING
+    SITUATION = TestBeatRunIsRecorded.SITUATION
+
+    @staticmethod
+    def _beat_config(entities):
+        from src.config.beats import BeatConfig, BeatSource
+
+        return BeatConfig(
+            name="test-beat",
+            description="A test beat.",
+            sources=(BeatSource(adapter="rss", feed_tags=("regulatory",)),),
+            coverage={},
+            standing_questions=(),
+            channels=("terminal",),
+            config_path="config/beats/test-beat.json",
+            entities=entities,
+        )
+
+    def _wire(self, mock_curator, mock_frame_mgr, contents):
+        articles = [
+            {
+                "id": i,
+                "title": f"Article {i}",
+                "source": f"Source {i}",
+                "content": content,
+                "published_date": "2026-08-20",
+                "url": f"https://example.com/{i}",
+            }
+            for i, content in enumerate(contents, 1)
+        ]
+        curator = MagicMock()
+        mock_curator.return_value = curator
+        curator.curate_for_narrative_synthesis = AsyncMock(return_value={"articles": articles})
+        curator._format_user_profile = MagicMock(return_value={})
+        curator._get_synthesis_instructions = MagicMock(return_value="")
+        curator.beat_feed_urls = ["https://in-beat.test/feed"]
+
+        frame_mgr = MagicMock()
+        mock_frame_mgr.return_value = frame_mgr
+        frame_mgr.find_matching_cluster.return_value = None
+        frame_mgr.discover_frames = AsyncMock(return_value=None)
+
+        client = MagicMock()
+        client.analyze = AsyncMock(side_effect=[self.CLUSTERING, json.dumps({})])
+        client.analyze_with_context = AsyncMock(return_value=self.SITUATION)
+        return client
+
+    @pytest.mark.asyncio
+    @patch("src.context.synthesizer.FrameManager")
+    @patch("src.context.synthesizer.ContextCurator")
+    async def test_mentions_are_written_in_the_synthesis_transaction(
+        self, mock_curator, mock_frame_mgr, isolated_db, test_session
+    ):
+        from src.config.beats import CoverageEntity
+        from src.database.models import BeatEntity, BeatRun, EntityMention
+
+        client = self._wire(
+            mock_curator, mock_frame_mgr, ["CISA issued an advisory.", "Nothing relevant."]
+        )
+        beat = self._beat_config((CoverageEntity("org", "CISA"), CoverageEntity("program", "CMMC")))
+
+        result = await NarrativeSynthesizer(client=client, beat=beat).synthesize(
+            hours=24, max_articles=10
+        )
+
+        assert result["status"] == "success"
+        assert test_session.query(BeatEntity).count() == 2
+
+        beat_run = test_session.query(BeatRun).one()
+        mentions = test_session.query(EntityMention).all()
+        # Both entities get a row, including the one that counted zero.
+        assert {m.item_count for m in mentions} == {0, 1}
+        assert all(m.beat_run_id == beat_run.id for m in mentions)
+        assert all(m.synthesis_id == result["synthesis_id"] for m in mentions)
+        assert all(m.items_scanned == 2 for m in mentions)
+
+    @pytest.mark.asyncio
+    @patch("src.context.synthesizer.FrameManager")
+    @patch("src.context.synthesizer.ContextCurator")
+    async def test_the_brief_metadata_reports_the_delta_not_a_tally(
+        self, mock_curator, mock_frame_mgr, isolated_db, test_session
+    ):
+        from src.config.beats import CoverageEntity
+
+        beat = self._beat_config((CoverageEntity("org", "CISA"),))
+
+        # Three quiet runs establish a baseline, then CISA appears twice.
+        for contents in (["Nothing."], ["Nothing."], ["Nothing."]):
+            client = self._wire(mock_curator, mock_frame_mgr, contents * 2)
+            await NarrativeSynthesizer(client=client, beat=beat).synthesize(
+                hours=24, max_articles=10
+            )
+
+        client = self._wire(mock_curator, mock_frame_mgr, ["CISA acted.", "CISA again."])
+        result = await NarrativeSynthesizer(client=client, beat=beat).synthesize(
+            hours=24, max_articles=10
+        )
+
+        activity = result["synthesis_data"]["metadata"]["institutional_activity"]
+        assert activity["entities"] == [
+            {
+                "kind": "org",
+                "name": "CISA",
+                "count": 2,
+                "trailing_average": 0.0,
+                "prior_runs": 3,
+                "movement": "up",
+            }
+        ]
+
+    @pytest.mark.asyncio
+    @patch("src.context.synthesizer.FrameManager")
+    @patch("src.context.synthesizer.ContextCurator")
+    async def test_a_beat_without_coverage_records_nothing(
+        self, mock_curator, mock_frame_mgr, isolated_db, test_session
+    ):
+        from src.database.models import BeatEntity, EntityMention
+
+        client = self._wire(mock_curator, mock_frame_mgr, ["CISA acted.", "More."])
+
+        result = await NarrativeSynthesizer(client=client, beat=self._beat_config(())).synthesize(
+            hours=24, max_articles=10
+        )
+
+        assert "institutional_activity" not in result["synthesis_data"]["metadata"]
+        assert test_session.query(BeatEntity).count() == 0
+        assert test_session.query(EntityMention).count() == 0
+
+    @pytest.mark.asyncio
+    @patch("src.context.synthesizer.FrameManager")
+    @patch("src.context.synthesizer.ContextCurator")
+    async def test_the_default_brief_records_nothing(
+        self, mock_curator, mock_frame_mgr, isolated_db, test_session
+    ):
+        from src.database.models import BeatEntity, EntityMention
+
+        client = self._wire(mock_curator, mock_frame_mgr, ["CISA acted.", "More."])
+
+        result = await NarrativeSynthesizer(client=client).synthesize(hours=24, max_articles=10)
+
+        assert "institutional_activity" not in result["synthesis_data"]["metadata"]
+        assert test_session.query(BeatEntity).count() == 0
+        assert test_session.query(EntityMention).count() == 0
+
+    @pytest.mark.asyncio
+    @patch("src.context.synthesizer.FrameManager")
+    @patch("src.context.synthesizer.ContextCurator")
+    async def test_a_database_without_the_tables_loses_the_section_not_the_brief(
+        self, mock_curator, mock_frame_mgr, isolated_db, test_engine, test_session
+    ):
+        """
+        The activity pass is an additive reading of articles the run already
+        has. On a database that predates the migration it is skipped with a
+        warning; losing a whole brief over one section would be the worse
+        outcome, and the run's own attribution is unaffected.
+        """
+        from src.config.beats import CoverageEntity
+        from src.database.models import BeatEntity, BeatRun, EntityMention
+
+        EntityMention.__table__.drop(test_engine)
+        BeatEntity.__table__.drop(test_engine)
+
+        client = self._wire(mock_curator, mock_frame_mgr, ["CISA acted.", "More."])
+        beat = self._beat_config((CoverageEntity("org", "CISA"),))
+
+        result = await NarrativeSynthesizer(client=client, beat=beat).synthesize(
+            hours=24, max_articles=10
+        )
+
+        assert result["status"] == "success"
+        assert "institutional_activity" not in result["synthesis_data"]["metadata"]
+        assert test_session.query(BeatRun).count() == 1

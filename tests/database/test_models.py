@@ -238,3 +238,81 @@ class TestModelIndexes:
 
         for idx in expected_indexes:
             assert idx in index_names, f"Index {idx} should exist on articles table"
+
+
+class TestInstitutionalActivitySchema:
+    """
+    The institutional activity tables, and the boundary they are built around.
+
+    `beat_entities.kind` admits org / program / document_type. There is no
+    person kind and no persons table, so there is no row a per-individual
+    activity ledger could be assembled from. A named individual may appear
+    inside a rendered situation where the source document names a signatory --
+    that is an attribute of a document and expires with it -- but never as a
+    row here, because a row here accumulates across runs.
+
+    Added 2026-08-26 with backlog task 006.
+    """
+
+    def test_the_kind_vocabulary_is_closed_and_holds_no_person(self):
+        from src.database.models import ENTITY_KINDS
+
+        assert ENTITY_KINDS == ("org", "program", "document_type")
+
+    def test_no_table_in_the_schema_is_person_shaped(self, test_engine):
+        """
+        A blunt structural check over the whole schema, not just the new
+        tables: if a persons table is ever added, this fails.
+        """
+        from sqlalchemy import inspect
+
+        from src.database.models import Base
+
+        forbidden = ("people", "persons", "person", "officials", "individuals", "watchlist")
+        names = set(Base.metadata.tables) | set(inspect(test_engine).get_table_names())
+
+        assert not [name for name in names if any(word in name.lower() for word in forbidden)]
+
+    def test_no_column_on_the_activity_tables_names_an_individual(self):
+        from src.database.models import BeatEntity, EntityMention
+
+        columns = {column.name for column in BeatEntity.__table__.columns} | {
+            column.name for column in EntityMention.__table__.columns
+        }
+
+        assert columns == {
+            "id",
+            "beat_id",
+            "kind",
+            "name",
+            "aliases",
+            "created_at",
+            "updated_at",
+            "entity_id",
+            "beat_run_id",
+            "synthesis_id",
+            "item_count",
+            "items_scanned",
+            "observed_at",
+        }
+
+    def test_one_mention_row_per_entity_per_run(self, test_session):
+        """
+        The uniqueness that keeps a re-run from doubling a baseline.
+        """
+        from src.database.models import Beat, BeatEntity, BeatRun, EntityMention
+
+        beat = Beat(name="b")
+        test_session.add(beat)
+        test_session.flush()
+        entity = BeatEntity(beat_id=beat.id, kind="org", name="GSA", aliases=[])
+        run = BeatRun(beat_id=beat.id)
+        test_session.add_all([entity, run])
+        test_session.flush()
+
+        test_session.add(EntityMention(entity_id=entity.id, beat_run_id=run.id, item_count=1))
+        test_session.commit()
+        test_session.add(EntityMention(entity_id=entity.id, beat_run_id=run.id, item_count=9))
+
+        with pytest.raises(IntegrityError):
+            test_session.commit()

@@ -13,11 +13,13 @@ import json
 import pytest
 
 from src.config.beats import (
+    ENTITY_KINDS,
     SUPPORTED_ADAPTERS,
     BeatConfig,
     BeatNotFound,
     BeatSource,
     BeatValidationError,
+    CoverageEntity,
     available_beats,
     load_beat,
 )
@@ -100,24 +102,25 @@ class TestLoadingAValidBeat:
         assert beat.standing_questions == ()
         assert beat.channels == ("terminal",)
 
-    def test_coverage_and_standing_questions_are_reserved_not_read(self, beats_dir):
+    def test_coverage_round_trips_and_standing_questions_stay_reserved(self, beats_dir):
         """
-        Task 006 and 007 own these. They round-trip so those tasks need no
-        migration, but nothing in this codebase consumes them yet.
+        ``coverage`` is now read (task 006) and also round-trips verbatim, so
+        nothing downstream has to reconstruct the file. ``standing_questions``
+        is still validated for shape only -- task 007 owns it.
         """
         write_beat(
             beats_dir,
             "reserved",
             valid_payload(
                 name="reserved",
-                coverage={"entities": ["CISA"]},
+                coverage={"orgs": ["CISA"]},
                 standing_questions=["Will the rule land?"],
             ),
         )
 
         beat = load_beat("reserved", beats_dir)
 
-        assert beat.coverage == {"entities": ["CISA"]}
+        assert beat.coverage == {"orgs": ["CISA"]}
         assert beat.standing_questions == ("Will the rule land?",)
 
     def test_available_beats_lists_files(self, beats_dir):
@@ -393,3 +396,181 @@ class TestPeopleAreNotTrackable:
         )
         loaded = load_beat("fine", beats_dir=tmp_path)
         assert loaded.coverage == {"orgs": ["GSA"], "programs": ["FedRAMP 20x"]}
+
+    def test_a_person_shaped_key_by_any_other_name_is_also_rejected(self, tmp_path):
+        """
+        The `people` rejection is specific; the kind vocabulary is closed.
+        Renaming the block does not get a person list past the loader, which
+        is what keeps the boundary from depending on one blacklisted word.
+        """
+        beat = tmp_path / "renamed.json"
+        beat.write_text(
+            json.dumps(
+                {
+                    "name": "renamed",
+                    "sources": [{"adapter": "rss", "feed_tags": ["general_news"]}],
+                    "coverage": {"officials": ["A Name"]},
+                }
+            )
+        )
+        with pytest.raises(BeatValidationError) as exc:
+            load_beat("renamed", beats_dir=tmp_path)
+        message = str(exc.value)
+        assert "officials" in message
+        assert "never individuals" in message
+
+    def test_no_entity_can_carry_a_person_kind(self, tmp_path):
+        """There is no spelling of `kind` that produces a person entity."""
+        beat = tmp_path / "kinds.json"
+        beat.write_text(
+            json.dumps(
+                {
+                    "name": "kinds",
+                    "sources": [{"adapter": "rss", "feed_tags": ["general_news"]}],
+                    "coverage": {"orgs": ["GSA"], "programs": [], "document_types": []},
+                }
+            )
+        )
+        loaded = load_beat("kinds", beats_dir=tmp_path)
+        assert {entity.kind for entity in loaded.entities} <= ENTITY_KINDS
+        assert "person" not in ENTITY_KINDS
+        assert "people" not in ENTITY_KINDS
+
+
+class TestCoverageEntities:
+    """
+    The parsed view of `coverage`: what the institutional activity pass reads.
+
+    The raw block still round-trips on `BeatConfig.coverage`; `entities` is the
+    same content typed, with the plural config key mapped to the singular kind.
+    """
+
+    def test_short_form_entry_is_a_bare_canonical_name(self, beats_dir):
+        write_beat(beats_dir, "short", valid_payload("short", coverage={"orgs": ["GSA"]}))
+
+        entities = load_beat("short", beats_dir).entities
+
+        assert entities == (CoverageEntity(kind="org", name="GSA"),)
+        assert entities[0].terms == ("GSA",)
+
+    def test_long_form_entry_carries_aliases(self, beats_dir):
+        write_beat(
+            beats_dir,
+            "long",
+            valid_payload(
+                "long",
+                coverage={
+                    "orgs": [
+                        {
+                            "name": "CISA",
+                            "aliases": ["Cybersecurity and Infrastructure Security Agency"],
+                        }
+                    ]
+                },
+            ),
+        )
+
+        entity = load_beat("long", beats_dir).entities[0]
+
+        assert entity.kind == "org"
+        assert entity.name == "CISA"
+        assert entity.aliases == ("Cybersecurity and Infrastructure Security Agency",)
+        assert entity.terms[0] == "CISA", "canonical name comes first"
+
+    def test_each_block_maps_to_its_kind(self, beats_dir):
+        write_beat(
+            beats_dir,
+            "kinds",
+            valid_payload(
+                "kinds",
+                coverage={
+                    "orgs": ["GSA"],
+                    "programs": ["CMMC"],
+                    "document_types": ["Emergency Directive"],
+                },
+            ),
+        )
+
+        entities = load_beat("kinds", beats_dir).entities
+
+        assert [(e.kind, e.name) for e in entities] == [
+            ("org", "GSA"),
+            ("program", "CMMC"),
+            ("document_type", "Emergency Directive"),
+        ]
+
+    def test_terms_deduplicate_a_repeated_alias(self, beats_dir):
+        write_beat(
+            beats_dir,
+            "dupe",
+            valid_payload("dupe", coverage={"orgs": [{"name": "GSA", "aliases": ["GSA", "GSA"]}]}),
+        )
+
+        assert load_beat("dupe", beats_dir).entities[0].terms == ("GSA",)
+
+    def test_an_absent_coverage_block_yields_no_entities(self, beats_dir):
+        write_beat(beats_dir, "none", valid_payload("none"))
+
+        assert load_beat("none", beats_dir).entities == ()
+
+    def test_the_shipped_beat_declares_only_institutions(self):
+        entities = load_beat(SHIPPED_BEAT).entities
+
+        assert entities, "the shipped beat should declare coverage"
+        assert {entity.kind for entity in entities} <= ENTITY_KINDS
+
+
+class TestMalformedCoverage:
+    def test_block_must_be_a_list(self, beats_dir):
+        write_beat(beats_dir, "bad", valid_payload("bad", coverage={"orgs": "GSA"}))
+
+        with pytest.raises(BeatValidationError, match="'coverage.orgs' must be a list"):
+            load_beat("bad", beats_dir)
+
+    def test_entry_must_be_a_string_or_an_object(self, beats_dir):
+        write_beat(beats_dir, "bad", valid_payload("bad", coverage={"orgs": [17]}))
+
+        with pytest.raises(BeatValidationError, match=r"coverage\.orgs\[0\] must be a string"):
+            load_beat("bad", beats_dir)
+
+    def test_entry_object_needs_a_name(self, beats_dir):
+        write_beat(beats_dir, "bad", valid_payload("bad", coverage={"orgs": [{"aliases": []}]}))
+
+        with pytest.raises(BeatValidationError, match="missing required key 'name'"):
+            load_beat("bad", beats_dir)
+
+    def test_entry_object_rejects_unknown_keys(self, beats_dir):
+        write_beat(
+            beats_dir,
+            "bad",
+            valid_payload("bad", coverage={"orgs": [{"name": "GSA", "role": "signs things"}]}),
+        )
+
+        with pytest.raises(BeatValidationError, match="unknown key"):
+            load_beat("bad", beats_dir)
+
+    def test_empty_name_is_rejected(self, beats_dir):
+        write_beat(beats_dir, "bad", valid_payload("bad", coverage={"orgs": ["  "]}))
+
+        with pytest.raises(BeatValidationError, match="non-empty 'name'"):
+            load_beat("bad", beats_dir)
+
+    def test_alias_must_be_a_non_empty_string(self, beats_dir):
+        write_beat(
+            beats_dir,
+            "bad",
+            valid_payload("bad", coverage={"orgs": [{"name": "GSA", "aliases": [""]}]}),
+        )
+
+        with pytest.raises(BeatValidationError, match="non-empty strings"):
+            load_beat("bad", beats_dir)
+
+    def test_a_duplicated_entity_is_rejected(self, beats_dir):
+        write_beat(
+            beats_dir,
+            "bad",
+            valid_payload("bad", coverage={"orgs": ["GSA", {"name": "GSA"}]}),
+        )
+
+        with pytest.raises(BeatValidationError, match="declares 'GSA' more than once"):
+            load_beat("bad", beats_dir)

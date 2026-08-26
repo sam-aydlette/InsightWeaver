@@ -12,11 +12,16 @@ from __future__ import annotations
 from ..utils.base_formatter import BaseTerminalFormatter
 from ..utils.colors import accent, header, muted, warning
 from ._text import (
+    ACTIVITY_NOTE,
     DIRECTION_GLYPH,
+    activity_footnote,
+    activity_sentence,
     clean_citations,
     decision_summary,
+    institutional_activity,
     prediction_check_line,
     question_lines,
+    split_activity,
     watch_items,
 )
 from .document import BriefDocument
@@ -108,6 +113,10 @@ class TerminalRenderer(BaseTerminalFormatter):
                     lines.append(f"    Shared point: {muted(mf['shared_point'])}")
                 lines.append("")
 
+        # Institutional activity -- what the beat's declared institutions did
+        # this run against what they usually do.
+        lines.extend(self._render_institutional_activity(metadata))
+
         # Thin coverage
         if thin_coverage:
             lines.append(header("-" * self.max_width))
@@ -131,6 +140,41 @@ class TerminalRenderer(BaseTerminalFormatter):
         lines.append(header("=" * self.max_width))
 
         return "\n".join(lines)
+
+    def _render_institutional_activity(self, metadata: dict) -> list[str]:
+        """
+        Format the institutional activity section, or nothing at all.
+
+        Two blocks, and both matter. The first is what moved. The second is the
+        entities that have been active before and are steady or silent today --
+        quieter, but present, because an office going quiet is information and
+        a section that only ever showed increases would read as a scoreboard.
+        """
+        block = institutional_activity(metadata)
+        moved, steady = split_activity(block)
+        if not moved and not steady:
+            return []
+
+        lines = [
+            header("-" * self.max_width),
+            header("INSTITUTIONAL ACTIVITY"),
+            muted(ACTIVITY_NOTE),
+            header("-" * self.max_width),
+            "",
+        ]
+        for entry in moved:
+            lines.append(f"  {activity_sentence(entry)}")
+        if moved and steady:
+            lines.append("")
+        for entry in steady:
+            lines.append(muted(f"  {activity_sentence(entry)}"))
+
+        footnote = activity_footnote(block)
+        if footnote:
+            lines.append("")
+            lines.append(muted(f"  {footnote}"))
+        lines.append("")
+        return lines
 
     def _render_situation(self, situation: dict, index: int) -> str:
         """Format a single situation for terminal display."""

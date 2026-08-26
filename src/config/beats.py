@@ -47,6 +47,20 @@ REQUIRED_BEAT_KEYS = frozenset({"name", "sources"})
 SOURCE_KEYS = frozenset({"adapter", "feed_tags", "geo_tags", "scope"})
 REQUIRED_SOURCE_KEYS = frozenset({"adapter", "feed_tags"})
 
+# The only three things a beat may track, and the plural config key that
+# declares each. The mapping is closed on purpose: any other key -- `people`,
+# `officials`, `staff`, anything -- is a validation error rather than a
+# silently ignored block, so the boundary cannot be reintroduced by convention.
+COVERAGE_KINDS: dict[str, str] = {
+    "orgs": "org",
+    "programs": "program",
+    "document_types": "document_type",
+}
+ENTITY_KINDS = frozenset(COVERAGE_KINDS.values())
+
+# Keys permitted on the long form of one coverage entry.
+COVERAGE_ENTRY_KEYS = frozenset({"name", "aliases"})
+
 
 class BeatNotFound(FileNotFoundError):
     """Raised when no beat file exists for the requested name."""
@@ -102,13 +116,52 @@ class BeatSource:
 
 
 @dataclass(frozen=True)
+class CoverageEntity:
+    """
+    One institution a beat tracks: an organization, a program, or a type of
+    document.
+
+    ``kind`` is one of :data:`ENTITY_KINDS`. There is no person kind, and the
+    absence is the point -- personnel rotate while offices persist, so a name
+    goes dark on reassignment and the silence reads as inactivity, which is a
+    wrong answer that looks like a real one. ``name`` is the canonical form
+    used everywhere the entity is displayed or stored; ``aliases`` are the
+    other surface forms that count as the same entity.
+    """
+
+    kind: str
+    name: str
+    aliases: tuple[str, ...] = ()
+
+    @property
+    def key(self) -> str:
+        """Stable identity of this entity within a beat: ``kind:name``."""
+        return f"{self.kind}:{self.name}"
+
+    @property
+    def terms(self) -> tuple[str, ...]:
+        """
+        Every surface form that counts as this entity, canonical name first.
+
+        Deduplicated but order-preserving, so matching is deterministic
+        regardless of how the config repeated itself.
+        """
+        seen: dict[str, None] = {}
+        for term in (self.name, *self.aliases):
+            seen.setdefault(term, None)
+        return tuple(seen)
+
+
+@dataclass(frozen=True)
 class BeatConfig:
     """
     A loaded, validated beat definition.
 
-    ``coverage`` and ``standing_questions`` are reserved: they are validated
-    for shape so that backlog tasks 006 and 007 need no schema migration, but
-    nothing in this codebase reads them yet.
+    ``coverage`` is the raw block as written; ``entities`` is the same block
+    parsed into :class:`CoverageEntity` values, which is what the institutional
+    activity pass reads. ``standing_questions`` is still reserved: it is
+    validated for shape so that backlog task 007 needs no schema migration, but
+    nothing reads it yet.
     """
 
     name: str
@@ -118,6 +171,7 @@ class BeatConfig:
     standing_questions: tuple[Any, ...]
     channels: tuple[str, ...]
     config_path: str
+    entities: tuple[CoverageEntity, ...] = ()
 
     def resolve_feeds(self, matcher: FeedMatcher | None = None) -> list[Feed]:
         """
@@ -194,20 +248,8 @@ def load_beat(name: str, beats_dir: Path | str | None = None) -> BeatConfig:
 
     coverage = raw.get("coverage", {})
     if not isinstance(coverage, dict):
-        raise BeatValidationError(path, "'coverage' must be an object (reserved for task 006)")
-    # A beat tracks institutions, not people. `coverage` will hold orgs, programs and
-    # document types (task 006); a `people` key is refused here rather than ignored so
-    # the boundary is enforced by the loader and cannot be reintroduced by convention.
-    # This repository is public and covers a domain the operator works in: a per-person
-    # activity ledger would read as surveillance of colleagues regardless of the
-    # mechanism, and offices are the better signal anyway since personnel rotate.
-    if "people" in coverage:
-        raise BeatValidationError(
-            path,
-            "'coverage.people' is not supported: a beat tracks organizations, programs "
-            "and document types, never individuals. A named person may appear as an "
-            "attribute of a specific document, never as an accumulated record.",
-        )
+        raise BeatValidationError(path, "'coverage' must be an object")
+    entities = _parse_coverage(path, coverage)
 
     standing_questions = raw.get("standing_questions", [])
     if not isinstance(standing_questions, list):
@@ -225,7 +267,103 @@ def load_beat(name: str, beats_dir: Path | str | None = None) -> BeatConfig:
         standing_questions=tuple(standing_questions),
         channels=channels,
         config_path=str(path),
+        entities=entities,
     )
+
+
+def _parse_coverage(path: Path, coverage: dict[str, Any]) -> tuple[CoverageEntity, ...]:
+    """
+    Validate the ``coverage`` block into :class:`CoverageEntity` values.
+
+    A beat tracks institutions, not people. ``coverage`` holds orgs, programs
+    and document types; a ``people`` key is refused here rather than ignored so
+    the boundary is enforced by the loader and cannot be reintroduced by
+    convention. This repository is public and covers a domain the operator
+    works in: a per-person activity ledger would read as surveillance of
+    colleagues regardless of the mechanism, and offices are the better signal
+    anyway since personnel rotate.
+
+    The `people` rejection is checked before the general unknown-key check so
+    that the specific reason is the one the author reads.
+    """
+    if "people" in coverage:
+        raise BeatValidationError(
+            path,
+            "'coverage.people' is not supported: a beat tracks organizations, programs "
+            "and document types, never individuals. A named person may appear as an "
+            "attribute of a specific document, never as an accumulated record.",
+        )
+
+    unknown = set(coverage) - set(COVERAGE_KINDS)
+    if unknown:
+        supported = ", ".join(sorted(COVERAGE_KINDS))
+        raise BeatValidationError(
+            path,
+            f"'coverage' has unknown key(s): {', '.join(sorted(unknown))} "
+            f"(supported: {supported}). A beat tracks organizations, programs and "
+            f"document types, never individuals.",
+        )
+
+    parsed: list[CoverageEntity] = []
+    seen: set[str] = set()
+    for block, kind in COVERAGE_KINDS.items():
+        raw_entries = coverage.get(block, [])
+        if not isinstance(raw_entries, list):
+            raise BeatValidationError(path, f"'coverage.{block}' must be a list")
+        for index, entry in enumerate(raw_entries):
+            entity = _parse_coverage_entry(path, f"coverage.{block}[{index}]", kind, entry)
+            if entity.key in seen:
+                raise BeatValidationError(
+                    path, f"'coverage.{block}' declares '{entity.name}' more than once"
+                )
+            seen.add(entity.key)
+            parsed.append(entity)
+
+    return tuple(parsed)
+
+
+def _parse_coverage_entry(path: Path, where: str, kind: str, entry: Any) -> CoverageEntity:
+    """
+    Validate one coverage entry, in either the short or the long form.
+
+    Short form is a bare string -- the canonical name, matched on its own.
+    Long form is ``{"name": ..., "aliases": [...]}``. Any other key is an
+    error: a coverage entry describes an institution and its surface forms,
+    and there is nothing else for it to carry.
+    """
+    if isinstance(entry, str):
+        name = entry
+        aliases: tuple[str, ...] = ()
+    elif isinstance(entry, dict):
+        unknown = set(entry) - COVERAGE_ENTRY_KEYS
+        if unknown:
+            supported = ", ".join(sorted(COVERAGE_ENTRY_KEYS))
+            raise BeatValidationError(
+                path,
+                f"{where} has unknown key(s): {', '.join(sorted(unknown))} "
+                f"(supported: {supported})",
+            )
+        if "name" not in entry:
+            raise BeatValidationError(path, f"{where} is missing required key 'name'")
+        name = entry["name"]
+        raw_aliases = entry.get("aliases", [])
+        if not isinstance(raw_aliases, list):
+            raise BeatValidationError(path, f"{where}.aliases must be a list of strings")
+        for alias in raw_aliases:
+            if not isinstance(alias, str) or not alias.strip():
+                raise BeatValidationError(
+                    path, f"{where}.aliases must contain only non-empty strings, got {alias!r}"
+                )
+        aliases = tuple(alias.strip() for alias in raw_aliases)
+    else:
+        raise BeatValidationError(
+            path, f"{where} must be a string or an object with a 'name', got {entry!r}"
+        )
+
+    if not isinstance(name, str) or not name.strip():
+        raise BeatValidationError(path, f"{where} must have a non-empty 'name'")
+
+    return CoverageEntity(kind=kind, name=name.strip(), aliases=aliases)
 
 
 def _parse_sources(path: Path, raw_sources: Any) -> tuple[BeatSource, ...]:

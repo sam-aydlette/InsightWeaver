@@ -44,3 +44,21 @@ class TestRender:
         md = MarkdownRenderer().render(empty_document)
         assert "_No situations met the analysis threshold._" in md
         assert "## Thin coverage" not in md
+
+
+class TestInstitutionalActivity:
+    def test_absent_when_the_run_recorded_none(self, brief_document):
+        assert "## Institutional activity" not in MarkdownRenderer().render(brief_document)
+
+    def test_section_carries_movement_and_steady_lines(self, activity_document):
+        md = MarkdownRenderer().render(activity_document)
+        assert "## Institutional activity" in md
+        assert "- FedRAMP PMO appeared in 6 items this run, against a trailing average of 1." in md
+        assert "- OMB appeared in 0 items this run, against a trailing average of 3.4." in md
+        assert "- _CMMC appeared in 0, unchanged._" in md
+        assert "_3 declared entities have never been mentioned and are not listed._" in md
+
+    def test_is_deterministic(self, activity_document):
+        assert MarkdownRenderer().render(activity_document) == MarkdownRenderer().render(
+            activity_document
+        )

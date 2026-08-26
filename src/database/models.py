@@ -592,3 +592,96 @@ class BeatRun(Base):
         Index("idx_beat_run_synthesis", "synthesis_id"),
         Index("idx_beat_run_started_at", "started_at"),
     )
+
+
+# ============================================================================
+# Institutional activity
+# What a beat's declared institutions did this run, against what they usually
+# do. Added 2026-08-26 for backlog task 006.
+#
+# The hard boundary, restated in the schema itself: `kind` admits `org`,
+# `program` and `document_type` and nothing else. There is no person kind and
+# no persons table, so there is no row a per-individual activity ledger could
+# be assembled from. A named individual may appear inside a rendered situation
+# where the source document names a signatory -- that is an attribute of a
+# document and expires with it -- but never as a row here, because a row here
+# accumulates across runs into a file on someone. See
+# backlog/006-institutional-activity.md and docs/CONCEPTS.md.
+# ============================================================================
+
+
+ENTITY_KIND_ORG = "org"
+ENTITY_KIND_PROGRAM = "program"
+ENTITY_KIND_DOCUMENT_TYPE = "document_type"
+
+# The closed set. Enforced at the loader (src/config/beats.py rejects a
+# `coverage.people` key) and again on the write path in
+# src/context/institutional_activity.py, which refuses an unknown kind rather
+# than storing it.
+ENTITY_KINDS = (ENTITY_KIND_ORG, ENTITY_KIND_PROGRAM, ENTITY_KIND_DOCUMENT_TYPE)
+
+
+class BeatEntity(Base):
+    """
+    One institution a beat tracks, mirroring an entry in its `coverage` block.
+
+    The config file stays authoritative for which entities exist and what their
+    aliases are; this row exists so mentions have something stable to key off
+    across runs and so an entity keeps its history after a config edit.
+    """
+
+    __tablename__ = "beat_entities"
+
+    id = Column(Integer, primary_key=True)
+    beat_id = Column(Integer, ForeignKey("beats.id"), nullable=False)
+
+    # One of ENTITY_KINDS. Never a person.
+    kind = Column(String(20), nullable=False)
+    name = Column(String(200), nullable=False)  # canonical form, as configured
+    aliases = Column(JSON, default=list)  # other surface forms of the same institution
+
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
+
+    beat = relationship("Beat")
+    mentions = relationship("EntityMention", back_populates="entity")
+
+    __table_args__ = (
+        Index("idx_beat_entity_beat", "beat_id"),
+        UniqueConstraint("beat_id", "kind", "name", name="_beat_entity_uc"),
+    )
+
+
+class EntityMention(Base):
+    """
+    How many of one run's items mentioned one entity.
+
+    One row per entity per recorded run, **including the zeroes**: a run in
+    which an office said nothing is an observation about that office, and
+    without the zero row the trailing average would be an average over only
+    the days something happened, which always reads as "normal".
+
+    ``item_count`` counts *items*, not occurrences -- an article that names
+    CISA nine times is one item. Counting repetitions would let a verbose
+    outlet impersonate institutional activity.
+    """
+
+    __tablename__ = "entity_mentions"
+
+    id = Column(Integer, primary_key=True)
+    entity_id = Column(Integer, ForeignKey("beat_entities.id"), nullable=False)
+    beat_run_id = Column(Integer, ForeignKey("beat_runs.id"), nullable=True)
+    synthesis_id = Column(Integer, ForeignKey("narrative_syntheses.id"), nullable=True)
+
+    item_count = Column(Integer, nullable=False, default=0)
+    items_scanned = Column(Integer)  # denominator: how many items this run looked at
+    observed_at = Column(DateTime, default=utcnow, nullable=False)
+
+    entity = relationship("BeatEntity", back_populates="mentions")
+
+    __table_args__ = (
+        Index("idx_entity_mention_entity", "entity_id"),
+        Index("idx_entity_mention_run", "beat_run_id"),
+        Index("idx_entity_mention_observed", "observed_at"),
+        UniqueConstraint("entity_id", "beat_run_id", name="_entity_mention_run_uc"),
+    )

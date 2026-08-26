@@ -108,3 +108,57 @@ class TestOneLineSummary:
             TerminalRenderer().render_one_line_summary(brief_document)
             == "BRIEF: 42 articles, 2 situations analyzed"
         )
+
+
+class TestInstitutionalActivity:
+    """
+    The section reads like an analyst noting movement, not like a dashboard.
+    What is pinned: the sentence forms, that steady entities survive, that
+    nothing is ordered by count, and that a brief without a reading gains no
+    section at all.
+    """
+
+    def test_absent_when_the_run_recorded_none(self, brief_document):
+        out = strip_ansi(TerminalRenderer().render(brief_document))
+        assert "INSTITUTIONAL ACTIVITY" not in out
+
+    def test_section_header_and_disclaimer(self, activity_document):
+        out = strip_ansi(TerminalRenderer().render(activity_document))
+        assert "INSTITUTIONAL ACTIVITY" in out
+        assert "not a measure of significance" in out
+
+    def test_a_spike_states_the_baseline_it_departed_from(self, activity_document):
+        out = strip_ansi(TerminalRenderer().render(activity_document))
+        assert "FedRAMP PMO appeared in 6 items this run, against a trailing average of 1." in out
+
+    def test_a_drop_to_silence_is_stated_the_same_way(self, activity_document):
+        out = strip_ansi(TerminalRenderer().render(activity_document))
+        assert "OMB appeared in 0 items this run, against a trailing average of 3.4." in out
+
+    def test_a_first_observation_says_it_has_no_baseline(self, activity_document):
+        out = strip_ansi(TerminalRenderer().render(activity_document))
+        assert "Emergency Directive appeared in 1 item this run; no trailing average yet." in out
+
+    def test_steady_entities_are_kept_not_dropped(self, activity_document):
+        """Silence is information; a section showing only increases is a scoreboard."""
+        out = strip_ansi(TerminalRenderer().render(activity_document))
+        assert "CMMC appeared in 0, unchanged." in out
+        assert "GSA appeared in 2, unchanged." in out
+
+    def test_never_mentioned_entities_are_accounted_for_but_not_named(self, activity_document):
+        out = strip_ansi(TerminalRenderer().render(activity_document))
+        assert "3 declared entities have never been mentioned and are not listed." in out
+
+    def test_movers_precede_steady_entities_but_neither_is_ranked_by_count(self, activity_document):
+        out = strip_ansi(TerminalRenderer().render(activity_document))
+        section = out.split("INSTITUTIONAL ACTIVITY")[1]
+        order = [
+            line
+            for name in ("FedRAMP PMO", "OMB", "Emergency Directive", "GSA", "CMMC")
+            for line in [section.index(name)]
+        ]
+        assert order == sorted(order), "movers first, then steady, each in config order"
+
+    def test_is_deterministic(self, activity_document):
+        renderer = TerminalRenderer()
+        assert renderer.render(activity_document) == renderer.render(activity_document)

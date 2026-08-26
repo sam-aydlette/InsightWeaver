@@ -6,11 +6,13 @@ package touches the pipeline, the database, the network or Claude: rendering
 is a pure function of a document, and these tests are what pins that down.
 """
 
+from typing import Any
+
 import pytest
 
 from src.render.document import BriefDocument
 
-SYNTHESIS_DATA = {
+SYNTHESIS_DATA: dict[str, Any] = {
     "situations": [
         {
             "title": "Procurement rule change lands^[1]",
@@ -120,6 +122,79 @@ def brief_document() -> BriefDocument:
     """A representative document exercising every renderable section."""
     return BriefDocument.from_synthesis_data(
         SYNTHESIS_DATA,
+        articles_analyzed=42,
+        synthesis_id=176,
+        analysis_run_id=15,
+        generated_at="2026-05-15T10:43:37.873249",
+    )
+
+
+# One realistic institutional-activity reading, on a beat that has been running
+# for a while. Deliberately mixed: something spiking, something that has gone
+# quiet after being active, something appearing for the first time, and two
+# entities sitting on their baseline. No entry here names a natural person, and
+# the payload has no field that could carry one.
+INSTITUTIONAL_ACTIVITY: dict[str, Any] = {
+    "window": 5,
+    "items_scanned": 42,
+    "never_observed": 3,
+    "entities": [
+        {
+            "kind": "org",
+            "name": "FedRAMP PMO",
+            "count": 6,
+            "trailing_average": 1.0,
+            "prior_runs": 5,
+            "movement": "up",
+        },
+        {
+            "kind": "org",
+            "name": "GSA",
+            "count": 2,
+            "trailing_average": 2.0,
+            "prior_runs": 5,
+            "movement": "unchanged",
+        },
+        {
+            "kind": "org",
+            "name": "OMB",
+            "count": 0,
+            "trailing_average": 3.4,
+            "prior_runs": 5,
+            "movement": "down",
+        },
+        {
+            "kind": "program",
+            "name": "CMMC",
+            "count": 0,
+            "trailing_average": 0.2,
+            "prior_runs": 5,
+            "movement": "unchanged",
+        },
+        {
+            "kind": "document_type",
+            "name": "Emergency Directive",
+            "count": 1,
+            "trailing_average": None,
+            "prior_runs": 0,
+            "movement": "first_run",
+        },
+    ],
+}
+
+
+@pytest.fixture
+def activity_document() -> BriefDocument:
+    """A beat brief carrying an institutional activity reading."""
+    data = {
+        **SYNTHESIS_DATA,
+        "metadata": {
+            **SYNTHESIS_DATA["metadata"],
+            "institutional_activity": INSTITUTIONAL_ACTIVITY,
+        },
+    }
+    return BriefDocument.from_synthesis_data(
+        data,
         articles_analyzed=42,
         synthesis_id=176,
         analysis_run_id=15,
