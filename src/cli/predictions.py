@@ -7,6 +7,7 @@ from datetime import timedelta
 
 import click
 
+from ..context.beat_scope import prediction_scope_filter
 from ..database.connection import get_db
 from ..database.models import (
     PREDICTION_STATUS_CONTRADICTED,
@@ -17,6 +18,7 @@ from ..database.models import (
 )
 from ..utils import utcnow
 from .colors import accent, header, muted, success, warning
+from .scope import beat_option, resolve_beat_scope, scope_label
 
 
 @click.group(name="predictions")
@@ -43,74 +45,117 @@ def _print_predictions(rows, show_resolution: bool):
 
 @predictions_command.command(name="open")
 @click.option("--limit", "-n", type=int, default=50)
-def open_predictions(limit):
-    """List predictions still waiting on coverage."""
+@beat_option
+def open_predictions(limit, beat_name):
+    """
+    List predictions still waiting on coverage.
+
+    Scoped: without --beat this is your own ledger only.
+    """
     with get_db() as session:
+        beat_id = resolve_beat_scope(session, beat_name)
         rows = (
             session.query(Prediction)
-            .filter(Prediction.status == PREDICTION_STATUS_OPEN)
+            .filter(
+                Prediction.status == PREDICTION_STATUS_OPEN,
+                prediction_scope_filter(session, beat_id),
+            )
             .order_by(Prediction.made_at.asc())
             .limit(limit)
             .all()
         )
         if not rows:
-            click.echo(muted("No open predictions."))
+            click.echo(muted("No open predictions in " + scope_label(beat_name) + "."))
             return
-        click.echo(header(f"OPEN PREDICTIONS ({len(rows)} shown)"))
+        click.echo(header(f"OPEN PREDICTIONS ({len(rows)} shown, {scope_label(beat_name)})"))
         click.echo("=" * 80)
         _print_predictions(rows, show_resolution=False)
 
 
 @predictions_command.command(name="triggered")
 @click.option("--limit", "-n", type=int, default=50)
-def triggered_predictions(limit):
-    """List predictions whose observable showed up in later coverage."""
+@beat_option
+def triggered_predictions(limit, beat_name):
+    """
+    List predictions whose observable showed up in later coverage.
+
+    Scoped: without --beat this is your own ledger only.
+    """
     with get_db() as session:
+        beat_id = resolve_beat_scope(session, beat_name)
         rows = (
             session.query(Prediction)
-            .filter(Prediction.status == PREDICTION_STATUS_TRIGGERED)
+            .filter(
+                Prediction.status == PREDICTION_STATUS_TRIGGERED,
+                prediction_scope_filter(session, beat_id),
+            )
             .order_by(Prediction.resolved_at.desc())
             .limit(limit)
             .all()
         )
         if not rows:
-            click.echo(muted("No triggered predictions yet."))
+            click.echo(muted("No triggered predictions yet in " + scope_label(beat_name) + "."))
             return
-        click.echo(header(f"TRIGGERED PREDICTIONS ({len(rows)} shown)"))
+        click.echo(header(f"TRIGGERED PREDICTIONS ({len(rows)} shown, {scope_label(beat_name)})"))
         click.echo("=" * 80)
         _print_predictions(rows, show_resolution=True)
 
 
 @predictions_command.command(name="contradicted")
 @click.option("--limit", "-n", type=int, default=50)
-def contradicted_predictions(limit):
-    """List predictions later coverage explicitly went against."""
+@beat_option
+def contradicted_predictions(limit, beat_name):
+    """
+    List predictions later coverage explicitly went against.
+
+    Scoped: without --beat this is your own ledger only.
+    """
     with get_db() as session:
+        beat_id = resolve_beat_scope(session, beat_name)
         rows = (
             session.query(Prediction)
-            .filter(Prediction.status == PREDICTION_STATUS_CONTRADICTED)
+            .filter(
+                Prediction.status == PREDICTION_STATUS_CONTRADICTED,
+                prediction_scope_filter(session, beat_id),
+            )
             .order_by(Prediction.resolved_at.desc())
             .limit(limit)
             .all()
         )
         if not rows:
-            click.echo(muted("No contradicted predictions yet."))
+            click.echo(muted("No contradicted predictions yet in " + scope_label(beat_name) + "."))
             return
-        click.echo(header(f"CONTRADICTED PREDICTIONS ({len(rows)} shown)"))
+        click.echo(
+            header(f"CONTRADICTED PREDICTIONS ({len(rows)} shown, {scope_label(beat_name)})")
+        )
         click.echo("=" * 80)
         _print_predictions(rows, show_resolution=True)
 
 
 @predictions_command.command(name="track-record")
 @click.option("--days", "-d", type=int, default=90, help="Window in days (default: 90).")
-def track_record(days):
-    """Show the tool's calibration record over a rolling window."""
+@beat_option
+def track_record(days, beat_name):
+    """
+    Show the tool's calibration record over a rolling window.
+
+    Scoped, and this is the case that matters most: a calibration number is
+    only meaningful for one ledger. Mixing a beat's resolved observables into
+    your own hit rate would corrupt the one figure the tool exists to be
+    honest about.
+    """
     cutoff = utcnow() - timedelta(days=days)
     with get_db() as session:
-        window = session.query(Prediction).filter(Prediction.made_at >= cutoff)
+        beat_id = resolve_beat_scope(session, beat_name)
+        window = session.query(Prediction).filter(
+            Prediction.made_at >= cutoff,
+            prediction_scope_filter(session, beat_id),
+        )
         total = window.count()
         if total == 0:
-            click.echo(muted(f"No predictions made in the last {days} days."))
+            click.echo(
+                muted(f"No predictions made in the last {days} days in {scope_label(beat_name)}.")
+            )
             return
 
         counts = {
@@ -123,7 +168,7 @@ def track_record(days):
         }
         resolved = counts["triggered"] + counts["contradicted"]
 
-        click.echo(header(f"CALIBRATION RECORD (last {days} days)"))
+        click.echo(header(f"CALIBRATION RECORD (last {days} days, {scope_label(beat_name)})"))
         click.echo("=" * 80)
         click.echo(f"  Predictions made:     {total}")
         click.echo(f"  {success('Triggered')}:            {counts['triggered']}")

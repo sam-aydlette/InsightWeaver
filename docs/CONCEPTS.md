@@ -24,7 +24,7 @@ A **Question** is an unresolved epistemic thread the coverage is implicitly trac
 
 **Reappearance.** When a previously resolved Question's text appears again in fresh coverage, a *new* Question is created with `previous_question_id` pointing at the resolved one. Resolution is never silently undone.
 
-**CLI.** `questions list | show <id> | resolve <id> --note ...`
+**CLI.** `questions list [--beat NAME] | show <id> | resolve <id> --note ...`
 
 **In the brief.** Returning questions surface their identity inline: `Q47 (run 4, asked 2026-03-12)` for repeat appearances, `Q47 (new)` for first ones.
 
@@ -40,7 +40,7 @@ A **Prediction** is a falsifiable observable the synthesis committed to watching
 
 **Why it matters.** This makes the tool's forward-looking statements auditable. The `predictions track-record` command shows the calibration: of N predictions resolved in the last 90 days, what fraction triggered vs. were contradicted.
 
-**CLI.** `predictions open | triggered | contradicted | track-record`
+**CLI.** `predictions open | triggered | contradicted | track-record`, each taking `--beat NAME`
 
 **In the brief.** A transparency line at the top of each brief reports the check results: "Prediction check: 8 open observables graded — 1 triggered, 0 contradicted, 7 still open."
 
@@ -137,6 +137,29 @@ What stays **global**, deliberately:
 - **Decisions, DecisionFactors and DecisionEvidence.** A standing decision belongs to the user, not to a subject; the point of routing beat coverage into it is that a compliance development can move the user's career-timing factor. Scoping the decision journal per beat would break exactly the connection it exists to make.
 - **TopicClusters and NarrativeFrames.** A frame is a structural property of coverage, not of a subject. The same "national-security framing" appears in both the compliance beat and the general brief, and it is the same frame. Splitting the glossary per beat would fragment the frame vocabulary and weaken the `diet` signals, which depend on comparing feeds across the whole corpus.
 - **Article content filtering.** Stage 3 still filters articles against the person profile's `excluded_topics` before a beat brief selects from what remains. A beat scopes which *sources* are read, not who the brief is for.
+
+### Reading the graph back out: `questions`, `predictions`, `forecast`
+
+Scoping the write path is only half the boundary. `brief` writes the graph; `questions`, `predictions` and `forecast` read it back out, and an unscoped read would surface a beat's ledger as though it were the user's own. That is the same silent-wrong-answer failure the scoping exists to prevent, so these commands answer the same way `brief` does:
+
+**No `--beat` means your own ledger, `--beat NAME` means that subject's.** One flag, the same meaning everywhere.
+
+| Command | Scoped? |
+| --- | --- |
+| `questions list` | yes |
+| `predictions open` / `triggered` / `contradicted` | yes |
+| `predictions track-record` | yes |
+| `forecast` | yes |
+| `questions show <id>` | no -- id-addressed, discloses its ledger |
+| `questions resolve <id> --note ...` | no -- id-addressed, reports its ledger |
+
+`track-record` is the case that matters most. A calibration figure is only meaningful within one ledger: folding a compliance beat's resolved observables into the user's personal hit rate would corrupt the single number the tool exists to be honest about. `forecast` is a derived view over the predictions ledger, so it inherits the ledger's scoping rather than defining its own.
+
+**The two exceptions are deliberate, and they are not "left global by omission".** `questions show 47` and `questions resolve 47` name one specific row. Refusing to find it because it belongs to another ledger would be obstructive, and silently scoping the lookup would make a valid id look nonexistent — addressing a row by id is an explicit act, not a browse. So both operate on the whole graph, and both **disclose** the ledger the row belongs to: `show` prints a `Ledger:` line, and `resolve` names the beat in its confirmation. The appearance history inside `show` is likewise unscoped, because it is the full history of the row the user asked about. Scoping is thereby always either applied or stated, never assumed.
+
+**`--beat` on the read side resolves against the `beats` table, not `config/beats/`.** A ledger you have already accumulated stays readable after its config file is edited or deleted; reading is about what ran, not about what is currently configured to run. An unrecognised name is an error naming the beats that have runs, rather than an empty result that would read as "you have nothing here".
+
+On a database with no `beat_runs` rows these commands behave exactly as they always have, for the same reason the brief does: the default scope is the whole graph.
 
 ---
 

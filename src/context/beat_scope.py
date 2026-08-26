@@ -38,13 +38,25 @@ class BeatTablesMissing(RuntimeError):
     """Raised when a beat run is attempted on a database that predates beats."""
 
 
+class BeatNotRecorded(LookupError):
+    """Raised when a name does not match any beat that has ever run."""
+
+    def __init__(self, name: str, known: list[str]) -> None:
+        self.name = name
+        self.known = known
+        available = ", ".join(known) if known else "none yet"
+        super().__init__(f"No beat named '{name}' has recorded a run. Beats with runs: {available}")
+
+
 def require_beat_tables(bind) -> None:
     """
-    Fail before a beat run starts if this database cannot record it.
+    Fail if this database has no beats at all.
 
-    Without ``beats``/``beat_runs`` the run would have nowhere to be
-    attributed, and an unattributed beat run is indistinguishable from the
-    default brief -- so it must not start at all.
+    On the write side: without ``beats``/``beat_runs`` a run would have nowhere
+    to be attributed, and an unattributed beat run is indistinguishable from
+    the default brief -- so it must not start. On the read side: there is no
+    beat ledger to show, and an empty listing would read as "this beat has
+    nothing", which is a wrong answer rather than a missing one.
     """
     inspector = inspect(bind)
     missing = [
@@ -54,8 +66,8 @@ def require_beat_tables(bind) -> None:
     ]
     if missing:
         raise BeatTablesMissing(
-            f"This database has no {' or '.join(missing)} table, so a beat run could "
-            f"not be recorded. Run 'python -m src.database.migrations.add_beats' "
+            f"This database has no {' or '.join(missing)} table, so it holds no beats "
+            f"yet. Run 'python -m src.database.migrations.add_beats' "
             f"(or 'insightweaver brief setup') once, then retry."
         )
 
@@ -175,3 +187,42 @@ def scoped_appearance_count(session: Session, question_id: int | None, beat_id: 
         stmt = stmt.where(QuestionSituation.synthesis_id.in_(_beat_synthesis_ids(beat_id)))
 
     return int(session.execute(stmt).scalar() or 0)
+
+
+def beat_id_by_name(session: Session, name: str) -> int:
+    """
+    Resolve a beat name to its id for the read side.
+
+    Deliberately keyed off the ``beats`` table rather than ``config/beats/``:
+    a ledger you have already accumulated stays readable after its config file
+    is edited or deleted. Reading is about what ran, not about what is
+    currently configured to run.
+    """
+    require_beat_tables(session.get_bind())
+    row = session.query(Beat).filter(Beat.name == name).first()
+    if row is None:
+        known = [entry[0] for entry in session.query(Beat.name).order_by(Beat.name).all()]
+        raise BeatNotRecorded(name, known)
+    return int(row.id)
+
+
+def owning_beat_names(session: Session, question_id: int | None) -> list[str]:
+    """
+    Which beats, if any, a question has appeared under.
+
+    Used by the id-addressed commands to disclose the scope a row belongs to.
+    An empty list means the question belongs to the default scope.
+    """
+    if question_id is None or not _beat_runs_recorded(session):
+        return []
+
+    rows = (
+        session.query(Beat.name)
+        .join(BeatRun, BeatRun.beat_id == Beat.id)
+        .join(QuestionSituation, QuestionSituation.synthesis_id == BeatRun.synthesis_id)
+        .filter(QuestionSituation.question_id == question_id)
+        .distinct()
+        .order_by(Beat.name)
+        .all()
+    )
+    return [entry[0] for entry in rows]

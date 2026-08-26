@@ -9,6 +9,7 @@ from datetime import timedelta
 
 import click
 
+from ..context.beat_scope import prediction_scope_filter
 from ..database.connection import get_db
 from ..database.models import (
     PREDICTION_STATUS_CONTRADICTED,
@@ -19,6 +20,7 @@ from ..database.models import (
 )
 from ..utils import utcnow
 from .colors import accent, header, muted, success, warning
+from .scope import beat_option, resolve_beat_scope, scope_label
 
 
 @click.command(name="forecast")
@@ -29,14 +31,22 @@ from .colors import accent, header, muted, success, warning
     default=60,
     help="Window for the resolved track record (default: 60 days).",
 )
-def forecast_command(days):
-    """Show open observables and the recently-resolved record."""
+@beat_option
+def forecast_command(days, beat_name):
+    """
+    Show open observables and the recently-resolved record.
+
+    Scoped: this is a derived view over the predictions ledger, so it inherits
+    the ledger's scoping. Without --beat it shows your own observables only.
+    """
     cutoff = utcnow() - timedelta(days=days)
 
     with get_db() as session:
+        beat_id = resolve_beat_scope(session, beat_name)
+        scope = prediction_scope_filter(session, beat_id)
         open_preds = (
             session.query(Prediction)
-            .filter(Prediction.status == PREDICTION_STATUS_OPEN)
+            .filter(Prediction.status == PREDICTION_STATUS_OPEN, scope)
             .order_by(Prediction.made_at.asc())
             .all()
         )
@@ -47,12 +57,13 @@ def forecast_command(days):
                     [PREDICTION_STATUS_TRIGGERED, PREDICTION_STATUS_CONTRADICTED]
                 ),
                 Prediction.resolved_at >= cutoff,
+                scope,
             )
             .order_by(Prediction.resolved_at.desc())
             .all()
         )
 
-        click.echo(header("FORECAST"))
+        click.echo(header(f"FORECAST ({scope_label(beat_name)})"))
         click.echo(
             muted(
                 "A derived view over the predictions ledger -- not a separate engine. "

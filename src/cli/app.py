@@ -88,6 +88,7 @@ def print_help():
     click.echo()
     click.echo(header("Questions command:"))
     click.echo(f"  {accent('questions list')}         - List open (or resolved) questions")
+    click.echo(muted("    Add --beat NAME to any ledger view to read that beat's ledger"))
     click.echo(f"  {accent('questions show')} <id>    - Show a question's full history")
     click.echo(f"  {accent('questions resolve')} <id> --note '...'  - Resolve a question")
     click.echo()

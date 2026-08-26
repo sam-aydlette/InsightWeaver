@@ -187,6 +187,19 @@ A beat's brief is drawn only from that beat's sources, renders through the same
 `BriefDocument` as every other brief, and accumulates its own slice of the graph:
 its Questions and Predictions are kept apart from the default brief's, so a
 returning question's run number means "the Nth time *this subject* raised it".
+
+The ledger commands read the same way. `questions list`, `predictions`, and
+`forecast` show your own ledger by default and never surface a beat's rows;
+pass `--beat NAME` to read that subject's instead:
+
+```bash
+insightweaver questions list --beat us-public-sector-compliance
+insightweaver predictions track-record --beat us-public-sector-compliance
+insightweaver forecast --beat us-public-sector-compliance
+```
+
+`questions show <id>` and `questions resolve <id>` are addressed by id, so they
+stay global and disclose which ledger the row belongs to.
 Run attribution lives in the `beats` and `beat_runs` tables -- no existing table
 grew a `beat_id` column. See `docs/CONCEPTS.md` for the scoping rationale and for
 what stays deliberately global (the decision journal, the frame glossary).
