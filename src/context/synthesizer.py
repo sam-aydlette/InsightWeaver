@@ -46,16 +46,24 @@ ANALYSIS_THRESHOLD = 2  # Minimum articles for full situation analysis
 class NarrativeSynthesizer:
     """Two-pass situation-based narrative synthesizer."""
 
-    def __init__(self, topic_filters: dict | None = None):
+    def __init__(self, topic_filters: dict | None = None, client: ClaudeClient | None = None):
+        """
+        Args:
+            topic_filters: Optional curation filters.
+            client: Optional Claude client. When omitted (the production path),
+                every collaborator builds its own client with its own model, as
+                before. When supplied, it is injected into all of them, which is
+                the seam tests use to run without an ANTHROPIC_API_KEY.
+        """
         self.topic_filters = topic_filters or {}
         self.curator = ContextCurator(topic_filters=self.topic_filters)
-        self.client = ClaudeClient()
+        self.client = client or ClaudeClient()
         self.analysis_rules = load_analysis_rules()
         self.frame_manager = FrameManager(self.client)
-        self.question_matcher = QuestionMatcher()
-        self.prediction_tracker = PredictionTracker()
-        self.decision_router = DecisionRouter()
-        self.cross_cluster_reconciler = CrossClusterReconciler()
+        self.question_matcher = QuestionMatcher(client)
+        self.prediction_tracker = PredictionTracker(client)
+        self.decision_router = DecisionRouter(client)
+        self.cross_cluster_reconciler = CrossClusterReconciler(client)
 
     async def synthesize(self, hours: int = 48, max_articles: int = 50) -> dict[str, Any]:
         """
@@ -408,7 +416,8 @@ class NarrativeSynthesizer:
     # Utilities
     # =========================================================================
 
-    def _build_citation_map(self, articles: list[dict]) -> dict:
+    @staticmethod
+    def _build_citation_map(articles: list[dict]) -> dict:
         """Build authoritative citation map from articles."""
         citation_map = {}
         for i, article in enumerate(articles, 1):
@@ -710,11 +719,13 @@ class NarrativeSynthesizer:
                 )
                 sec_idx += 1
 
-    def _estimate_tokens(self, context: dict[str, Any]) -> int:
+    @staticmethod
+    def _estimate_tokens(context: dict[str, Any]) -> int:
         """Rough token count estimate (1 token ~ 4 chars)."""
         return len(json.dumps(context)) // 4
 
-    def _hash_profile(self, profile: dict[str, Any] | None) -> str:
+    @staticmethod
+    def _hash_profile(profile: dict[str, Any] | None) -> str:
         """Hash user profile for tracking."""
         import hashlib
 
