@@ -12,6 +12,18 @@ from sqlalchemy.orm import sessionmaker
 from src.context.synthesizer import NarrativeSynthesizer
 
 
+def _stub_client() -> MagicMock:
+    """A client double that carries the attributes the real one does.
+
+    ``.model`` matters: the synthesizer records it as provenance on every
+    AnalysisRun, so a double without it lets a bug reach the database that
+    the real object would have caught. Added 2026-08-26.
+    """
+    client = MagicMock()
+    client.model = "claude-sonnet-5"
+    return client
+
+
 @pytest.fixture
 def isolated_db(test_engine):
     """Point the synthesizer's get_db at the throwaway per-test SQLite file.
@@ -49,7 +61,7 @@ class TestSynthesizerConfiguration:
         """Topic filters should affect which articles are included in synthesis"""
         filters = {"topics": ["cybersecurity"]}
 
-        NarrativeSynthesizer(topic_filters=filters, client=MagicMock())
+        NarrativeSynthesizer(topic_filters=filters, client=_stub_client())
 
         # beat=None is the default path: the curator is told there is no beat,
         # which leaves its article selection exactly as it was before beats.
@@ -129,7 +141,7 @@ class TestSynthesizeNoArticles:
             return_value={"articles": []}
         )
 
-        synthesizer = NarrativeSynthesizer(client=MagicMock())
+        synthesizer = NarrativeSynthesizer(client=_stub_client())
         result = await synthesizer.synthesize()
 
         assert result["status"] == "no_articles"
@@ -169,6 +181,7 @@ class TestSynthesizeTwoPass:
         # Setup Claude responses. The client is injected, so no real
         # ClaudeClient (and therefore no ANTHROPIC_API_KEY) is ever needed.
         mock_client_instance = MagicMock()
+        mock_client_instance.model = "claude-sonnet-5"
 
         # Pass 1: clustering response
         clustering_response = json.dumps(
@@ -324,6 +337,7 @@ class TestBeatRunIsRecorded:
         frame_mgr.discover_frames = AsyncMock(return_value=None)
 
         client = MagicMock()
+        client.model = "claude-sonnet-5"
         client.analyze = AsyncMock(side_effect=[self.CLUSTERING, json.dumps({})])
         client.analyze_with_context = AsyncMock(return_value=self.SITUATION)
         return client
@@ -446,6 +460,7 @@ class TestInstitutionalActivityIsRecorded:
         frame_mgr.discover_frames = AsyncMock(return_value=None)
 
         client = MagicMock()
+        client.model = "claude-sonnet-5"
         client.analyze = AsyncMock(side_effect=[self.CLUSTERING, json.dumps({})])
         client.analyze_with_context = AsyncMock(return_value=self.SITUATION)
         return client

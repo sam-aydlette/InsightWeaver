@@ -30,14 +30,21 @@ class ClaudeClient:
             raise ValueError("ANTHROPIC_API_KEY not configured")
 
         self.client = AsyncAnthropic(api_key=self.api_key, timeout=300.0)
-        self.model = model or "claude-sonnet-4-20250514"
-        self.max_tokens = 16384
+        # Changed 2026-08-26: claude-sonnet-4-20250514 was RETIRED on 2026-06-15 and
+        # returns 404. Every synthesis run since then has failed at the API call. The
+        # documented replacement for that model is claude-sonnet-5.
+        self.model = model or "claude-sonnet-5"
+        # Raised from 16384 the same day. max_tokens caps thinking AND response text
+        # together, and this model thinks by default, so the old ceiling would truncate
+        # a full-length synthesis mid-answer. Its tokenizer also produces more tokens
+        # for the same text than the retired model's did.
+        self.max_tokens = 32000
 
     async def analyze(
         self,
         system_prompt: str,
         user_message: str,
-        temperature: float = 1.0,
+        effort: str = "high",
         max_tokens: int | None = None,
     ) -> str:
         """
@@ -46,7 +53,7 @@ class ClaudeClient:
         Args:
             system_prompt: System context and instructions
             user_message: User query/request
-            temperature: Sampling temperature (0-1)
+            effort: Reasoning depth -- "low" | "medium" | "high" | "xhigh" | "max"
             max_tokens: Maximum tokens in response
 
         Returns:
@@ -56,7 +63,11 @@ class ClaudeClient:
             response = await self.client.messages.create(
                 model=self.model,
                 max_tokens=max_tokens or self.max_tokens,
-                temperature=temperature,
+                # Sent via extra_body: the pinned SDK predates output_config as a
+                # named parameter and raises TypeError on it, but forwards extra_body
+                # into the request unchanged. Added 2026-08-26 -- once the SDK pin
+                # moves past that, this becomes output_config={"effort": effort}.
+                extra_body={"output_config": {"effort": effort}},
                 system=system_prompt,
                 messages=[{"role": "user", "content": user_message}],
             )
@@ -71,7 +82,7 @@ class ClaudeClient:
         self,
         system_prompt: str,
         messages: list[dict[str, str]],
-        temperature: float = 1.0,
+        effort: str = "high",
         max_tokens: int | None = None,
     ) -> str:
         """
@@ -81,7 +92,7 @@ class ClaudeClient:
             system_prompt: System context and instructions
             messages: List of message dicts with 'role' and 'content' keys
                       Roles must alternate: user, assistant, user, assistant...
-            temperature: Sampling temperature (0-1)
+            effort: Reasoning depth -- "low" | "medium" | "high" | "xhigh" | "max"
             max_tokens: Maximum tokens in response
 
         Returns:
@@ -91,7 +102,11 @@ class ClaudeClient:
             response = await self.client.messages.create(
                 model=self.model,
                 max_tokens=max_tokens or self.max_tokens,
-                temperature=temperature,
+                # Sent via extra_body: the pinned SDK predates output_config as a
+                # named parameter and raises TypeError on it, but forwards extra_body
+                # into the request unchanged. Added 2026-08-26 -- once the SDK pin
+                # moves past that, this becomes output_config={"effort": effort}.
+                extra_body={"output_config": {"effort": effort}},
                 system=system_prompt,
                 messages=messages,
             )
@@ -103,7 +118,7 @@ class ClaudeClient:
             raise
 
     async def analyze_with_context(
-        self, context: dict[str, Any], task: str, temperature: float = 1.0
+        self, context: dict[str, Any], task: str, effort: str = "high"
     ) -> str:
         """
         Analyze using curated context
@@ -111,13 +126,13 @@ class ClaudeClient:
         Args:
             context: Curated context dictionary from ContextCurator
             task: Task description/question
-            temperature: Sampling temperature
+            effort: Reasoning depth
 
         Returns:
             Claude's response text
         """
         system_prompt = self._build_system_prompt(context)
-        return await self.analyze(system_prompt, task, temperature)
+        return await self.analyze(system_prompt, task, effort)
 
     def _build_system_prompt(self, context: dict[str, Any]) -> str:
         """
