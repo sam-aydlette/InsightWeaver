@@ -14,6 +14,7 @@ from src.context.synthesizer import NarrativeSynthesizer
 from src.processors.content_filter import ContentFilter
 from src.processors.deduplicator import run_deduplication
 from src.rss.parallel_fetcher import fetch_all_active_feeds
+from src.sources.runner import run_configured_adapters
 from src.utils.profile_loader import get_user_profile
 from src.utils.profiler import get_profiler, profile
 
@@ -215,10 +216,32 @@ class PipelineOrchestrator:
         return results
 
     async def _fetch_feeds(self) -> dict[str, Any]:
-        """Run RSS feed fetching stage"""
-        return await fetch_all_active_feeds(
+        """
+        Run the ingestion stage: RSS feeds, then every non-RSS source adapter.
+
+        The RSS half is untouched. The adapter half was added 2026-08-26 for
+        backlog task 005 so the beat can reach sources that publish no usable
+        RSS. Both halves write the same ``articles`` row shape, so every later
+        stage is unaware that this stage grew a second half.
+        """
+        results = await fetch_all_active_feeds(
             max_concurrent=self.max_concurrent_feeds, rate_limit=self.rate_limit
         )
+
+        adapter_summary = await run_configured_adapters()
+        if adapter_summary.total_sources:
+            results["total_feeds"] += adapter_summary.total_sources
+            results["successful_feeds"] += adapter_summary.successful_sources
+            results["failed_feeds"] += (
+                adapter_summary.total_sources - adapter_summary.successful_sources
+            )
+            results["total_articles"] += adapter_summary.total_articles
+            results["adapters"] = adapter_summary.as_dict()
+            # Surfaced all the way to the CLI: an unreachable or newly silent
+            # source must not be absorbed into a total that still looks fine.
+            results["source_alerts"] = adapter_summary.alerts
+
+        return results
 
     async def _deduplicate_articles(self) -> dict[str, Any]:
         """Run article deduplication stage"""
@@ -308,6 +331,9 @@ class PipelineOrchestrator:
             "articles_kept": filter_stage.get("kept_count", 0),
             "articles_synthesized": synthesis_stage.get("articles_analyzed", 0),
             "narrative_generated": synthesis_stage.get("synthesis_id") is not None,
+            # Carried into the summary so the CLI cannot render a brief without
+            # also rendering the fact that a source failed or went silent.
+            "source_alerts": fetch_stage.get("source_alerts", []),
         }
 
         # Calculate duration

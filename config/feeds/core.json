@@ -35,6 +35,18 @@
       "relevance_score": 0.9
     },
     {
+      "name": "Federal Register - Documents API",
+      "url": "https://www.federalregister.gov/api/v1/documents.json",
+      "adapter": "federal_register",
+      "applicability": {
+        "scope": ["always"],
+        "geo_tags": ["usa"],
+        "domain_tags": ["federal_policy", "regulatory"],
+        "specialty_tags": ["cybersecurity", "compliance"]
+      },
+      "relevance_score": 0.95
+    },
+    {
       "name": "Supreme Court Blog",
       "url": "https://www.scotusblog.com/feed/",
       "applicability": {
