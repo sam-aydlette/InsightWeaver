@@ -13,12 +13,20 @@ from ..config.settings import settings
 from ..database.connection import create_tables
 from ..feed_manager import setup_feeds
 from ..pipeline.orchestrator import run_pipeline
-from .brief_formatter import BriefFormatter, clean_citations
-from .colors import accent, header, muted, warning
+from ..render.document import BriefDocument, StoredBriefNotFound, load_stored_brief
+from ..render.email import EmailDeliveryError, EmailRenderer
+from ..render.html import HTMLRenderer
+from ..render.markdown import MarkdownRenderer
+from ..render.terminal import TerminalRenderer
+from .colors import muted, warning
 from .loading import loading
 from .output import get_output_manager, is_debug_mode
 
 logger = logging.getLogger(__name__)
+
+# Output media a stored brief can be rendered to. The live pipeline path is
+# unchanged and always renders to the terminal.
+RENDER_FORMATS = ("terminal", "html", "email")
 
 
 # ============================================================================
@@ -50,6 +58,55 @@ def setup_database():
     print(
         f"Loaded {stats['database']['active_feeds']} active feeds across {len(stats['database']['categories'])} categories"
     )
+
+
+# ============================================================================
+# Render-only path (--from-run)
+# ============================================================================
+
+
+def default_html_path(doc: BriefDocument) -> Path:
+    """Where ``--format html`` writes when ``--output`` is not given."""
+    return settings.data_dir / "briefs" / f"brief-{doc.synthesis_id}.html"
+
+
+def render_stored_brief(
+    synthesis_id: int,
+    output_format: str,
+    output_path: str | None,
+    quiet: bool,
+    save_path: str | None,
+) -> None:
+    """
+    Render a stored ``narrative_syntheses`` row.
+
+    This replays what a past run produced; it never fetches, synthesizes or
+    calls Claude, so it needs no API key and no network, and rendering the same
+    id twice produces the same bytes.
+    """
+    try:
+        doc = load_stored_brief(synthesis_id)
+    except StoredBriefNotFound as exc:
+        raise click.ClickException(str(exc))
+
+    if output_format == "terminal":
+        renderer = TerminalRenderer()
+        click.echo(renderer.render_compact(doc) if quiet else renderer.render(doc))
+    elif output_format == "html":
+        target = Path(output_path) if output_path else default_html_path(doc)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(HTMLRenderer().render(doc), encoding="utf-8")
+        click.echo(muted(f"Wrote HTML brief to {target}"))
+    elif output_format == "email":
+        try:
+            recipient = EmailRenderer().send(doc)
+        except EmailDeliveryError as exc:
+            raise click.ClickException(str(exc))
+        click.echo(muted(f"Sent brief {synthesis_id} to {recipient}"))
+
+    if save_path:
+        Path(save_path).write_text(MarkdownRenderer().render(doc))
+        click.echo(muted(f"Saved markdown to {save_path}"))
 
 
 # ============================================================================
@@ -93,6 +150,28 @@ def setup_database():
     default=None,
     help="Save brief as markdown to PATH",
 )
+@click.option(
+    "--from-run",
+    "from_run",
+    type=int,
+    default=None,
+    metavar="ID",
+    help="Render a stored brief by narrative_syntheses id instead of running the pipeline",
+)
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(RENDER_FORMATS),
+    default="terminal",
+    help="Output medium for --from-run (default: terminal)",
+)
+@click.option(
+    "--output",
+    "output_path",
+    type=click.Path(dir_okay=False, writable=True),
+    default=None,
+    help="Destination file for --format html",
+)
 def brief_group(
     ctx,
     hours,
@@ -104,6 +183,9 @@ def brief_group(
     filter_national,
     filter_global,
     save_path,
+    from_run,
+    output_format,
+    output_path,
 ):
     """
     Run intelligence brief pipeline and generate report
@@ -113,8 +195,26 @@ def brief_group(
 
     You can filter by topic (e.g., --cybersecurity) and/or scope (e.g., --local).
     Multiple filters combine with AND logic: --cybersecurity --local shows only local cybersecurity news.
+
+    Pass --from-run ID to re-render a brief already stored in narrative_syntheses.
+    That path is offline and deterministic: no feeds, no Claude call, no API key,
+    and the same id always renders the same bytes.
     """
     if ctx.invoked_subcommand is None:
+        # Render-only path. Deliberately ahead of the API-key check: replaying
+        # a stored run must work with ANTHROPIC_API_KEY unset.
+        if from_run is not None:
+            render_stored_brief(from_run, output_format, output_path, quiet, save_path)
+            return
+
+        if output_format != "terminal":
+            raise click.ClickException(
+                f"--format {output_format} needs --from-run ID. The live pipeline path "
+                "renders to the terminal only."
+            )
+        if output_path:
+            raise click.ClickException("--output only applies to --from-run --format html.")
+
         # Check for API key
         if not settings.anthropic_api_key:
             click.echo(warning("Warning: ANTHROPIC_API_KEY not configured"))
@@ -212,35 +312,18 @@ def brief_group(
                 click.echo("  • Run without filters to see all available content")
                 click.echo("=" * 80)
             elif report_result.get("success") and articles_analyzed > 0:
-                synthesis_data = report_result.get("synthesis_data", {})
-                situations = synthesis_data.get("situations", [])
-                metadata = synthesis_data.get("metadata", {})
-
-                formatter = BriefFormatter()
+                # Same document model and same renderers the --from-run path
+                # uses; the only difference is where the document came from.
+                doc = BriefDocument.from_report(report_result)
+                renderer = TerminalRenderer()
 
                 if quiet:
-                    click.echo()
-                    if situations:
-                        click.echo(header("Situations analyzed:"))
-                        for i, s in enumerate(situations, 1):
-                            title = clean_citations(s.get("title", "Untitled"))
-                            click.echo(f"  {accent(f'{i}.')} {title}")
-
-                    thin = synthesis_data.get("thin_coverage", [])
-                    if thin:
-                        click.echo(muted(f"\n+ {len(thin)} topics with thin coverage"))
-
-                    click.echo(
-                        muted(
-                            f"\nArticles: {articles_analyzed} | "
-                            f"Clusters: {metadata.get('clusters_total', 0)}"
-                        )
-                    )
+                    click.echo(renderer.render_compact(doc))
                 else:
-                    click.echo(formatter.format_report(report_result))
+                    click.echo(renderer.render(doc))
 
                 if save_path:
-                    Path(save_path).write_text(formatter.format_markdown(report_result))
+                    Path(save_path).write_text(MarkdownRenderer().render(doc))
                     click.echo(muted(f"\nSaved markdown to {save_path}"))
 
             # Pipeline summary
