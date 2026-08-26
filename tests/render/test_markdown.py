@@ -62,3 +62,39 @@ class TestInstitutionalActivity:
         assert MarkdownRenderer().render(activity_document) == MarkdownRenderer().render(
             activity_document
         )
+
+
+class TestStandingAgendaMarkdown:
+    """Every declared question, moved or not, survives into the archival copy."""
+
+    def test_section_absent_without_a_declared_agenda(self, brief_document):
+        assert "## Standing agenda" not in MarkdownRenderer().render(brief_document)
+
+    def test_every_declared_question_appears(self, beat_document):
+        out = MarkdownRenderer().render(beat_document)
+        assert "## Standing agenda" in out
+        for entry in beat_document.standing_agenda:
+            assert entry["text"] in out
+
+    def test_moved_and_unmoved_are_labelled(self, beat_document):
+        out = MarkdownRenderer().render(beat_document)
+        assert "### [MOVED] Does CMMC Phase 2 slip past its statutory date?" in out
+        assert "### [NO MOVEMENT] Which CSPs move to FedRAMP authorized" in out
+        assert "**Moved in:** Situation 1: Procurement rule change lands[1]" in out
+
+    def test_never_moved_question_says_so_explicitly(self, beat_document):
+        out = MarkdownRenderer().render(beat_document)
+        assert "No coverage this run bore on this question, and none ever has." in out
+
+
+class TestBeatSectionsComposeMarkdown:
+    def test_both_sections_render_in_order(self, full_beat_document):
+        out = MarkdownRenderer().render(full_beat_document)
+        assert "## Standing agenda" in out
+        assert "## Institutional activity" in out
+        assert out.index("## Standing agenda") < out.index("## Institutional activity")
+
+    def test_neither_section_loses_its_quiet_entries(self, full_beat_document):
+        out = MarkdownRenderer().render(full_beat_document)
+        assert "No coverage this run bore on this question, and none ever has." in out
+        assert "OMB appeared in 0 items this run" in out

@@ -98,7 +98,7 @@ The synthesis path (what produces the brief you read):
 The persistent-layer maintenance that runs alongside (you don't have to read any of this -- it just makes the next brief grounded in accumulated context):
 
 - **Pre-pass: prediction check.** Before any new analysis, the open-prediction ledger is graded against today's coverage. Observables flagged in past runs are marked triggered, contradicted, or still open. A transparency line at the top of every brief reports the result.
-- **Question matching.** Each situation's unresolved questions are bound to a persistent graph. Returning questions surface their identity inline (`Q47 (run 4, asked 2026-03-12)`).
+- **Question matching.** Each situation's unresolved questions are bound to a persistent graph. Returning questions surface their identity inline (`Q47 (run 4, asked 2026-03-12)`). A beat can also declare standing questions it always reports against, moved or not.
 - **Prediction creation.** `what_to_watch` observables from each situation become open predictions, keyed to their question.
 - **Frame classification.** Each article in each cluster is tagged with the frame it most exhibits.
 - **Decision routing.** Situations are matched against the factors of standing decisions you've registered. Today's coverage gets recorded as evidence per decision, so each run updates an accumulating record.
@@ -182,7 +182,10 @@ A beat lives in `config/beats/<name>.json` and selects its feeds through the sam
     "programs": ["FedRAMP 20x", "CMMC"],
     "document_types": [{ "name": "Binding Operational Directive", "aliases": ["BOD"] }]
   },
-  "standing_questions": [],
+  "standing_questions": [
+    "Does CMMC Phase 2 slip past its statutory date?",
+    "Which CSPs move to FedRAMP authorized, and at which impact level?"
+  ],
   "channels": ["terminal"]
 }
 ```
@@ -191,6 +194,34 @@ A beat's brief is drawn only from that beat's sources, renders through the same
 `BriefDocument` as every other brief, and accumulates its own slice of the graph:
 its Questions and Predictions are kept apart from the default brief's, so a
 returning question's run number means "the Nth time *this subject* raised it".
+
+### Standing questions
+
+`standing_questions` is what makes the output a brief rather than a digest. A
+question there is *declared*, not discovered: the beat carries it whether or not
+this week's coverage mentions it, and every run reports what moved against it.
+
+```
+STANDING AGENDA
+What this beat declared it is watching. Unmoved items are reported, not dropped.
+
+  [MOVED] Does CMMC Phase 2 slip past its statutory date?
+    Q1 (declared 2026-08-26, run 2)
+    Moved in: Situation 1: DoD signals CMMC Phase 2 timeline pressure[3]
+    Watching for: A DFARS class deviation naming CMMC Phase 2 -- published before the statutory date
+
+  [NO MOVEMENT] Which CSPs move to FedRAMP authorized, and at which impact level?
+    Q2 (declared 2026-08-26, never moved)
+    No coverage this run bore on this question, and none ever has.
+```
+
+The second entry is the whole point: **"no movement on CMMC Phase 2 this week" is
+itself information**, so a quiet standing question is reported as unmoved rather
+than dropped as an empty section. Declared questions are still bound to coverage
+by the same matcher emergent questions use, but on a tighter threshold, because a
+standing question that falsely reads "moved" is worse than one that misses a
+match. Nothing is auto-generated and nothing is auto-retired: the agenda is the
+human's. See `docs/CONCEPTS.md`, "Standing questions", for the binding rule.
 
 The ledger commands read the same way. `questions list`, `predictions`, and
 `forecast` show your own ledger by default and never surface a beat's rows;
@@ -240,18 +271,22 @@ reads as inactivity. A named individual may appear inside a rendered situation w
 source document names a signatory -- an attribute of a document, which expires with it --
 but never as a stored row, which would accumulate. See `docs/CONCEPTS.md`.
 
-Running your first beat needs the two beat tables, plus two more for institutional
-activity:
+Running your first beat needs the two beat tables, plus one each for institutional
+activity and standing questions:
 
 ```bash
-python -m src.database.migrations.add_beats           # or: insightweaver brief setup
+python -m src.database.migrations.add_beats                # or: insightweaver brief setup
 python -m src.database.migrations.add_beat_entities
+python -m src.database.migrations.add_standing_questions
 ```
 
-Both migrations are additive and reversible (`... add_beats down`). Until you run
-`add_beats`, `--beat` stops with a clear error and every other command -- including plain
-`insightweaver brief` -- carries on exactly as before. Without `add_beat_entities` a beat
-brief still runs; it simply has no activity section.
+All are additive and reversible (`... down`). Until you run `add_beats`, `--beat`
+stops with a clear error naming what is missing, and every other command --
+including plain `insightweaver brief` -- carries on exactly as before. Without
+`add_beat_entities` a beat brief still runs and simply has no activity section;
+`add_standing_questions` is required before a beat that declares an agenda will
+run, because a declared question that cannot be recorded must not be silently
+dropped.
 
 ---
 

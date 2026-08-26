@@ -21,6 +21,11 @@ from ._text import (
     prediction_check_line,
     question_lines,
     split_activity,
+    standing_agenda,
+    standing_agenda_movement,
+    standing_agenda_no_movement,
+    standing_agenda_provenance,
+    standing_agenda_status,
     watch_items,
 )
 from .document import BriefDocument
@@ -121,6 +126,7 @@ class HTMLRenderer:
         out.append('<hr class="rule">')
 
         out.extend(self._decisions(doc))
+        out.extend(self._standing_agenda(doc))
         out.extend(self._situations(doc))
         out.extend(self._meta_fractures(doc))
         out.extend(self._institutional_activity(doc))
@@ -177,6 +183,41 @@ class HTMLRenderer:
         footnote = activity_footnote(block)
         if footnote:
             out.append(f'<p class="meta">{escape(footnote)}</p>')
+        return out
+
+    def _standing_agenda(self, doc: BriefDocument) -> list[str]:
+        """
+        The beat's declared agenda, every item of it.
+
+        As in the other renderers, an unmoved standing question is rendered
+        with a NO MOVEMENT label rather than omitted.
+        """
+        agenda = standing_agenda(doc.metadata)
+        if not agenda:
+            return []
+
+        out = [
+            "<h2>Standing agenda</h2>",
+            '<p class="section-note">What this beat declared it is watching. '
+            "Unmoved items are reported, not dropped.</p>",
+        ]
+        for entry in agenda:
+            status = standing_agenda_status(entry)
+            text = str(entry.get("text", "(question)"))
+            out.append(f"<h3>[{escape(status)}] {escape(text)}</h3>")
+            out.append(f'<p class="meta">{escape(standing_agenda_provenance(entry))}</p>')
+            out.append("<ul>")
+            movement = standing_agenda_movement(entry)
+            if movement:
+                for item in movement:
+                    out.append(f'<li><span class="label">Moved in:</span> {escape(item)}</li>')
+            else:
+                out.append(f"<li>{escape(standing_agenda_no_movement(entry))}</li>")
+            for observable in entry.get("watching") or []:
+                out.append(
+                    f'<li><span class="label">Watching for:</span> {escape(str(observable))}</li>'
+                )
+            out.append("</ul>")
         return out
 
     def _situations(self, doc: BriefDocument) -> list[str]:

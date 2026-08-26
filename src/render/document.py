@@ -123,6 +123,17 @@ class BriefDocument:
         return _as_dict_list(self.metadata.get("decision_routing"))
 
     @property
+    def standing_agenda(self) -> list[dict[str, Any]]:
+        """
+        This beat's declared agenda and how it moved, as the run recorded it.
+
+        Empty for the person brief and for any beat that declares nothing. Note
+        that a non-empty list can contain entries that did not move; that is
+        the point, and no consumer may drop them.
+        """
+        return _as_dict_list(self.metadata.get("standing_agenda"))
+
+    @property
     def prediction_check(self) -> dict[str, Any]:
         """Pre-synthesis grading of open observables."""
         return _as_dict(self.metadata.get("prediction_check"))

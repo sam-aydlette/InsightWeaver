@@ -22,6 +22,11 @@ from ._text import (
     prediction_check_line,
     question_lines,
     split_activity,
+    standing_agenda,
+    standing_agenda_movement,
+    standing_agenda_no_movement,
+    standing_agenda_provenance,
+    standing_agenda_status,
     watch_items,
 )
 from .document import BriefDocument
@@ -84,6 +89,9 @@ class TerminalRenderer(BaseTerminalFormatter):
                     name = factor.get("name", "(factor)")
                     lines.append(f"    [{glyph}] {name} {muted(f'({direction})')}")
             lines.append("")
+
+        # Standing agenda -- what this beat declared it is watching.
+        lines.extend(self._render_standing_agenda(doc))
 
         # Situations
         if situations:
@@ -174,6 +182,45 @@ class TerminalRenderer(BaseTerminalFormatter):
             lines.append("")
             lines.append(muted(f"  {footnote}"))
         lines.append("")
+        return lines
+
+    def _render_standing_agenda(self, doc: BriefDocument) -> list[str]:
+        """
+        The beat's declared agenda, every item of it.
+
+        Each entry is rendered whether or not it moved. There is deliberately
+        no "skip the quiet ones" branch here: a standing question that vanishes
+        on a quiet day is the exact failure this section exists to prevent, so
+        an unmoved question gets a NO MOVEMENT label and a sentence saying so.
+        """
+        agenda = standing_agenda(doc.metadata)
+        if not agenda:
+            return []
+
+        lines = [
+            header("STANDING AGENDA"),
+            muted(
+                "What this beat declared it is watching. Unmoved items are reported, not dropped."
+            ),
+            "",
+        ]
+        for entry in agenda:
+            status = standing_agenda_status(entry)
+            label = accent(f"[{status}]") if entry.get("moved") else warning(f"[{status}]")
+            lines.append(f"  {label} {entry.get('text', '(question)')}")
+            lines.append(f"    {muted(standing_agenda_provenance(entry))}")
+
+            movement = standing_agenda_movement(entry)
+            if movement:
+                for item in movement:
+                    lines.append(f"    Moved in: {item}")
+            else:
+                lines.append(f"    {muted(standing_agenda_no_movement(entry))}")
+
+            for observable in entry.get("watching") or []:
+                lines.append(f"    Watching for: {muted(str(observable))}")
+            lines.append("")
+
         return lines
 
     def _render_situation(self, situation: dict, index: int) -> str:
