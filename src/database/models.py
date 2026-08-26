@@ -524,3 +524,71 @@ class DecisionEvidence(Base):
         Index("idx_decision_evidence_factor", "factor_id"),
         Index("idx_decision_evidence_synthesis", "synthesis_id"),
     )
+
+
+# ============================================================================
+# Beats
+# A beat is a subject with its own sources, as opposed to the person-shaped
+# user profile. These two tables are purely additive (added 2026-08-26 for
+# backlog task 004): no existing table gained a beat_id column, because a
+# run's beat membership is recorded here and the graph's beat scope is derived
+# from it. See docs/CONCEPTS.md, "Beats", for the reasoning.
+# ============================================================================
+
+
+BEAT_RUN_STATUS_STARTED = "started"
+BEAT_RUN_STATUS_COMPLETED = "completed"
+BEAT_RUN_STATUS_FAILED = "failed"
+
+
+class Beat(Base):
+    """
+    A subject the user runs briefs for, mirroring config/beats/<name>.json.
+
+    The config file is authoritative for sources; this row exists so runs can
+    be attributed to a beat and so the beat's identity survives a config edit.
+    """
+
+    __tablename__ = "beats"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(200), nullable=False, unique=True)
+    description = Column(Text)
+    config_path = Column(String(500))
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
+
+    runs = relationship("BeatRun", back_populates="beat")
+
+    __table_args__ = (Index("idx_beat_name", "name"),)
+
+
+class BeatRun(Base):
+    """
+    One brief run attributed to a beat.
+
+    This is the join that scopes the graph: a Question or Prediction belongs to
+    a beat when the synthesis it appeared in has a BeatRun row for that beat,
+    and belongs to the default (person) scope when its syntheses have none.
+    """
+
+    __tablename__ = "beat_runs"
+
+    id = Column(Integer, primary_key=True)
+    beat_id = Column(Integer, ForeignKey("beats.id"), nullable=False)
+    analysis_run_id = Column(Integer, ForeignKey("analysis_runs.id"), nullable=True)
+    synthesis_id = Column(Integer, ForeignKey("narrative_syntheses.id"), nullable=True)
+
+    status = Column(String(20), nullable=False, default=BEAT_RUN_STATUS_COMPLETED)
+    started_at = Column(DateTime, default=utcnow, nullable=False)
+    completed_at = Column(DateTime, nullable=True)
+    articles_analyzed = Column(Integer)
+    feeds_resolved = Column(Integer)  # How many feeds the beat selected at run time
+
+    beat = relationship("Beat", back_populates="runs")
+
+    __table_args__ = (
+        Index("idx_beat_run_beat", "beat_id"),
+        Index("idx_beat_run_synthesis", "synthesis_id"),
+        Index("idx_beat_run_started_at", "started_at"),
+    )

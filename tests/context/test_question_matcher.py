@@ -240,7 +240,9 @@ class TestSynthesizerCollectAndEnrich:
             (0, "secondary:0", ProposedQuestion("Will B?", False)),
         ]
 
-        NarrativeSynthesizer._enrich_situations_with_questions(situations, plan, [q1, q2])
+        NarrativeSynthesizer._enrich_situations_with_questions(
+            situations, plan, [q1, q2], test_session
+        )
         enriched = situations[0]["where_this_goes"]["unresolved_questions"]
         assert enriched["primary"]["text"] == "Will A?"
         assert enriched["primary"]["question_id"] == q1.id

@@ -9,8 +9,10 @@ from pathlib import Path
 
 import click
 
+from ..config.beats import BeatConfig, BeatNotFound, BeatValidationError, load_beat
 from ..config.settings import settings
-from ..database.connection import create_tables
+from ..context.beat_scope import BeatTablesMissing, require_beat_tables
+from ..database.connection import create_tables, engine
 from ..feed_manager import setup_feeds
 from ..pipeline.orchestrator import run_pipeline
 from ..render.document import BriefDocument, StoredBriefNotFound, load_stored_brief
@@ -58,6 +60,28 @@ def setup_database():
     print(
         f"Loaded {stats['database']['active_feeds']} active feeds across {len(stats['database']['categories'])} categories"
     )
+
+
+def load_beat_or_fail(beat_name: str) -> BeatConfig:
+    """
+    Load a beat by name, turning both failure modes into CLI errors.
+
+    A misnamed beat lists what is available; a malformed one names the problem.
+    Neither is silently tolerated: running a beat brief against a half-understood
+    definition would produce a brief nobody can account for.
+    """
+    try:
+        beat = load_beat(beat_name)
+    except (BeatNotFound, BeatValidationError) as exc:
+        raise click.ClickException(str(exc))
+
+    # A beat run must be recordable before it starts; see require_beat_tables.
+    try:
+        require_beat_tables(engine)
+    except BeatTablesMissing as exc:
+        raise click.ClickException(str(exc))
+
+    return beat
 
 
 # ============================================================================
@@ -172,6 +196,13 @@ def render_stored_brief(
     default=None,
     help="Destination file for --format html",
 )
+@click.option(
+    "--beat",
+    "beat_name",
+    default=None,
+    metavar="NAME",
+    help="Scope the brief to config/beats/NAME.json instead of the user profile",
+)
 def brief_group(
     ctx,
     hours,
@@ -186,6 +217,7 @@ def brief_group(
     from_run,
     output_format,
     output_path,
+    beat_name,
 ):
     """
     Run intelligence brief pipeline and generate report
@@ -199,13 +231,26 @@ def brief_group(
     Pass --from-run ID to re-render a brief already stored in narrative_syntheses.
     That path is offline and deterministic: no feeds, no Claude call, no API key,
     and the same id always renders the same bytes.
+
+    Pass --beat NAME to run the brief for a subject rather than for you: article
+    selection is restricted to that beat's configured sources, and the questions
+    and predictions it accumulates are kept separate from the default brief's.
     """
     if ctx.invoked_subcommand is None:
         # Render-only path. Deliberately ahead of the API-key check: replaying
         # a stored run must work with ANTHROPIC_API_KEY unset.
         if from_run is not None:
+            if beat_name:
+                raise click.ClickException(
+                    "--beat applies to the live pipeline. --from-run replays a stored "
+                    "run exactly as it was recorded, including the beat it ran for."
+                )
             render_stored_brief(from_run, output_format, output_path, quiet, save_path)
             return
+
+        # Resolve the beat before anything expensive happens: a typo in the
+        # name should cost nothing.
+        beat = load_beat_or_fail(beat_name) if beat_name else None
 
         if output_format != "terminal":
             raise click.ClickException(
@@ -256,7 +301,9 @@ def brief_group(
         output_mgr = get_output_manager()
 
         # Build loading message based on filters
-        if topic_filters:
+        if beat:
+            loading_msg = f"Generating {beat.name} brief"
+        elif topic_filters:
             filter_desc = []
             if topics:
                 filter_desc.append(f"{', '.join(topics)}")
@@ -269,13 +316,14 @@ def brief_group(
         # Run pipeline (fetch, deduplicate, filter, synthesize)
         async def run_brief():
             pipeline_result = await run_pipeline(
-                prioritize_hours=hours, topic_filters=topic_filters
+                prioritize_hours=hours, topic_filters=topic_filters, beat=beat
             )
 
             # Extract synthesis result from pipeline
             synthesis_stage = pipeline_result.get("stages", {}).get("synthesis", {})
             report_result = {
                 "success": synthesis_stage.get("status") == "success",
+                "status": synthesis_stage.get("status"),
                 "articles_analyzed": synthesis_stage.get("articles_analyzed", 0),
                 "synthesis_data": synthesis_stage.get("synthesis_data", {}),
                 "synthesis_id": synthesis_stage.get("synthesis_id"),
@@ -295,7 +343,27 @@ def brief_group(
             articles_analyzed = report_result.get("articles_analyzed", 0)
             articles_fetched = pipeline_summary.get("articles_fetched", 0)
 
-            if topic_filters and articles_analyzed == 0 and articles_fetched > 0:
+            synthesis_status = report_result.get("status")
+
+            if beat and articles_analyzed == 0 and synthesis_status == "no_articles":
+                # A beat with no articles is a real and expected outcome while
+                # RSS is the only adapter -- say so plainly rather than
+                # printing an empty brief.
+                click.echo("\n" + warning("!" * 80))
+                click.echo(warning(f"NO ARTICLES IN BEAT '{beat.name}'"))
+                click.echo(warning("!" * 80))
+                click.echo(
+                    muted(
+                        f"\nThe beat selects {len(beat.resolve_feeds())} configured feed(s), "
+                        f"but none of them yielded articles in the last {hours} hours."
+                    )
+                )
+                click.echo("\nSuggestions:")
+                click.echo("  - Widen the window: --hours 168")
+                click.echo("  - Check the beat's feeds are loaded: brief setup")
+                click.echo("  - The domain may simply not publish much RSS")
+                click.echo("=" * 80)
+            elif topic_filters and articles_analyzed == 0 and articles_fetched > 0:
                 # Filters were too restrictive
                 click.echo("\n" + warning("!" * 80))
                 click.echo(warning("NO ARTICLES MATCHED YOUR FILTERS"))

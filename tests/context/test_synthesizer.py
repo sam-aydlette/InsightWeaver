@@ -51,7 +51,9 @@ class TestSynthesizerConfiguration:
 
         NarrativeSynthesizer(topic_filters=filters, client=MagicMock())
 
-        mock_curator.assert_called_with(topic_filters=filters)
+        # beat=None is the default path: the curator is told there is no beat,
+        # which leaves its article selection exactly as it was before beats.
+        mock_curator.assert_called_with(topic_filters=filters, beat=None)
 
 
 class TestCitationMap:
@@ -248,3 +250,141 @@ class TestSynthesizeTwoPass:
         assert synthesis_data["metadata"]["clusters_analyzed"] == 1
         assert synthesis_data["metadata"]["clusters_thin"] == 2
         assert synthesis_data["metadata"]["analysis_threshold"] == "2+ articles"
+
+
+class TestBeatRunIsRecorded:
+    """
+    A beat run must leave a ``beat_runs`` row attributing the synthesis, and a
+    non-beat run must leave none. That row is the whole basis of beat scoping:
+    the graph tables carry no beat_id, so an unattributed run is
+    indistinguishable from the default brief.
+
+    Added 2026-08-26 with the beat abstraction (backlog task 004).
+    """
+
+    CLUSTERING = json.dumps(
+        {"clusters": [{"title": "Rulemaking", "article_ids": [1, 2], "keywords": ["rule"]}]}
+    )
+    SITUATION = json.dumps(
+        {
+            "title": "A rulemaking situation",
+            "narrative": "Narrative.",
+            "actors": [],
+            "power_dynamics": {"who_benefits": "X", "who_is_harmed": "Y", "who_decides": "Z"},
+            "coverage_frame": {
+                "dominant_frame": "F",
+                "assumed_premise": "P",
+                "de_emphasized": "D",
+            },
+            "causal_structure": {"forces": "F", "constraints": "C", "dependencies": "D"},
+            "information_gaps": [],
+            "article_citations": [1, 2],
+        }
+    )
+
+    @staticmethod
+    def _beat_config():
+        from src.config.beats import BeatConfig, BeatSource
+
+        return BeatConfig(
+            name="test-beat",
+            description="A test beat.",
+            sources=(BeatSource(adapter="rss", feed_tags=("regulatory",)),),
+            watchlist={},
+            standing_questions=(),
+            channels=("terminal",),
+            config_path="config/beats/test-beat.json",
+        )
+
+    def _wire(self, mock_curator, mock_frame_mgr):
+        """Curator, frame manager and Claude client doubles for one run."""
+        articles = [
+            {
+                "id": i,
+                "title": f"Article {i}",
+                "source": f"Source {i}",
+                "content": f"Content {i}",
+                "published_date": "2026-08-20",
+                "url": f"https://example.com/{i}",
+            }
+            for i in (1, 2)
+        ]
+        curator = MagicMock()
+        mock_curator.return_value = curator
+        curator.curate_for_narrative_synthesis = AsyncMock(return_value={"articles": articles})
+        curator._format_user_profile = MagicMock(return_value={})
+        curator._get_synthesis_instructions = MagicMock(return_value="")
+        # The curator is the component that resolves a beat's feed set; the
+        # synthesizer only records how big it was.
+        curator.beat_feed_urls = ["https://in-beat.test/feed"]
+
+        frame_mgr = MagicMock()
+        mock_frame_mgr.return_value = frame_mgr
+        frame_mgr.find_matching_cluster.return_value = None
+        frame_mgr.discover_frames = AsyncMock(return_value=None)
+
+        client = MagicMock()
+        client.analyze = AsyncMock(side_effect=[self.CLUSTERING, json.dumps({})])
+        client.analyze_with_context = AsyncMock(return_value=self.SITUATION)
+        return client
+
+    @pytest.mark.asyncio
+    @patch("src.context.synthesizer.FrameManager")
+    @patch("src.context.synthesizer.ContextCurator")
+    async def test_beat_run_attributes_the_synthesis(
+        self, mock_curator, mock_frame_mgr, isolated_db, test_session
+    ):
+        from src.database.models import Beat, BeatRun
+
+        client = self._wire(mock_curator, mock_frame_mgr)
+        beat = self._beat_config()
+
+        synthesizer = NarrativeSynthesizer(client=client, beat=beat)
+        result = await synthesizer.synthesize(hours=24, max_articles=10)
+
+        assert result["status"] == "success"
+
+        beat_row = test_session.query(Beat).filter(Beat.name == "test-beat").one()
+        assert beat_row.config_path == "config/beats/test-beat.json"
+
+        beat_run = test_session.query(BeatRun).one()
+        assert beat_run.beat_id == beat_row.id
+        assert beat_run.synthesis_id == result["synthesis_id"]
+        assert beat_run.articles_analyzed == 2
+        assert beat_run.feeds_resolved == 1
+
+    @pytest.mark.asyncio
+    @patch("src.context.synthesizer.FrameManager")
+    @patch("src.context.synthesizer.ContextCurator")
+    async def test_run_without_a_beat_records_nothing(
+        self, mock_curator, mock_frame_mgr, isolated_db, test_session
+    ):
+        from src.database.models import Beat, BeatRun
+
+        client = self._wire(mock_curator, mock_frame_mgr)
+
+        synthesizer = NarrativeSynthesizer(client=client)
+        result = await synthesizer.synthesize(hours=24, max_articles=10)
+
+        assert result["status"] == "success"
+        assert synthesizer.beat_id is None
+        assert test_session.query(BeatRun).count() == 0
+        assert test_session.query(Beat).count() == 0
+
+    @pytest.mark.asyncio
+    @patch("src.context.synthesizer.FrameManager")
+    @patch("src.context.synthesizer.ContextCurator")
+    async def test_repeated_beat_runs_reuse_one_beat_row(
+        self, mock_curator, mock_frame_mgr, isolated_db, test_session
+    ):
+        from src.database.models import Beat, BeatRun
+
+        beat = self._beat_config()
+        for _ in range(2):
+            client = self._wire(mock_curator, mock_frame_mgr)
+            await NarrativeSynthesizer(client=client, beat=beat).synthesize(
+                hours=24, max_articles=10
+            )
+
+        assert test_session.query(Beat).count() == 1
+        assert test_session.query(BeatRun).count() == 2

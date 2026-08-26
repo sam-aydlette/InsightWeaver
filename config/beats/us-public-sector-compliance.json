@@ -1,0 +1,19 @@
+{
+  "name": "us-public-sector-compliance",
+  "description": "Regulatory, legislative, judicial and federal cybersecurity activity that changes what US public sector bodies and their contractors are obliged to do.",
+  "sources": [
+    {
+      "adapter": "rss",
+      "feed_tags": ["regulatory", "federal_policy", "legislative", "judicial"],
+      "geo_tags": ["usa"]
+    },
+    {
+      "adapter": "rss",
+      "feed_tags": ["cybersecurity"],
+      "geo_tags": ["usa"]
+    }
+  ],
+  "watchlist": {},
+  "standing_questions": [],
+  "channels": ["terminal"]
+}

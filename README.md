@@ -157,6 +157,55 @@ that decides what a brief looks like.
 
 ---
 
+## Beats: briefing a subject instead of a person
+
+The user profile models *you* -- a location, a profession, a voting context. A **beat**
+models a *subject*: a standing topic with its own sources. Both coexist, and the
+person path is unchanged.
+
+```bash
+insightweaver brief --beat us-public-sector-compliance
+```
+
+A beat lives in `config/beats/<name>.json` and selects its feeds through the same
+`applicability` tags (`scope` / `geo_tags` / `domain_tags` / `specialty_tags`) that
+`config/feeds/` already uses:
+
+```json
+{
+  "name": "us-public-sector-compliance",
+  "sources": [
+    { "adapter": "rss", "feed_tags": ["regulatory", "federal_policy"], "geo_tags": ["usa"] }
+  ],
+  "watchlist": {},
+  "standing_questions": [],
+  "channels": ["terminal"]
+}
+```
+
+A beat's brief is drawn only from that beat's sources, renders through the same
+`BriefDocument` as every other brief, and accumulates its own slice of the graph:
+its Questions and Predictions are kept apart from the default brief's, so a
+returning question's run number means "the Nth time *this subject* raised it".
+Run attribution lives in the `beats` and `beat_runs` tables -- no existing table
+grew a `beat_id` column. See `docs/CONCEPTS.md` for the scoping rationale and for
+what stays deliberately global (the decision journal, the frame glossary).
+
+RSS is the only adapter today, so the first beats are thin. That thinness is a
+finding about the source layer, not a defect in the beat.
+
+Running your first beat needs the two new tables:
+
+```bash
+python -m src.database.migrations.add_beats     # or: insightweaver brief setup
+```
+
+The migration is additive and reversible (`... add_beats down`). Until you run it,
+`--beat` stops with a clear error and every other command -- including plain
+`insightweaver brief` -- carries on exactly as before.
+
+---
+
 ## Requirements
 
 - Python 3.10+

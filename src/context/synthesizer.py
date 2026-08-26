@@ -10,10 +10,13 @@ import json
 import logging
 from typing import Any
 
+from ..config.beats import BeatConfig
 from ..database.connection import get_db
 from ..database.models import (
+    BEAT_RUN_STATUS_COMPLETED,
     AnalysisRun,
     Article,
+    BeatRun,
     ContextSnapshot,
     DecisionEvidence,
     NarrativeSynthesis,
@@ -30,6 +33,7 @@ from ..prompts.synthesis import (
 from ..utils import utcnow
 from ..utils.profiler import profile
 from ._json import parse_claude_json
+from .beat_scope import ensure_beat, scoped_appearance_count
 from .claude_client import ClaudeClient
 from .cross_cluster_reconciler import CrossClusterReconciler
 from .curator import ContextCurator
@@ -46,7 +50,12 @@ ANALYSIS_THRESHOLD = 2  # Minimum articles for full situation analysis
 class NarrativeSynthesizer:
     """Two-pass situation-based narrative synthesizer."""
 
-    def __init__(self, topic_filters: dict | None = None, client: ClaudeClient | None = None):
+    def __init__(
+        self,
+        topic_filters: dict | None = None,
+        client: ClaudeClient | None = None,
+        beat: BeatConfig | None = None,
+    ):
         """
         Args:
             topic_filters: Optional curation filters.
@@ -54,9 +63,15 @@ class NarrativeSynthesizer:
                 every collaborator builds its own client with its own model, as
                 before. When supplied, it is injected into all of them, which is
                 the seam tests use to run without an ANTHROPIC_API_KEY.
+            beat: Optional beat. Scopes both the articles curated and the slice
+                of the commitment graph this run reads and writes. ``None`` is
+                the default person-profile brief, unchanged.
         """
         self.topic_filters = topic_filters or {}
-        self.curator = ContextCurator(topic_filters=self.topic_filters)
+        self.beat = beat
+        # Set on the first store/check of a beat run; None for the default path.
+        self.beat_id: int | None = None
+        self.curator = ContextCurator(topic_filters=self.topic_filters, beat=beat)
         self.client = client or ClaudeClient()
         self.analysis_rules = load_analysis_rules()
         self.frame_manager = FrameManager(self.client)
@@ -93,6 +108,13 @@ class NarrativeSynthesizer:
                 return {"articles_analyzed": 0, "synthesis_id": None, "status": "no_articles"}
 
             try:
+                # Register the beat before anything touches the graph. Every
+                # scoped read and write below keys off this id, so failing to
+                # get one must abort the run rather than quietly dump the
+                # beat's questions into the default scope.
+                if self.beat is not None:
+                    self.beat_id = self._register_beat(self.beat)
+
                 # Pre-pass: grade the open-prediction ledger against today's
                 # coverage before any new analysis. This keeps the tool's own
                 # forward-looking statements auditable.
@@ -472,8 +494,12 @@ class NarrativeSynthesizer:
                 question_plan = self._collect_proposed_questions(situations)
                 if question_plan:
                     proposed = [pq for _, _, pq in question_plan]
-                    resolved = await self.question_matcher.resolve_questions(proposed, session)
-                    self._enrich_situations_with_questions(situations, question_plan, resolved)
+                    resolved = await self.question_matcher.resolve_questions(
+                        proposed, session, beat_id=self.beat_id
+                    )
+                    self._enrich_situations_with_questions(
+                        situations, question_plan, resolved, session, self.beat_id
+                    )
                 else:
                     resolved = []
 
@@ -562,6 +588,24 @@ class NarrativeSynthesizer:
                             synchronize_session=False,
                         )
 
+                # Attribute this run to its beat. Written in the same
+                # transaction as the synthesis, so a stored synthesis is either
+                # attributed or does not exist -- there is no window in which a
+                # beat's questions look like the default brief's.
+                if self.beat_id is not None:
+                    session.add(
+                        BeatRun(
+                            beat_id=self.beat_id,
+                            analysis_run_id=run.id,
+                            synthesis_id=synthesis.id,
+                            status=BEAT_RUN_STATUS_COMPLETED,
+                            started_at=run.started_at,
+                            completed_at=utcnow(),
+                            articles_analyzed=articles_count,
+                            feeds_resolved=len(self.curator.beat_feed_urls),
+                        )
+                    )
+
                 session.commit()
                 logger.info(f"Stored synthesis: {synthesis.id}")
                 return synthesis.id
@@ -570,11 +614,26 @@ class NarrativeSynthesizer:
             logger.error(f"Failed to store synthesis: {e}")
             return None
 
+    @staticmethod
+    def _register_beat(beat: BeatConfig) -> int:
+        """
+        Get or create this beat's ``beats`` row and return its id.
+
+        Deliberately not caught: without a beat id the run cannot be scoped,
+        and an unscoped beat run would corrupt the default brief's graph.
+        """
+        with get_db() as session:
+            beat_id = ensure_beat(session, beat)
+            session.commit()
+            return beat_id
+
     async def _check_predictions(self, articles: list[dict]) -> dict:
         """Grade the open-prediction ledger against today's coverage."""
         try:
             with get_db() as session:
-                return await self.prediction_tracker.check_open_predictions(articles, session)
+                return await self.prediction_tracker.check_open_predictions(
+                    articles, session, beat_id=self.beat_id
+                )
         except Exception as e:
             logger.warning(f"Prediction check failed; continuing without it: {e}")
             return {
@@ -674,8 +733,17 @@ class NarrativeSynthesizer:
         situations: list[dict],
         plan: list[tuple[int, str, ProposedQuestion]],
         resolved: list[Question],
+        session,
+        beat_id: int | None = None,
     ) -> None:
-        """Attach question identity metadata onto each situation's questions."""
+        """
+        Attach question identity metadata onto each situation's questions.
+
+        Appearance counts are counted within ``beat_id``'s scope, so the run
+        number a brief prints is "the Nth time *this* subject raised it". With
+        no beat runs on record the scope is the whole graph, which is the count
+        this produced before beats existed.
+        """
         # Group resolved by situation_index + slot for easy lookup.
         by_slot: dict[tuple[int, str], Question] = {}
         for (sit_idx, slot, _pq), q in zip(plan, resolved, strict=True):
@@ -687,7 +755,7 @@ class NarrativeSynthesizer:
                 continue
             primary_q = by_slot.get((sit_idx, "primary"))
             if primary_q:
-                appearance_count = len(primary_q.situation_links) + 1
+                appearance_count = scoped_appearance_count(session, primary_q.id, beat_id) + 1
                 futures["unresolved_questions"] = {
                     "primary": {
                         "text": primary_q.text,
@@ -706,7 +774,7 @@ class NarrativeSynthesizer:
                 sec_q = by_slot.get((sit_idx, f"secondary:{sec_idx}"))
                 if not sec_q:
                     break
-                appearance_count = len(sec_q.situation_links) + 1
+                appearance_count = scoped_appearance_count(session, sec_q.id, beat_id) + 1
                 futures.setdefault("unresolved_questions", {"primary": None, "secondary": []})
                 futures["unresolved_questions"].setdefault("secondary", []).append(
                     {

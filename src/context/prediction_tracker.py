@@ -22,6 +22,7 @@ from ..database.models import (
 from ..prompts.predictions import PREDICTION_CHECK_PROMPT
 from ..utils import utcnow
 from ._json import parse_claude_json
+from .beat_scope import prediction_scope_filter
 from .claude_client import ClaudeClient
 
 logger = logging.getLogger(__name__)
@@ -40,15 +41,23 @@ class PredictionTracker:
     def __init__(self, client: ClaudeClient | None = None):
         self.client = client or ClaudeClient(model=TRACKER_MODEL)
 
-    async def check_open_predictions(self, articles: list[dict], session: Session) -> dict:
+    async def check_open_predictions(
+        self, articles: list[dict], session: Session, beat_id: int | None = None
+    ) -> dict:
         """
         Expire stale predictions, then grade the rest against today's coverage.
 
         Returns a summary dict for the brief's transparency block. Writes
         status changes to the session but does not commit -- the caller owns
         the transaction.
+
+        ``beat_id`` restricts both the expiry sweep and the grading pass to one
+        scope's ledger, so a beat run never resolves or ages out the default
+        brief's observables and vice versa. With no beat runs on record the
+        scope is the whole ledger, i.e. the behaviour that predates beats.
         """
         now = utcnow()
+        scope = prediction_scope_filter(session, beat_id)
         summary = {
             "checked": 0,
             "triggered": 0,
@@ -64,6 +73,7 @@ class PredictionTracker:
             .filter(
                 Prediction.status == PREDICTION_STATUS_OPEN,
                 Prediction.made_at < cutoff,
+                scope,
             )
             .all()
         )
@@ -77,7 +87,7 @@ class PredictionTracker:
 
         open_preds = (
             session.query(Prediction)
-            .filter(Prediction.status == PREDICTION_STATUS_OPEN)
+            .filter(Prediction.status == PREDICTION_STATUS_OPEN, scope)
             .order_by(Prediction.made_at.desc())
             .limit(OPEN_PREDICTION_LIMIT)
             .all()

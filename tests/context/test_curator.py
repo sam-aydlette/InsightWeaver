@@ -254,3 +254,110 @@ class TestEnforceTokenBudget:
 
         # Should reduce articles to fit budget
         assert len(result["articles"]) < 100
+
+
+class TestBeatScopedArticleSelection:
+    """
+    A beat's brief must be drawn only from that beat's sources. The curator's
+    article query is where that boundary lives, so these tests exercise it
+    against a real (throwaway) database rather than a mock.
+
+    Added 2026-08-26 with the beat abstraction (backlog task 004).
+    """
+
+    @staticmethod
+    def _beat(*feed_tags, geo_tags=()):
+        from src.config.beats import BeatConfig, BeatSource
+
+        return BeatConfig(
+            name="test-beat",
+            description="",
+            sources=(
+                BeatSource(adapter="rss", feed_tags=tuple(feed_tags), geo_tags=tuple(geo_tags)),
+            ),
+            watchlist={},
+            standing_questions=(),
+            channels=("terminal",),
+            config_path="config/beats/test-beat.json",
+        )
+
+    @staticmethod
+    def _seed(session):
+        """Two feeds with one article each, fetched just now."""
+        from src.database.models import Article, RSSFeed
+        from src.utils import utcnow
+
+        titles = {}
+        for name, url in (
+            ("In Beat", "https://in-beat.test/feed"),
+            ("Out Of Beat", "https://out-of-beat.test/feed"),
+        ):
+            feed = RSSFeed(name=name, url=url, category="x", is_active=True)
+            session.add(feed)
+            session.flush()
+            article = Article(
+                feed_id=feed.id,
+                guid=f"guid-{name}",
+                title=f"{name} article",
+                filtered=False,
+                fetched_at=utcnow(),
+            )
+            session.add(article)
+            titles[name] = article.title
+        session.flush()
+        return titles
+
+    @patch("src.context.curator.get_user_profile")
+    def test_beat_excludes_articles_from_other_feeds(self, mock_get_profile, test_session):
+        mock_get_profile.return_value = MagicMock()
+        self._seed(test_session)
+
+        beat = self._beat("regulatory")
+        with patch.object(
+            type(beat),
+            "resolve_feed_urls",
+            lambda self, matcher=None: ["https://in-beat.test/feed"],
+        ):
+            curator = ContextCurator(beat=beat)
+            articles = curator._get_recent_articles(test_session, hours=24, max_articles=50)
+
+        assert [a.title for a in articles] == ["In Beat article"]
+
+    @patch("src.context.curator.get_user_profile")
+    def test_no_beat_selects_everything_as_before(self, mock_get_profile, test_session):
+        mock_get_profile.return_value = MagicMock()
+        self._seed(test_session)
+
+        curator = ContextCurator()
+        articles = curator._get_recent_articles(test_session, hours=24, max_articles=50)
+
+        assert {a.title for a in articles} == {"In Beat article", "Out Of Beat article"}
+
+    @patch("src.context.curator.get_user_profile")
+    def test_beat_matching_no_feeds_yields_nothing_rather_than_everything(
+        self, mock_get_profile, test_session
+    ):
+        """
+        The dangerous failure mode: a beat that resolves to no feeds must not
+        fall back to the whole corpus and quietly produce a general brief.
+        """
+        mock_get_profile.return_value = MagicMock()
+        self._seed(test_session)
+
+        beat = self._beat("no-such-tag")
+        with patch.object(type(beat), "resolve_feed_urls", lambda self, matcher=None: []):
+            curator = ContextCurator(beat=beat)
+            articles = curator._get_recent_articles(test_session, hours=24, max_articles=50)
+
+        assert articles == []
+
+    @patch("src.context.curator.get_user_profile")
+    def test_beat_feed_urls_are_resolved_once_at_construction(self, mock_get_profile, test_session):
+        """The feed set a run uses is fixed even if config/beats/ changes."""
+        mock_get_profile.return_value = MagicMock()
+
+        beat = self._beat("regulatory", geo_tags=("usa",))
+        curator = ContextCurator(beat=beat)
+
+        assert curator.beat_feed_urls == beat.resolve_feed_urls()
+        assert curator.beat is beat
