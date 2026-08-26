@@ -128,6 +128,17 @@ class BriefDocument:
         return _as_dict(self.metadata.get("prediction_check"))
 
     @property
+    def institutional_activity(self) -> dict[str, Any]:
+        """
+        This run's institutional coverage reading: which of the beat's declared
+        orgs, programs and document types moved against their trailing average.
+
+        Empty for the default person brief and for a beat that declares no
+        ``coverage`` entities.
+        """
+        return _as_dict(self.metadata.get("institutional_activity"))
+
+    @property
     def clusters_analyzed(self) -> int:
         return _as_int(self.metadata.get("clusters_analyzed"))
 

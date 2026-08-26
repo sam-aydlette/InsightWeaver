@@ -12,11 +12,15 @@ from __future__ import annotations
 from html import escape
 
 from ._text import (
+    ACTIVITY_NOTE,
     DIRECTION_GLYPH,
+    activity_footnote,
+    activity_sentence,
     clean_citations,
     decision_summary,
     prediction_check_line,
     question_lines,
+    split_activity,
     watch_items,
 )
 from .document import BriefDocument
@@ -119,6 +123,7 @@ class HTMLRenderer:
         out.extend(self._decisions(doc))
         out.extend(self._situations(doc))
         out.extend(self._meta_fractures(doc))
+        out.extend(self._institutional_activity(doc))
         out.extend(self._thin_coverage(doc))
 
         return "\n".join(out)
@@ -145,6 +150,33 @@ class HTMLRenderer:
                         f'<span class="tag">({escape(direction)})</span></li>'
                     )
                 out.append("</ul>")
+        return out
+
+    def _institutional_activity(self, doc: BriefDocument) -> list[str]:
+        """
+        What the beat's declared institutions did this run against their
+        baseline. Steady entities are rendered muted rather than dropped: an
+        office going quiet is information.
+        """
+        block = doc.institutional_activity
+        moved, steady = split_activity(block)
+        if not moved and not steady:
+            return []
+
+        out = [
+            "<h2>Institutional activity</h2>",
+            f'<p class="section-note">{escape(ACTIVITY_NOTE)}</p>',
+            "<ul>",
+        ]
+        for entry in moved:
+            out.append(f"<li>{escape(activity_sentence(entry))}</li>")
+        for entry in steady:
+            out.append(f'<li class="muted">{escape(activity_sentence(entry))}</li>')
+        out.append("</ul>")
+
+        footnote = activity_footnote(block)
+        if footnote:
+            out.append(f'<p class="meta">{escape(footnote)}</p>')
         return out
 
     def _situations(self, doc: BriefDocument) -> list[str]:

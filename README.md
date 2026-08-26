@@ -177,7 +177,11 @@ A beat lives in `config/beats/<name>.json` and selects its feeds through the sam
   "sources": [
     { "adapter": "rss", "feed_tags": ["regulatory", "federal_policy"], "geo_tags": ["usa"] }
   ],
-  "coverage": {},
+  "coverage": {
+    "orgs": [{ "name": "CISA", "aliases": ["Cybersecurity and Infrastructure Security Agency"] }],
+    "programs": ["FedRAMP 20x", "CMMC"],
+    "document_types": [{ "name": "Binding Operational Directive", "aliases": ["BOD"] }]
+  },
   "standing_questions": [],
   "channels": ["terminal"]
 }
@@ -207,15 +211,47 @@ what stays deliberately global (the decision journal, the frame glossary).
 RSS was the only adapter until 2026-08-26, and the first beats were thin because
 of it. See "Source adapters" below for what changed.
 
-Running your first beat needs the two new tables:
+### Institutional activity
 
-```bash
-python -m src.database.migrations.add_beats     # or: insightweaver brief setup
+The `coverage` block names the **institutions** a beat tracks: organizations, programs
+and document types. Each run counts how many items mention each one and the brief
+reports what departed from its trailing average, not a tally:
+
+```
+INSTITUTIONAL ACTIVITY
+Movement against each entity's trailing average. A count is an observation, not a measure of significance.
+
+  FedRAMP PMO appeared in 4 items this run, against a trailing average of 0.
+  CISA appeared in 0 items this run, against a trailing average of 1.
+
+  GSA appeared in 1, unchanged.
 ```
 
-The migration is additive and reversible (`... add_beats down`). Until you run it,
-`--beat` stops with a clear error and every other command -- including plain
-`insightweaver brief` -- carries on exactly as before.
+A flat count would be noise -- these are the entities that appear most days. Matching is
+deterministic word-boundary alias matching with no model call, because a count a model
+produced is not reproducible tomorrow and an unreproducible baseline cannot support a
+delta. Expect it to look uninformative until several runs have accumulated.
+
+**There is no person kind and no persons table.** `kind` is `org`, `program` or
+`document_type`; a `coverage.people` key is rejected by the loader with an error rather
+than ignored. Personnel rotate and offices persist, so tracking `FedRAMP PMO` survives a
+staffing change while tracking a name goes silently dark on reassignment and the absence
+reads as inactivity. A named individual may appear inside a rendered situation where the
+source document names a signatory -- an attribute of a document, which expires with it --
+but never as a stored row, which would accumulate. See `docs/CONCEPTS.md`.
+
+Running your first beat needs the two beat tables, plus two more for institutional
+activity:
+
+```bash
+python -m src.database.migrations.add_beats           # or: insightweaver brief setup
+python -m src.database.migrations.add_beat_entities
+```
+
+Both migrations are additive and reversible (`... add_beats down`). Until you run
+`add_beats`, `--beat` stops with a clear error and every other command -- including plain
+`insightweaver brief` -- carries on exactly as before. Without `add_beat_entities` a beat
+brief still runs; it simply has no activity section.
 
 ---
 

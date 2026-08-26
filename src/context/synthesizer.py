@@ -38,7 +38,9 @@ from .claude_client import ClaudeClient
 from .cross_cluster_reconciler import CrossClusterReconciler
 from .curator import ContextCurator
 from .decision_router import DecisionRouter
+from .entity_matcher import item_text
 from .frame_manager import FrameManager
+from .institutional_activity import observe_activity, record_mentions
 from .prediction_tracker import PredictionTracker
 from .question_matcher import ProposedQuestion, QuestionMatcher
 
@@ -71,6 +73,11 @@ class NarrativeSynthesizer:
         self.beat = beat
         # Set on the first store/check of a beat run; None for the default path.
         self.beat_id: int | None = None
+        # This run's institutional mention counts, keyed by beat_entities.id.
+        # Populated by the (deterministic, model-free) coverage pass and drained
+        # into entity_mentions inside the synthesis transaction.
+        self.entity_counts: dict[int, int] = {}
+        self.entity_items_scanned: int = 0
         self.curator = ContextCurator(topic_filters=self.topic_filters, beat=beat)
         self.client = client or ClaudeClient()
         self.analysis_rules = load_analysis_rules()
@@ -114,6 +121,13 @@ class NarrativeSynthesizer:
                 # beat's questions into the default scope.
                 if self.beat is not None:
                     self.beat_id = self._register_beat(self.beat)
+
+                # Coverage pass: count which of the beat's declared
+                # institutions this run's items mention, and read those counts
+                # against each entity's trailing average. Deterministic word
+                # boundary alias matching -- no model call, no token cost, and
+                # the same articles always produce the same counts.
+                institutional_activity = self._observe_institutional_activity(articles)
 
                 # Pre-pass: grade the open-prediction ledger against today's
                 # coverage before any new analysis. This keeps the tool's own
@@ -280,6 +294,8 @@ class NarrativeSynthesizer:
                         "prediction_check": prediction_check,
                     },
                 }
+                if institutional_activity is not None:
+                    synthesis_data["metadata"]["institutional_activity"] = institutional_activity
 
                 # Store in database (also resolves Questions and writes joins)
                 synthesis_id = await self._store_synthesis(
@@ -593,18 +609,32 @@ class NarrativeSynthesizer:
                 # attributed or does not exist -- there is no window in which a
                 # beat's questions look like the default brief's.
                 if self.beat_id is not None:
-                    session.add(
-                        BeatRun(
-                            beat_id=self.beat_id,
-                            analysis_run_id=run.id,
-                            synthesis_id=synthesis.id,
-                            status=BEAT_RUN_STATUS_COMPLETED,
-                            started_at=run.started_at,
-                            completed_at=utcnow(),
-                            articles_analyzed=articles_count,
-                            feeds_resolved=len(self.curator.beat_feed_urls),
-                        )
+                    beat_run = BeatRun(
+                        beat_id=self.beat_id,
+                        analysis_run_id=run.id,
+                        synthesis_id=synthesis.id,
+                        status=BEAT_RUN_STATUS_COMPLETED,
+                        started_at=run.started_at,
+                        completed_at=utcnow(),
+                        articles_analyzed=articles_count,
+                        feeds_resolved=len(self.curator.beat_feed_urls),
                     )
+                    session.add(beat_run)
+
+                    # This run's institutional counts, written in the same
+                    # transaction as the run they describe. Every declared
+                    # entity gets a row, zeroes included: a quiet office is an
+                    # observation, and without the zero the trailing average
+                    # would only ever average the busy days.
+                    if self.entity_counts:
+                        session.flush()
+                        record_mentions(
+                            session,
+                            self.entity_counts,
+                            beat_run_id=beat_run.id,
+                            synthesis_id=synthesis.id,
+                            items_scanned=self.entity_items_scanned,
+                        )
 
                 session.commit()
                 logger.info(f"Stored synthesis: {synthesis.id}")
@@ -626,6 +656,43 @@ class NarrativeSynthesizer:
             beat_id = ensure_beat(session, beat)
             session.commit()
             return beat_id
+
+    def _observe_institutional_activity(self, articles: list[dict]) -> dict | None:
+        """
+        Count this run's mentions of the beat's declared coverage entities.
+
+        Returns the brief-facing payload, or ``None`` when there is nothing to
+        observe -- the default person brief, a beat with an empty ``coverage``
+        block, or a database that predates the tables. A failure here is
+        logged and swallowed: institutional activity is an additive reading of
+        articles the run already has, and losing a brief over it would be a
+        worse outcome than losing one section of it.
+
+        No Claude call happens on this path, by design. If alias matching ever
+        proves insufficient, that is a reason to say so, not to reach for a
+        model: a count that a model produced is not reproducible from the same
+        articles tomorrow, and an unreproducible baseline cannot support a
+        delta.
+        """
+        if self.beat is None or self.beat_id is None or not self.beat.entities:
+            return None
+
+        try:
+            texts = [item_text(article) for article in articles]
+            with get_db() as session:
+                observation = observe_activity(session, self.beat_id, self.beat.entities, texts)
+                session.commit()
+            self.entity_counts = observation.counts_by_entity_id
+            self.entity_items_scanned = observation.items_scanned
+            logger.info(
+                f"Institutional activity: {len(observation.entities)} entities with "
+                f"history or mentions, {observation.never_observed} never observed"
+            )
+            return observation.as_dict()
+        except Exception as e:
+            logger.warning(f"Institutional activity pass failed; continuing without it: {e}")
+            self.entity_counts = {}
+            return None
 
     async def _check_predictions(self, articles: list[dict]) -> dict:
         """Grade the open-prediction ledger against today's coverage."""

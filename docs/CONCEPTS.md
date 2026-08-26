@@ -112,7 +112,7 @@ A **Beat** is a *subject* the tool runs briefs for, as opposed to the *person* t
 
 **Source selection reuses the feed `applicability` tags**, it does not invent a parallel selector. `feed_tags` is matched against a feed's `domain_tags` and `specialty_tags`; the optional `geo_tags` and `scope` narrow against the families of the same name. Within a family the match is ANY, across families it is ALL, and multiple `sources` entries union. A beat is deliberately *not* validated by `src/utils/profile_loader.py` — that validator enforces a person-shaped schema, and a beat is a different shape.
 
-**`coverage` and `standing_questions` are reserved.** They are validated for shape so that entity coverages and standing questions need no migration later, but nothing reads them yet.
+**`coverage` declares the institutions the beat tracks; `standing_questions` is still reserved.** See "Institutional activity" below for what `coverage` does. `standing_questions` is validated for shape so it needs no migration later, but nothing reads it yet.
 
 **Run recording.** `beats` holds one row per subject; `beat_runs` holds one row per brief run, carrying the `analysis_run_id`, the `synthesis_id`, the article count and the number of feeds the beat resolved to. A run is attributed in the same transaction that stores its synthesis, so a stored synthesis is either attributed or does not exist.
 
@@ -163,6 +163,38 @@ On a database with no `beat_runs` rows these commands behave exactly as they alw
 
 ---
 
+## Institutional activity
+
+A beat's `coverage` block names the **institutions** it tracks: organizations, programs, and types of document. Each run counts how many of its items mention each one, and the brief reports the entities whose count **departed from their trailing average**.
+
+```json
+"coverage": {
+  "orgs":           [{ "name": "CISA", "aliases": ["Cybersecurity and Infrastructure Security Agency"] }],
+  "programs":       ["FedRAMP 20x", "CMMC"],
+  "document_types": [{ "name": "Binding Operational Directive", "aliases": ["BOD"] }]
+}
+```
+
+An entry is either a bare canonical name or `{"name": ..., "aliases": [...]}`. The three block names are the whole vocabulary: `kind` is `org`, `program` or `document_type`.
+
+**There is no person kind, and that is the design, not an omission.** The loader rejects a `coverage.people` key — and any other unrecognised block — with an error rather than ignoring it, so the boundary is enforced by the schema and cannot be reintroduced by convention. `beat_entities` has no person kind and there is no persons table, so no per-individual record exists to profile with. A named individual may appear inside a rendered situation where the source document names a signatory; that is an attribute of a document and expires with it, whereas a person row would accumulate across runs into a file on someone.
+
+The reasoning is on the merits as well as the ethics. Personnel rotate and offices persist: tracking `FedRAMP PMO` survives a staffing change, while tracking a name goes silently dark on reassignment and the absence reads as inactivity — a wrong answer that looks like a real one. The interesting signal was never a person; it is whether an office moved.
+
+**The signal is the delta, never the count.** A flat tally is noise: the entities a beat declares are the ones that appear most days, so "FedRAMP PMO: 6" reproduces a standing fact every morning. What the brief says is `FedRAMP PMO appeared in 6 items this run, against a trailing average of 1`. The baseline is the last five recorded runs, and a move must clear both one whole item and half the baseline before it is reported as movement. **Expect this to look useless on day one** — there is no baseline until several runs have accumulated, and it must not be tuned against a single run.
+
+**Matching is deterministic word-boundary alias matching. No model is involved.** A count a model produced is not reproducible from the same articles tomorrow, and an unreproducible baseline cannot support a delta. Acronyms collide badly — `CISA` sits inside "precisa", `OMB` inside "bombing" and "combat", `BOD` inside "body" — so every term is anchored between non-alphanumeric positions, and a term written entirely in capitals matches case-sensitively, because an acronym is only itself when it is shouted. Hyphens and slashes are boundaries, so "CISA-issued" counts. A mention is counted per *item*, not per occurrence: an article naming CISA nine times is one item.
+
+**What appears and what does not.** An entity with no mentions and no history does not appear — declaring it was a hypothesis about where news comes from, and one that has never paid out is a note about the config, not a line in the brief. An entity that **has** been active and is now quiet does appear: silence is information, and dropping it is the same class of bug as a standing question vanishing on a quiet day. `entity_mentions` records a row per entity per run including the zeroes, because a baseline that averaged only the busy days would always read as normal.
+
+**It is not a leaderboard.** Entries are ordered by kind then name, never by count, and the section states that a count is an observation rather than a measure of significance. Consistent with "no entity stores a truth value": activity is not importance, and the tool does not infer intent, motive or significance from it.
+
+**Schema.** `beat_entities` holds one row per declared institution per beat, carrying `kind`, the canonical `name` and the configured `aliases`. `entity_mentions` holds one row per entity per run, carrying `item_count`, `items_scanned` and the `beat_run_id` and `synthesis_id` of the run — written in the same transaction as the synthesis, so a stored run is either fully recorded or does not exist. An entity dropped from the config keeps its rows; deleting them would silently rewrite the record of what was observed.
+
+**Migration.** `python -m src.database.migrations.add_beat_entities`. Purely additive; a database without it keeps working and the activity section is simply absent.
+
+---
+
 ## Sources
 
 Each RSSFeed carries derived **calibration signals**, computed on demand from ArticleFrame and FrameGap data. No new schema for this — purely a view:
@@ -178,6 +210,7 @@ Each RSSFeed carries derived **calibration signals**, computed on demand from Ar
 
 With `--beat`, step 0 is registering the beat and resolving its sources; every graph read and write below is then confined to that beat's scope, and step 8 also writes the `beat_runs` row. Without `--beat` the run operates in the default scope, which on a database with no beat runs is the whole graph.
 
+0. **Coverage pass** (beats with a `coverage` block only) — the run's items are matched against the beat's declared institutions and read against their trailing averages. Deterministic, no model call.
 1. **Prediction check** — open Predictions are graded against today's coverage. Resolutions written to the ledger.
 2. **Pass 1** — articles clustered into topic groups.
 3. **Pass 2** — each cluster gets a situation analysis (with frame-aware prompting if known frames exist) and its articles get tagged into ArticleFrame.

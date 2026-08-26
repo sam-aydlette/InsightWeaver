@@ -51,6 +51,118 @@ def prediction_check_line(check: dict | None) -> str:
     )
 
 
+# --- institutional activity -------------------------------------------------
+#
+# The section reports movement against a trailing average, never a tally. A
+# flat count is noise: the entities a beat declares are the ones that appear
+# most days, so "FedRAMP PMO: 6" reproduces a standing fact every morning. The
+# sentences below are built to read like an analyst noting a change, and the
+# ordering deliberately never sorts by count -- that would be a leaderboard,
+# and activity is not significance.
+
+MOVEMENT_UP = "up"
+MOVEMENT_DOWN = "down"
+MOVEMENT_UNCHANGED = "unchanged"
+MOVEMENT_FIRST_RUN = "first_run"
+
+ACTIVITY_NOTE = (
+    "Movement against each entity's trailing average. "
+    "A count is an observation, not a measure of significance."
+)
+
+
+def institutional_activity(metadata: dict) -> dict[str, Any]:
+    """
+    Pull the institutional activity block out of synthesis metadata.
+
+    Returns ``{}`` when the run recorded none -- the default person brief, or a
+    beat with no ``coverage`` entities.
+    """
+    block = metadata.get("institutional_activity")
+    return block if isinstance(block, dict) else {}
+
+
+def _activity_entries(block: dict) -> list[dict]:
+    entries = block.get("entities")
+    if not isinstance(entries, list):
+        return []
+    return [entry for entry in entries if isinstance(entry, dict)]
+
+
+def split_activity(block: dict) -> tuple[list[dict], list[dict]]:
+    """
+    Partition activity entries into ``(moved, steady)``, order preserved.
+
+    ``moved`` carries the entities whose count departed from their baseline,
+    plus the ones being observed for the first time (which have no baseline to
+    depart from and are stated as such). ``steady`` carries the rest: entities
+    that have been active before and are behaving normally, including normally
+    quiet ones. They are kept because an entity going silent is information,
+    and dropping it is the same class of bug as a standing question vanishing
+    on a quiet day.
+    """
+    moved: list[dict] = []
+    steady: list[dict] = []
+    for entry in _activity_entries(block):
+        movement = entry.get("movement")
+        if movement in (MOVEMENT_UP, MOVEMENT_DOWN, MOVEMENT_FIRST_RUN):
+            moved.append(entry)
+        else:
+            steady.append(entry)
+    return moved, steady
+
+
+def _format_average(value: Any) -> str:
+    """Render a trailing average without trailing zeros: 1.0 -> "1"."""
+    if not isinstance(value, int | float) or isinstance(value, bool):
+        return "0"
+    return f"{round(float(value), 1):g}"
+
+
+def _items(count: int) -> str:
+    return "1 item" if count == 1 else f"{count} items"
+
+
+def activity_sentence(entry: dict) -> str:
+    """
+    One entity's reading as a sentence.
+
+    Three forms, because there are three things that can be true: it moved
+    against a baseline, it has no baseline yet, or it is where it usually is.
+    """
+    name = str(entry.get("name", "(entity)"))
+    raw_count = entry.get("count", 0)
+    count = raw_count if isinstance(raw_count, int) and not isinstance(raw_count, bool) else 0
+    movement = entry.get("movement")
+
+    if movement == MOVEMENT_FIRST_RUN:
+        return f"{name} appeared in {_items(count)} this run; no trailing average yet."
+    if movement in (MOVEMENT_UP, MOVEMENT_DOWN):
+        average = _format_average(entry.get("trailing_average"))
+        return (
+            f"{name} appeared in {_items(count)} this run, against a trailing average of {average}."
+        )
+    return f"{name} appeared in {count}, unchanged."
+
+
+def activity_footnote(block: dict) -> str:
+    """
+    One line accounting for the entities the section does not list.
+
+    An entity with no mentions and no history does not appear -- declaring it
+    was a hypothesis about where news comes from, and a hypothesis that has
+    never paid out is a note about the config rather than a line in the brief.
+    Saying how many were withheld keeps that omission visible without naming
+    them into the brief.
+    """
+    withheld = block.get("never_observed")
+    if not isinstance(withheld, int) or isinstance(withheld, bool) or withheld <= 0:
+        return ""
+    if withheld == 1:
+        return "1 declared entity has never been mentioned and is not listed."
+    return f"{withheld} declared entities have never been mentioned and are not listed."
+
+
 def watch_items(futures: dict) -> list[str]:
     """Extract what_to_watch observables. Handles the list-of-objects shape
     and the legacy single-string shape."""

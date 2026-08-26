@@ -18,7 +18,31 @@
       "geo_tags": ["usa"]
     }
   ],
-  "coverage": {},
+  "coverage": {
+    "orgs": [
+      { "name": "FedRAMP PMO", "aliases": ["FedRAMP Program Management Office"] },
+      { "name": "CISA", "aliases": ["Cybersecurity and Infrastructure Security Agency"] },
+      { "name": "OMB", "aliases": ["Office of Management and Budget"] },
+      { "name": "GSA", "aliases": ["General Services Administration"] },
+      { "name": "NIST", "aliases": ["National Institute of Standards and Technology"] },
+      { "name": "DoD CIO", "aliases": ["DOD CIO", "Department of Defense CIO"] },
+      { "name": "DISA", "aliases": ["Defense Information Systems Agency"] }
+    ],
+    "programs": [
+      { "name": "FedRAMP", "aliases": ["Federal Risk and Authorization Management Program"] },
+      { "name": "FedRAMP 20x" },
+      { "name": "CMMC", "aliases": ["Cybersecurity Maturity Model Certification"] },
+      { "name": "StateRAMP" },
+      { "name": "TX-RAMP" }
+    ],
+    "document_types": [
+      { "name": "Binding Operational Directive", "aliases": ["BOD"] },
+      { "name": "Emergency Directive" },
+      { "name": "OMB Memorandum", "aliases": ["OMB memo"] },
+      { "name": "Security Requirements Guide", "aliases": ["SRG"] },
+      { "name": "Notice of Proposed Rulemaking", "aliases": ["NPRM"] }
+    ]
+  },
   "standing_questions": [],
   "channels": ["terminal"]
 }
