@@ -112,7 +112,7 @@ class TestSubstringMatchingWouldLie:
 
     @pytest.mark.parametrize("title", NIST_COLLISIONS)
     def test_no_collision_matches_even_the_bare_term(self, title):
-        """The boundary, not the two-level shape, is what rejects these."""
+        """For these lowercase collisions it is the case rule, not the boundary, that rejects them: every term here is shouted, so the compiled pattern is case-sensitive and never reaches the anchors. Verified 2026-08-27 by deleting LEFT_BOUNDARY/RIGHT_BOUNDARY from entity_matcher and re-running this class -- all 12 still passed. See TestBoundariesAreLoadBearingForShoutedTermsToo, which holds case constant so only the anchor can refuse the match."""
         compiled = compile_probe(probe(terms=("NIST", "the"), any_of=()))
         assert not compiled.matches(title)
 
