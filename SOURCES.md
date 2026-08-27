@@ -23,9 +23,22 @@ operator gets actual counsel before anything publishes.
 
 ## Rules this file encodes
 
-1. **Prefer government sources, and prefer official APIs over anything else.** For the US public
-   sector compliance beat this is also the better product: the Federal Register has a real API and
-   its documents are US Government works.
+1. **Prefer government sources and official APIs when choosing between equivalent sources of the
+   same fact.** The Federal Register has a real API and its documents are US Government works, so
+   where a primary document exists, read it rather than a report about it.
+
+   **This is a licensing rule. It is not a coverage strategy, and it was misread as one.** Applied
+   as sourcing guidance it selects for the sources that structurally cannot report an event: a
+   primary document records a *rule*, and a great deal of what matters in this domain is *news*
+   first -- who leads a program, whether a deadline is actually being enforced, whether an
+   authorization was pulled -- and sometimes never becomes a document at all.
+
+   Corrected 2026-08-27, after the beat's first live brief missed the reinstatement of the FedRAMP
+   director. The corpus held 3 incidental FedRAMP mentions in 50,983 articles and none within two
+   weeks, because no federal-IT trade outlet was configured at all. Preferring a primary source
+   over a secondary one covering the same fact is correct. Preferring primary sources *as a
+   category* leaves the beat unable to see anything that is not a published document. See
+   `backlog/009-federal-it-trade-press.md`.
 2. **Commercial wire content must not feed a beat intended for publication.** AP and Reuters are
    tagged `general_news` / `international` in `config/feeds/core.json` and carry no `regulatory`,
    `federal_policy`, `legislative`, `judicial` or `cybersecurity` tag, so the
