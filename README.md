@@ -4,6 +4,54 @@
 
 ---
 
+## Current state
+
+**A research prototype under active development, not a finished product.** It runs, it is tested,
+and parts of it do not yet work. This section says which is which, and is updated when that
+changes. Last updated 2026-08-27.
+
+**What works today**
+
+- The pipeline runs end to end and produces a brief: RSS and Federal Register ingestion, dedup,
+  filtering, clustering, three synthesis passes, and rendering to terminal, Markdown, HTML, or
+  email. The most recent live run analysed 50 articles into 9 situations in about ten minutes.
+- Beats scope a brief to a subject rather than a person, without a `beat_id` column on any graph
+  table -- scope is derived from a join, so one question can belong to two scopes with independent
+  counts (`backlog/004`).
+- Ingestion is behind an adapter interface, so a source that publishes no RSS can still be read
+  (`backlog/005`).
+- Standing questions: a beat declares what it watches, and a question that did **not** move is
+  reported rather than dropped (`backlog/007`).
+- Institutional activity is reported as movement against a trailing average, never as a tally,
+  and tracks organizations, programs, and document types -- **never individuals** (`backlog/006`).
+- A stored brief can be re-rendered offline in any format with no API key and no network call.
+- 852 tests; `make check` runs lint, typecheck, and the suite. `main` requires a pull request and
+  five green checks, enforced for administrators.
+
+**Known limitations, stated plainly**
+
+- **The calibration record is empty.** 33 predictions have been generated and **zero** ever
+  graded; 25 of them are phrased "X would signal Y", which is an interpretation rule and cannot be
+  wrong. This is the tool's central claim and it is currently unmet. `backlog/011` is the fix, and
+  it moves prediction-making to the operator.
+- **Coverage reaches documents, not events.** The first live compliance brief missed a major
+  personnel change in its own domain because no federal-IT trade outlet is configured. Across 207
+  feeds there is not one. `backlog/009` and `backlog/010`.
+- **Only one timescale.** Every question is reviewed on whatever rhythm the operator happens to
+  invoke, though the subjects move at very different speeds. Folded into `backlog/011`.
+- **Per-run cost is unmeasured.** There is no token accounting.
+- **Delta-based features need history to mean anything.** Institutional activity reports "no
+  trailing average yet" until several runs have accumulated. This is by construction, not a bug.
+
+**How the work is recorded**
+
+Every change lands as a pull request, and every non-trivial one is specified first in
+`backlog/NNN-*.md` with a goal, acceptance criteria, explicit out-of-scope boundaries, and known
+landmines. Those files are kept after the work ships, including where a later task documents that
+an earlier one measured the wrong thing -- `backlog/009` and `backlog/010` exist because
+`backlog/005` reported document counts as domain coverage, and that is written down rather than
+quietly corrected.
+
 ## The Problem
 
 The dominant narratives in daily news coverage preclude alternatives without the reader knowing it. This is a structural feature of how information is produced and distributed. Every article frames its subject: it foregrounds certain facts, backgrounds others, and takes certain premises for granted. When your information sources all use the same frame, you are not exposed to the alternatives. You cannot evaluate what you cannot see.
