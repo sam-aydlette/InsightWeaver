@@ -302,3 +302,19 @@ Stated plainly, because an unverified claim recorded as a fact is worse than no 
   Their basis is the general one — the publisher chose to publish a feed — not a per-site reading.
   Any source promoted into a beat that publishes needs its own reading before that beat publishes.
 - **Not legal advice**, as stated at the top.
+
+## The attribution condition is recorded but not yet met in rendered output
+
+The Government Executive Media Group grant of the Feeds is conditional: it asks for *"attribution
+to the specific GEMG brand, including at a minimum a linked logo, a link that returns to the
+original URL."*
+
+**The renderers do not currently emit article URLs.** A brief names its sources -- situations carry
+numbered citations and thin-coverage entries name the feed -- but no rendered format links back to
+the original. For the private terminal brief that is defensible, since there is no audience the
+attribution would reach. It is **not** defensible for anything published, and it is a second
+condition on top of the personal-use limit already recorded above.
+
+Recorded 2026-08-27, verified against `https://www.govexec.com/about/terms-and-conditions/` the
+same day. Before any GEMG-sourced content is published, both must be satisfied: written permission
+via `feedback@govexec.com`, and linked attribution in the rendered output.
