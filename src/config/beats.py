@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -41,11 +42,38 @@ SUPPORTED_ADAPTERS = frozenset({"rss", "federal_register"})
 SUPPORTED_CHANNELS = frozenset({"terminal", "markdown", "html", "email"})
 
 BEAT_KEYS = frozenset(
-    {"name", "description", "sources", "coverage", "standing_questions", "channels"}
+    {
+        "name",
+        "description",
+        "sources",
+        "coverage",
+        "standing_questions",
+        "coverage_probes",
+        "channels",
+    }
 )
 REQUIRED_BEAT_KEYS = frozenset({"name", "sources"})
 SOURCE_KEYS = frozenset({"adapter", "feed_tags", "geo_tags", "scope"})
 REQUIRED_SOURCE_KEYS = frozenset({"adapter", "feed_tags"})
+
+# Keys permitted on one coverage probe (backlog task 010, 2026-08-27).
+PROBE_KEYS = frozenset({"date", "what", "terms", "any_of", "window_days"})
+REQUIRED_PROBE_KEYS = frozenset({"date", "what", "terms"})
+
+# How far either side of a probe's date a report of it is still a report of it.
+# Symmetric because coverage runs both ways: a rule is trailed before it lands
+# and analysed for a week after. Fourteen days is the interval the FedRAMP miss
+# was measured over -- "3 incidental mentions and none within two weeks".
+DEFAULT_PROBE_WINDOW_DAYS = 14
+
+# The least evidence a probe may rest on. A probe is a claim that a match means
+# the beat saw a specific event, and one bare term cannot carry that claim:
+# `FedRAMP` alone is matched by an AWS region-launch post. Two independent
+# pieces of evidence -- two required terms, or one required term plus one
+# `any_of` group -- is the floor, enforced here rather than left to the author's
+# judgement, because a probe that passes on generic terms manufactures exactly
+# the confidence this feature exists to remove.
+MIN_PROBE_EVIDENCE = 2
 
 # The only three things a beat may track, and the plural config key that
 # declares each. The mapping is closed on purpose: any other key -- `people`,
@@ -153,6 +181,52 @@ class CoverageEntity:
 
 
 @dataclass(frozen=True)
+class CoverageProbe:
+    """
+    One thing that actually happened, used to test whether the beat can see it.
+
+    A probe is not a search. It is a claim of the form "an event of this
+    description occurred on this date, and any report of it would carry these
+    words" -- which makes an unmatched probe a statement about the beat's
+    sources rather than about the phrasing of a query.
+
+    ``terms`` must **all** appear in the same article; each group in ``any_of``
+    contributes one alternative that must appear. The two levels exist because
+    a single distinctive term is too weak to be evidence and a whole headline is
+    too brittle to survive a second outlet's phrasing.
+
+    A term ending in ``*`` is a stem: ``reinstat*`` matches "reinstated" and
+    "reinstatement". Without the marker a term matches whole words only. The
+    marker is explicit rather than implied so that the widening is visible in
+    the config to whoever has to trust the result -- see
+    :mod:`src.context.coverage_probe` for the matching rules themselves.
+    """
+
+    date: date
+    what: str
+    terms: tuple[str, ...]
+    any_of: tuple[tuple[str, ...], ...] = ()
+    window_days: int = DEFAULT_PROBE_WINDOW_DAYS
+
+    @property
+    def window(self) -> tuple[date, date]:
+        """The inclusive date range in which a report of this event counts."""
+        span = timedelta(days=self.window_days)
+        return self.date - span, self.date + span
+
+    @property
+    def evidence_count(self) -> int:
+        """How many independent things this probe requires of an article."""
+        return len(self.terms) + len(self.any_of)
+
+    def describe(self) -> str:
+        """The probe's requirement, written the way the config wrote it."""
+        parts = [" AND ".join(self.terms)] if self.terms else []
+        parts.extend("(" + " OR ".join(group) + ")" for group in self.any_of)
+        return " AND ".join(parts)
+
+
+@dataclass(frozen=True)
 class BeatConfig:
     """
     A loaded, validated beat definition.
@@ -164,6 +238,10 @@ class BeatConfig:
     ``standing_questions`` are the questions this beat declares it is watching,
     whether or not any given run's coverage mentions them. They are read by
     ``src/context/standing_agenda.py`` (backlog task 007).
+
+    ``coverage_probes`` are known past events the beat is tested against by
+    ``insightweaver beat coverage`` (backlog task 010). They are the answer to
+    "can this beat reach its domain" that an article count cannot give.
     """
 
     name: str
@@ -174,6 +252,7 @@ class BeatConfig:
     channels: tuple[str, ...]
     config_path: str
     entities: tuple[CoverageEntity, ...] = ()
+    coverage_probes: tuple[CoverageProbe, ...] = ()
 
     def resolve_feeds(self, matcher: FeedMatcher | None = None) -> list[Feed]:
         """
@@ -255,6 +334,8 @@ def load_beat(name: str, beats_dir: Path | str | None = None) -> BeatConfig:
 
     standing_questions = _parse_standing_questions(path, raw.get("standing_questions", []))
 
+    coverage_probes = _parse_coverage_probes(path, raw.get("coverage_probes", []))
+
     channels = _parse_channels(path, raw.get("channels", ["terminal"]))
 
     return BeatConfig(
@@ -266,7 +347,129 @@ def load_beat(name: str, beats_dir: Path | str | None = None) -> BeatConfig:
         channels=channels,
         config_path=str(path),
         entities=entities,
+        coverage_probes=coverage_probes,
     )
+
+
+def _parse_coverage_probes(path: Path, raw_probes: Any) -> tuple[CoverageProbe, ...]:
+    """
+    Validate the ``coverage_probes`` block into :class:`CoverageProbe` values.
+
+    Every rule here refuses a probe rather than repairing it. A probe is
+    evidence about whether the beat's sources reach its domain, and a probe
+    that was quietly loosened -- an unparseable date defaulted to today, a
+    single generic term accepted -- would answer the question with something
+    other than what the author wrote.
+    """
+    if not isinstance(raw_probes, list):
+        raise BeatValidationError(path, "'coverage_probes' must be a list of objects")
+
+    parsed: list[CoverageProbe] = []
+    for index, entry in enumerate(raw_probes):
+        where = f"coverage_probes[{index}]"
+        if not isinstance(entry, dict):
+            raise BeatValidationError(path, f"{where} must be an object, got {entry!r}")
+
+        unknown = set(entry) - PROBE_KEYS
+        if unknown:
+            supported = ", ".join(sorted(PROBE_KEYS))
+            raise BeatValidationError(
+                path,
+                f"{where} has unknown key(s): {', '.join(sorted(unknown))} (supported: {supported})",
+            )
+        missing = REQUIRED_PROBE_KEYS - set(entry)
+        if missing:
+            raise BeatValidationError(
+                path, f"{where} missing required key(s): {', '.join(sorted(missing))}"
+            )
+
+        raw_date = entry["date"]
+        if not isinstance(raw_date, str):
+            raise BeatValidationError(path, f"{where}.date must be a 'YYYY-MM-DD' string")
+        try:
+            when = date.fromisoformat(raw_date)
+        except ValueError:
+            raise BeatValidationError(
+                path, f"{where}.date is not a 'YYYY-MM-DD' date: {raw_date!r}"
+            )
+
+        what = entry["what"]
+        if not isinstance(what, str) or not what.strip():
+            raise BeatValidationError(
+                path, f"{where}.what must be a non-empty description of the event"
+            )
+
+        terms = _parse_probe_terms(path, f"{where}.terms", entry["terms"])
+        if not terms:
+            raise BeatValidationError(path, f"{where}.terms must not be empty")
+
+        raw_any_of = entry.get("any_of", [])
+        if not isinstance(raw_any_of, list):
+            raise BeatValidationError(path, f"{where}.any_of must be a list of term lists")
+        any_of: list[tuple[str, ...]] = []
+        for group_index, group in enumerate(raw_any_of):
+            alternatives = _parse_probe_terms(
+                path, f"{where}.any_of[{group_index}]", group, allow_bare_string=False
+            )
+            if not alternatives:
+                raise BeatValidationError(
+                    path,
+                    f"{where}.any_of[{group_index}] must not be empty -- an empty group of "
+                    f"alternatives is satisfied by nothing and would make the probe unmatchable",
+                )
+            any_of.append(alternatives)
+
+        window_days = entry.get("window_days", DEFAULT_PROBE_WINDOW_DAYS)
+        if not isinstance(window_days, int) or isinstance(window_days, bool) or window_days < 1:
+            raise BeatValidationError(
+                path, f"{where}.window_days must be a positive integer, got {window_days!r}"
+            )
+
+        probe = CoverageProbe(
+            date=when,
+            what=what.strip(),
+            terms=terms,
+            any_of=tuple(any_of),
+            window_days=window_days,
+        )
+        if probe.evidence_count < MIN_PROBE_EVIDENCE:
+            raise BeatValidationError(
+                path,
+                f"{where} rests on a single term ({terms[0]!r}). A probe needs at least "
+                f"{MIN_PROBE_EVIDENCE} independent requirements -- another entry in 'terms', "
+                f"or an 'any_of' group -- because one term on its own is matched by articles "
+                f"that merely mention the subject, and a probe that passes on a passing "
+                f"mention is worse than no probe.",
+            )
+        parsed.append(probe)
+
+    return tuple(parsed)
+
+
+def _parse_probe_terms(
+    path: Path, where: str, value: Any, allow_bare_string: bool = True
+) -> tuple[str, ...]:
+    """Validate one list of probe terms, order-preserving and deduplicated."""
+    if allow_bare_string and isinstance(value, str):
+        value = [value]
+    if not isinstance(value, list):
+        raise BeatValidationError(path, f"{where} must be a list of strings")
+
+    seen: dict[str, None] = {}
+    for term in value:
+        if not isinstance(term, str) or not term.strip():
+            raise BeatValidationError(
+                path, f"{where} must contain only non-empty strings, got {term!r}"
+            )
+        stripped = term.strip()
+        if stripped.rstrip("*") == "":
+            raise BeatValidationError(
+                path,
+                f"{where} contains {term!r}, which is a stem marker with no stem and "
+                f"would match every article",
+            )
+        seen.setdefault(stripped, None)
+    return tuple(seen)
 
 
 def _parse_coverage(path: Path, coverage: dict[str, Any]) -> tuple[CoverageEntity, ...]:
