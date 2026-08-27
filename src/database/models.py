@@ -349,6 +349,25 @@ class Question(Base):
     # Secondary questions are tracked but rendered quieter in the brief.
     is_primary = Column(Boolean, default=True, nullable=False)
 
+    # Review interval, e.g. "7d", "90d", "1y" (2026-08-27, backlog task 011).
+    # A cadence is NOT a deadline: it says how often this question is worth
+    # re-examining, while a Prediction's due_by says when a specific claim
+    # resolves. A question reviewed quarterly can hold a claim resolving in
+    # three weeks.
+    #
+    # Nullable, and null means "not on any review schedule". Every question
+    # that predates this column is model-emergent -- the graph noticed it in
+    # coverage, the operator never put it on an agenda -- so `forecast --due`
+    # correctly never surfaces it. A cadence is the operator's read on how fast
+    # a subject moves, so only the operator can set one, via `questions add`.
+    cadence = Column(String(20), nullable=True)
+
+    # When the operator last reviewed this question. Stamped by `forecast --due`
+    # whether or not anything moved: a quiet question that reappears every day
+    # trains the operator to skim. Null means never reviewed, in which case
+    # first_asked_at is the baseline the interval counts from.
+    last_reviewed_at = Column(DateTime, nullable=True)
+
     situation_links = relationship("QuestionSituation", back_populates="question")
 
     __table_args__ = (
@@ -402,6 +421,18 @@ PREDICTION_STATUS_EXPIRED = "expired"
 # that far out is unlikely to still bear on the original observable.
 PREDICTION_EXPIRY_DAYS = 90
 
+# Who staked the claim (2026-08-27, backlog task 011). The calibration figure
+# counts operator predictions only; model predictions stay in the ledger as
+# prompts -- suggestions about what is worth holding an opinion on -- and are
+# reported under their own heading, never mixed in.
+PREDICTION_AUTHOR_OPERATOR = "operator"
+PREDICTION_AUTHOR_MODEL = "model"
+
+# What the operator judged when resolving. Recorded alongside status so the
+# verdict survives independently of the status vocabulary the check pass uses.
+PREDICTION_OUTCOME_YES = "yes"
+PREDICTION_OUTCOME_NO = "no"
+
 
 class Prediction(Base):
     """
@@ -422,9 +453,35 @@ class Prediction(Base):
     trigger_condition = Column(Text, nullable=False)
 
     made_at = Column(DateTime, default=utcnow, nullable=False)
-    made_in_synthesis_id = Column(Integer, ForeignKey("narrative_syntheses.id"), nullable=False)
+    # Nullable since 2026-08-27 (backlog task 011): an operator stakes a claim
+    # from the CLI, with no synthesis behind it. Model predictions still carry
+    # the synthesis that produced them.
+    made_in_synthesis_id = Column(Integer, ForeignKey("narrative_syntheses.id"), nullable=True)
+
+    # operator | model. Not nullable, because "who said this" is the one fact
+    # the calibration figure depends on; every pre-existing row backfills to
+    # 'model', which is what all 33 of them were.
+    author = Column(String(20), nullable=False, default=PREDICTION_AUTHOR_MODEL)
+
+    # When this specific claim resolves. Required at entry for an operator
+    # prediction -- a claim with no resolution date cannot come due and so
+    # cannot be graded, which is exactly how the ledger ended up with 19
+    # predictions that expired unjudged. Null on model predictions, which are
+    # aged out by PREDICTION_EXPIRY_DAYS instead.
+    due_by = Column(DateTime, nullable=True)
+
+    # Stated probability, 0.0-1.0. Required at entry for an operator
+    # prediction and deliberately given no default: an unstated confidence is
+    # a non-commitment in a different costume.
+    confidence = Column(Float, nullable=True)
 
     status = Column(String(20), nullable=False, default=PREDICTION_STATUS_OPEN)
+
+    # yes | no -- the operator's verdict on the claim as written.
+    outcome = Column(String(20), nullable=True)
+
+    # When the verdict was recorded. Deliberately separate from due_by:
+    # resolving three months after the due date is itself calibration data.
     resolved_at = Column(DateTime, nullable=True)
     resolution_note = Column(Text, nullable=True)
 
@@ -434,6 +491,8 @@ class Prediction(Base):
         Index("idx_prediction_status", "status"),
         Index("idx_prediction_question", "question_id"),
         Index("idx_prediction_made_at", "made_at"),
+        Index("idx_prediction_author", "author"),
+        Index("idx_prediction_due_by", "due_by"),
     )
 
 
