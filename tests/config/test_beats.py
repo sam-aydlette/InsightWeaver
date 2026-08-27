@@ -9,6 +9,7 @@ configuration rather than through a parallel selector.
 """
 
 import json
+from urllib.parse import urlparse
 
 import pytest
 
@@ -28,6 +29,11 @@ from src.config.feed_matcher import Feed
 # The beat that ships with the repo. Referenced by name so the tests fail if it
 # is renamed or removed rather than silently testing nothing.
 SHIPPED_BEAT = "us-public-sector-compliance"
+
+
+def _host(url):
+    """The lowercased hostname of a feed URL, minus any trailing dot."""
+    return (urlparse(url).hostname or "").lower().rstrip(".")
 
 
 def write_beat(directory, name, payload):
@@ -374,10 +380,13 @@ class TestShippedBeat:
         feeds = load_beat(SHIPPED_BEAT).resolve_feeds()
         names = {feed.name for feed in feeds}
 
-        # Thin by construction: the domain does not publish much RSS. If this
-        # ever exceeds a dozen feeds, the beat has drifted into being a
-        # general news beat and the selector needs re-reading.
-        assert 0 < len(feeds) <= 12
+        # Thin by construction: the domain does not publish much RSS. The
+        # ceiling was 12 until 2026-08-27, when backlog task 009 added five
+        # federal-IT trade feeds; raised to 20 to leave headroom for one more
+        # outlet without becoming a licence to grow indefinitely. If this ever
+        # exceeds 20, the beat has drifted into being a general news beat and
+        # the selector needs re-reading.
+        assert 0 < len(feeds) <= 20
         assert "Federal Register - Public Inspection" in names
         assert "CISA Cybersecurity Advisories" in names
         # Added 2026-08-26 (task 005). The RSS half of this beat is nearly
@@ -392,6 +401,49 @@ class TestShippedBeat:
         assert "Reuters" not in names
         assert "Krebs on Security" not in names
         assert "ARLnow - Arlington Local News" not in names
+
+    def test_resolves_at_least_one_non_gov_trade_source(self):
+        """
+        Added 2026-08-27 (task 009). Until then every source this beat resolved
+        was a primary-document publisher on a `.gov` host, and the beat's first
+        live brief missed the reinstatement of the FedRAMP director: across
+        50,983 stored articles there were three incidental FedRAMP mentions and
+        none within two weeks of the event, because no federal-IT trade outlet
+        was configured at all.
+
+        This asserts the property that was missing, not the volume that was
+        already there. A `.gov` feed publishes rules; only a trade outlet
+        reports who runs a program, whether a deadline is being enforced, or
+        whether an authorization was pulled. A future edit to config/feeds/
+        that drops the trade press fails here rather than showing up as a brief
+        that is quietly blind again.
+        """
+        feeds = load_beat(SHIPPED_BEAT).resolve_feeds()
+
+        non_gov = [feed for feed in feeds if not _host(feed.url).endswith(".gov")]
+        assert non_gov, (
+            "the beat resolves only .gov sources, so it can see published "
+            "documents and no reported news -- see backlog/009-federal-it-trade-press.md"
+        )
+
+        # Named, so dropping one is a failure and not a shrug. Each has a row
+        # in SOURCES.md recording its basis for use.
+        names = {feed.name for feed in feeds}
+        trade = {
+            "FedScoop",
+            "DefenseScoop",
+            "CyberScoop",
+            "Nextgov/FCW - Cybersecurity",
+            "Washington Technology",
+        }
+        assert trade <= names, f"federal-IT trade outlets missing from the beat: {trade - names}"
+
+        # And they are still not wires: SOURCES.md rule 2 is unchanged, and
+        # widening the beat to reach trade press must not widen it to reach AP
+        # or Reuters. Asserted here as well as above because this test is the
+        # one that argues for more non-.gov sources.
+        assert "Associated Press" not in names
+        assert "Reuters" not in names
 
     def test_resolution_is_deduplicated_by_url(self):
         feeds = load_beat(SHIPPED_BEAT).resolve_feeds()

@@ -1,0 +1,60 @@
+{
+  "description": "Federal IT trade press - the outlets that report federal technology, cybersecurity and acquisition as news rather than publishing it as a document. Added 2026-08-27 by backlog task 009, after the us-public-sector-compliance beat's first live brief missed the reinstatement of the FedRAMP director: across 207 feeds not one federal-IT trade outlet was configured, so the beat could see published rules and nothing else. Every entry here is tagged into that beat's existing selectors (federal_policy / regulatory / cybersecurity, geo usa). Basis for use for each is recorded in SOURCES.md; candidates rejected on licence grounds are recorded there too, so the absences are not mistaken for oversights.",
+  "feeds": [
+    {
+      "name": "FedScoop",
+      "url": "https://fedscoop.com/feed/",
+      "applicability": {
+        "scope": ["national"],
+        "geo_tags": ["usa"],
+        "domain_tags": ["federal_policy", "technology", "cybersecurity", "regulatory"],
+        "specialty_tags": ["federal_it"]
+      },
+      "relevance_score": 0.9
+    },
+    {
+      "name": "DefenseScoop",
+      "url": "https://defensescoop.com/feed/",
+      "applicability": {
+        "scope": ["national"],
+        "geo_tags": ["usa"],
+        "domain_tags": ["federal_policy", "technology", "cybersecurity"],
+        "specialty_tags": ["federal_it", "defense"]
+      },
+      "relevance_score": 0.8
+    },
+    {
+      "name": "CyberScoop",
+      "url": "https://cyberscoop.com/feed/",
+      "applicability": {
+        "scope": ["national"],
+        "geo_tags": ["usa"],
+        "domain_tags": ["cybersecurity", "federal_policy"],
+        "specialty_tags": ["federal_it", "threat_intelligence"]
+      },
+      "relevance_score": 0.7
+    },
+    {
+      "name": "Nextgov/FCW - Cybersecurity",
+      "url": "https://www.nextgov.com/rss/cybersecurity/",
+      "applicability": {
+        "scope": ["national"],
+        "geo_tags": ["usa"],
+        "domain_tags": ["cybersecurity", "federal_policy"],
+        "specialty_tags": ["federal_it"]
+      },
+      "relevance_score": 0.8
+    },
+    {
+      "name": "Washington Technology",
+      "url": "https://washingtontechnology.com/rss/all/",
+      "applicability": {
+        "scope": ["national"],
+        "geo_tags": ["usa"],
+        "domain_tags": ["federal_policy", "technology", "regulatory"],
+        "specialty_tags": ["federal_it", "acquisition"]
+      },
+      "relevance_score": 0.7
+    }
+  ]
+}
