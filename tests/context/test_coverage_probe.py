@@ -123,6 +123,88 @@ class TestSubstringMatchingWouldLie:
         assert not compiled.matches("A bod issued a statement")
 
 
+# All-caps collisions, for holding case constant while the boundary is tested.
+# Each headline embeds a shouted probe term inside a longer shouted word, so
+# case-sensitivity cannot be the thing that rejects it. The words are the ones
+# the hazard is actually made of: DOPMA is the Defense Officer Personnel
+# Management Act, PRECISA is ordinary Portuguese, and an all-caps headline is a
+# normal thing for a wire feed to emit.
+SHOUTED_COLLISIONS = [
+    # (probe term, second required term that IS present, headline)
+    ("OPM", "REPORT", "COMPTROLLER REPORT ON DOPMA REFORM ADVANCES"),
+    ("OPM", "REPORT", "AGENCY REPORT NAMES TOPMOST PRIORITIES"),
+    ("BOD", "CISA", "BODY CAMERA RULE ADVANCES AT CISA"),
+    ("BOD", "CISA", "CISA ISSUES BODY CAMERA GUIDANCE"),
+    ("OMB", "FBI", "FBI CONFIRMS BOMBING SUSPECT IN CUSTODY"),
+    ("CISA", "RELATORIO", "GOVERNO PRECISA DE NOVO RELATORIO SOBRE SEGURANCA"),
+]
+
+
+class TestBoundariesAreLoadBearingForShoutedTermsToo:
+    """
+    The boundary isolated from the case rule.
+
+    Every collision in :data:`NIST_COLLISIONS` is lowercase, so a shouted term
+    like ``NIST`` is already rejected by case-sensitivity before the boundary
+    anchors are consulted -- those cases would stay green if the anchors were
+    deleted outright. That is not a hypothetical gap: the shipped beat's probes
+    are shouted (``OPM``, ``CISA``), so it is exactly the term type in
+    production whose anchoring would go unguarded.
+
+    Here the headline and the term are both ALL CAPS. Case is held constant, so
+    the boundary anchor is the only thing left that can reject the match. Each
+    case was checked against the production regex with the anchors stripped and
+    case matching unchanged: all six then match, which is what makes these
+    assertions load-bearing rather than incidental.
+    """
+
+    @pytest.mark.parametrize(("term", "other", "title"), SHOUTED_COLLISIONS)
+    def test_a_shouted_term_inside_a_shouted_word_is_not_a_match(self, term, other, title):
+        compiled = compile_probe(probe(terms=(term, other), any_of=()))
+        assert not compiled.matches(title)
+
+    @pytest.mark.parametrize(("term", "other", "title"), SHOUTED_COLLISIONS)
+    def test_the_second_required_term_is_present_so_only_the_collision_fails(
+        self, term, other, title
+    ):
+        """
+        Pins *why* the case above fails. Without this, a headline that simply
+        lacked both terms would satisfy the assertion and prove nothing about
+        the boundary.
+        """
+        compiled = compile_probe(probe(terms=(term, other), any_of=()))
+        absent, _ = compiled.missing(title)
+        assert absent == (term,)
+
+    @pytest.mark.parametrize(
+        ("term", "other", "title"),
+        [
+            ("OPM", "REPORT", "OPM REPORT ON DOPMA REFORM ADVANCES"),
+            ("BOD", "CISA", "CISA ISSUES BOD 22-01"),
+            ("OMB", "FBI", "FBI CITES OMB MEMO M-26-01"),
+            ("CISA", "RELATORIO", "CISA PUBLICA NOVO RELATORIO SOBRE SEGURANCA"),
+        ],
+    )
+    def test_the_same_probe_still_matches_the_term_standing_alone(self, term, other, title):
+        """
+        The other half of the claim: the anchors reject the collision without
+        rejecting the event. A matcher that failed both would pass the tests
+        above and be useless.
+        """
+        compiled = compile_probe(probe(terms=(term, other), any_of=()))
+        assert compiled.matches(title)
+
+    def test_the_right_hand_anchor_is_exercised_at_position_zero(self):
+        """
+        ``BODY CAMERA...`` puts the collision at offset 0, where there is no
+        preceding character for the left-hand lookbehind to reject. Only the
+        right-hand anchor can refuse it.
+        """
+        compiled = compile_probe(probe(terms=("BOD",), any_of=()))
+        assert not compiled.matches("BODY CAMERA RULE ADVANCES")
+        assert compiled.matches("BOD 22-01 ADVANCES")
+
+
 class TestStems:
     def test_a_stem_must_be_marked(self):
         assert not compile_probe(probe(terms=("reinstat", "x"), any_of=())).matches(
