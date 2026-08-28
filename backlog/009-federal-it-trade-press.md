@@ -70,9 +70,13 @@ beat, all returning a non-zero live count. `tests/config/test_beats.py` now asse
 resolves at least one non-`.gov` source and names all five, and the assertion was checked by
 removing the config file and watching it fail.
 
-**The evidence that matters is not the count.** FedScoop's feed carried
-*"FedRAMP Director Pete Waterman reinstated at GSA after weeks of leave"*, and it stored with 320
-words of body text. That is the exact event this task exists because the beat missed.
+**The evidence that matters is not the count.** FedScoop's feed carried the FedRAMP leadership
+change of 2026-08-26, and it stored with 320 words of body text. That is the exact event this task
+exists because the beat missed.
+
+The headline names the official. It is not reproduced here: task 006 permits a person's name to
+appear as an attribute of a specific document event, and a task file is not that -- it is a durable
+artifact in a public repository, which is the accumulation that boundary exists to prevent.
 
 **Two decisions a reviewer must make rather than accept:**
 
