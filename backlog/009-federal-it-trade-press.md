@@ -1,6 +1,7 @@
 # Add federal-IT trade press to the compliance beat, so it can see events and not only published documents.
 REPO: InsightWeaver
-STATUS: QUEUED            # QUEUED | IN_PROGRESS | PARKED | DONE | FAILED
+STATUS: DONE              # QUEUED | IN_PROGRESS | PARKED | DONE | FAILED
+LANDED: PR #16, merged 2026-08-28
 ACCEPTANCE: `make check` passes, plus: at least four federal-IT trade outlets are configured in `config/feeds/` with the beat's existing tags (`regulatory`, `federal_policy`, `cybersecurity`); each has a row in `SOURCES.md` recording its basis for use; the `us-public-sector-compliance` beat resolves them; a live fetch retrieves a non-zero article count from each, and that count is reported in the PR; and `tests/config/test_beats.py` asserts the beat's resolved set now contains at least one non-`.gov` trade source, so a future feed-config edit that silently drops them fails CI.
 OUT OF SCOPE: Any source whose terms forbid automated retrieval. Commercial wire services (AP, Reuters) -- rule 2 in `SOURCES.md` stands unchanged and is separate from this task. HTML scraping adapters; every outlet in scope publishes RSS, and if one does not, drop it rather than writing a scraper. Paywalled content. Changing clustering, synthesis, entity matching, or standing questions. Re-tuning the Federal Register filter. Backfilling history.
 LANDMINES: **The failure this task fixes was invisible for exactly the reason it will be tempting to declare this done early.** Adding feeds makes article counts go up, and a rising count is not evidence the beat can see an event -- that was the mistake in task 005, which measured 469 documents narrowed to 24 and called the domain covered. Verify against task 010's known-event test, not against volume. Trade RSS feeds are often truncated to a summary with the body behind a click: check that `content` is populated and not just `description`, because a title-only corpus will match entity aliases while giving synthesis nothing to analyze. Several federal-IT outlets publish very high volume including vendor press releases and sponsored posts, which will drown the beat's 50-article curation window if unfiltered -- prefer a topic or category feed over a firehose where the outlet offers one. `main` is protected (5 required checks, `enforce_admins: true`) -- open a PR, do not push to it.
@@ -69,9 +70,13 @@ beat, all returning a non-zero live count. `tests/config/test_beats.py` now asse
 resolves at least one non-`.gov` source and names all five, and the assertion was checked by
 removing the config file and watching it fail.
 
-**The evidence that matters is not the count.** FedScoop's feed carried
-*"FedRAMP Director Pete Waterman reinstated at GSA after weeks of leave"*, and it stored with 320
-words of body text. That is the exact event this task exists because the beat missed.
+**The evidence that matters is not the count.** FedScoop's feed carried the FedRAMP leadership
+change of 2026-08-26, and it stored with 320 words of body text. That is the exact event this task
+exists because the beat missed.
+
+The headline names the official. It is not reproduced here: task 006 permits a person's name to
+appear as an attribute of a specific document event, and a task file is not that -- it is a durable
+artifact in a public repository, which is the accumulation that boundary exists to prevent.
 
 **Two decisions a reviewer must make rather than accept:**
 

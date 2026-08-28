@@ -284,9 +284,11 @@ Stated plainly, because an unverified claim recorded as a fact is worse than no 
   that section. **No quote in this file is unattributed, and none is unverified.** Also verified by
   fetching: that each of the five configured trade feeds returns a non-zero article count and
   stores rows, and that `content` is empty on the two GEMG feeds and populated on the three Scoop
-  News Group feeds. Verified by reading the stored row: that the FedScoop feed carries *"FedRAMP
-  Director Pete Waterman reinstated at GSA after weeks of leave"* with 320 words of body text —
-  the specific event the beat was blind to.
+  News Group feeds. Verified by reading the stored row: that the FedScoop feed carried the
+  FedRAMP leadership change of 2026-08-26 with 320 words of body text -- the specific event the
+  beat was blind to. The headline names the official; it is not reproduced here, because a durable
+  project artifact is not the "attribute of a specific document event" that
+  `backlog/006-institutional-activity.md` permits a person's name to appear as.
 - **Verified only as a negative:** that Scoop News Group publishes no terms page. Five candidate
   URLs were tried and all returned 404, and a link scan of the `fedscoop.com` homepage found no
   terms, privacy, legal or copyright link (claim 4). A page that exists somewhere those checks did
