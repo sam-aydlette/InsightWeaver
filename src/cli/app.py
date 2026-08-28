@@ -9,6 +9,7 @@ import time
 
 import click
 
+from .beat import beat_command
 from .brief import brief_group
 from .colors import accent, header, muted
 from .decisions import decisions_command
@@ -26,6 +27,7 @@ from .stake import predict_command, resolve_command
 # In particular "predictions" must precede "predict", since the shorter name is
 # a prefix of the longer one (2026-08-27, backlog task 011).
 COMMAND_DISPATCH = {
+    "beat": beat_command,
     "brief": brief_group,
     "forecast": forecast_command,
     "frames": frames_command,
@@ -42,7 +44,7 @@ COMMAND_DISPATCH = {
 def print_command_refresher():
     """Print a short refresher of available commands."""
     refresher = (
-        f"\n{header('Commands:')} {accent('brief')} | {accent('forecast')} | "
+        f"\n{header('Commands:')} {accent('brief')} | {accent('beat')} | {accent('forecast')} | "
         f"{accent('frames')} | {accent('questions')} | {accent('predictions')} | "
         f"{accent('predict')} | {accent('resolve')} | "
         f"{accent('decisions')} | {accent('diet')} | {accent('sources')} | "
@@ -55,6 +57,7 @@ def print_help():
     """Print full help text for interactive mode."""
     click.echo(header("Available commands:"))
     click.echo(f"  {accent('brief')}               - Generate intelligence brief and report")
+    click.echo(f"  {accent('beat')}                - Test a beat's sources against real events")
     click.echo(
         f"  {accent('forecast')}            - View open observables and resolved track record"
     )
@@ -128,6 +131,11 @@ def print_help():
     click.echo(f"  {accent('diet gaps')}              - Recurring frame absences")
     click.echo(f"  {accent('diet overlap')}           - Which frames only one feed carries")
     click.echo()
+    click.echo(header("Beat command:"))
+    click.echo(f"  {accent('beat coverage')} <name>  - Can this beat see events that happened?")
+    click.echo(muted("    Reads config/beats/NAME.json coverage_probes. No API key, no writes."))
+    click.echo(muted("    Exits 1 if a probe is unmatched, 2 if nothing could be measured."))
+    click.echo()
     click.echo(header("Sources command:"))
     click.echo(f"  {accent('sources list')}             - All feeds with calibration signals")
     click.echo(f"  {accent('sources show')} <name>      - Detailed view for one feed")
@@ -139,6 +147,7 @@ def print_help():
     click.echo(muted("  brief --save brief.md  (save brief as markdown)"))
     click.echo(muted("  brief --from-run 176   (re-render stored brief 176)"))
     click.echo(muted("  brief --beat us-public-sector-compliance  (subject brief)"))
+    click.echo(muted("  beat coverage us-public-sector-compliance  (can it see real events?)"))
     click.echo(muted("  forecast               (open observables + last 60d resolved)"))
     click.echo(muted("  forecast --days 30     (tighter resolved-record window)"))
     click.echo(muted("  forecast --due         (what is due now, at each question's cadence)"))

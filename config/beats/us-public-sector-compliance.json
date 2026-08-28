@@ -49,5 +49,40 @@
     "Does any CISA BOD create a compliance obligation with a deadline inside 90 days?",
     "Where do GovRAMP and TX-RAMP diverge from FedRAMP in ways that matter to a multi-state CSP?"
   ],
+  "coverage_probes": [
+    {
+      "date": "2026-08-25",
+      "what": "OPM issued corrections to its final rules on reduction-in-force, suitability and probationary appeals",
+      "terms": ["OPM"],
+      "any_of": [
+        ["reduction in force", "suitability", "probationary"],
+        ["final rule", "correction"]
+      ]
+    },
+    {
+      "date": "2026-08-24",
+      "what": "Supreme Court let the executive order restricting mail-in voting take effect",
+      "terms": ["Supreme Court", "mail-in voting"],
+      "any_of": [["allow*", "restriction*", "sides with", "stay"]]
+    },
+    {
+      "date": "2026-08-24",
+      "what": "FedRAMP director reinstated",
+      "terms": ["FedRAMP"],
+      "any_of": [
+        ["director", "administrator"],
+        ["reinstat*", "return*", "restored"]
+      ]
+    },
+    {
+      "date": "2021-11-03",
+      "what": "CISA issued Binding Operational Directive 22-01, creating the Known Exploited Vulnerabilities catalog and its remediation deadlines",
+      "terms": ["CISA"],
+      "any_of": [
+        ["binding operational directive", "BOD 22-01"],
+        ["known exploited", "catalog"]
+      ]
+    }
+  ],
   "channels": ["terminal"]
 }

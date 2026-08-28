@@ -366,6 +366,75 @@ reads as inactivity. A named individual may appear inside a rendered situation w
 source document names a signatory -- an attribute of a document, which expires with it --
 but never as a stored row, which would accumulate. See `docs/CONCEPTS.md`.
 
+### Coverage probes: can the beat actually see its domain?
+
+Added 2026-08-27. An article count tells you ingestion is *running*. It does not tell
+you ingestion *reaches the domain*, and the two were conflated once already: a beat
+resolving hundreds of Federal Register documents missed the reinstatement of the
+FedRAMP director, because a personnel change is not a document. The corpus held three
+incidental FedRAMP mentions across 50,983 articles and none within two weeks. Every
+volume number was green.
+
+A **coverage probe** is the test that catches it: name something that actually happened
+in this domain, then check whether the beat can see it.
+
+```json
+"coverage_probes": [
+  {
+    "date": "2026-08-24",
+    "what": "FedRAMP director reinstated",
+    "terms": ["FedRAMP"],
+    "any_of": [["director", "administrator"], ["reinstat*", "return*", "restored"]]
+  }
+]
+```
+
+```bash
+insightweaver beat coverage us-public-sector-compliance
+```
+
+```
+[MATCHED] OPM issued corrections to its final rules on reduction-in-force appeals
+  event 2026-08-25 | window 2026-08-11 .. 2026-09-08
+  4 matching article(s); earliest shown
+    seen by Federal Register - Documents API (2026-08-25)
+      Suitability Action Appeals; Correction
+
+[UNMATCHED] FedRAMP director reinstated
+    no article from this beat's feeds matched
+      closest article lacked: FedRAMP
+      and no feed anywhere in the corpus carried it either.
+
+2 matched + 1 unmatched + 1 inconclusive of 4 probe(s) declared
+```
+
+`terms` must all appear in one article; each `any_of` group needs one member. The two
+levels exist because `FedRAMP` alone is too weak to be evidence -- an AWS region-launch
+post mentions it -- while an exact headline is too brittle to survive a second outlet's
+phrasing. A probe resting on one bare term is **rejected by the loader**, not accepted:
+a probe that passes on generic terms manufactures the confidence this command exists to
+remove.
+
+Matching is deterministic word-boundary matching, no model call. That anchoring is what
+makes a match evidence: of 54,044 articles stored on 2026-08-27, 657 titles contain the
+substring `nist` -- "administration", "minister", "Afghanistan", "communist" -- and four
+are about NIST. A trailing `*` marks a stem (`reinstat*` matches "reinstatement"); the
+marker is explicit rather than inferred so the widening is visible to whoever has to
+trust the result.
+
+The command reports **which feed carried each match**, because "your expected source
+carried it" and "an unrelated outlet mentioned it in passing" are different findings
+with different repairs. An unmatched probe is re-checked across the whole corpus, so the
+output distinguishes "nobody had it" from "feeds you do not subscribe to had it".
+
+It exits non-zero so it can gate: `1` if any probe is unmatched, `2` if nothing could be
+measured. A probe whose window predates the corpus is `INCONCLUSIVE` -- neither pass nor
+fail -- and stays in the denominator, because a probe set that quietly decays to the
+events still in retention is a green light that means nothing. That is also why an
+all-inconclusive run and a beat with no probes both exit `2` rather than `0`.
+
+Reads the article corpus only. No API key, no network, and it never writes.
+
 Running your first beat needs the two beat tables, plus one each for institutional
 activity and standing questions:
 

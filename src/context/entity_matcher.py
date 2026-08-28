@@ -35,23 +35,31 @@ from typing import Any
 from ..config.beats import CoverageEntity
 
 __all__ = [
+    "LEFT_BOUNDARY",
+    "RIGHT_BOUNDARY",
     "CompiledEntity",
     "compile_entities",
     "count_item_mentions",
+    "is_shouted",
     "item_text",
+    "term_pattern",
 ]
 
 # What counts as "inside a word". Deliberately alphanumerics only: a hyphen or
 # a slash is a boundary, so "CISA-issued" and "FedRAMP/StateRAMP" are mentions,
 # while "precisa" and "bombing" are not.
 _WORD_CHAR = "[0-9A-Za-z]"
-_LEFT_BOUNDARY = f"(?<!{_WORD_CHAR})"
-_RIGHT_BOUNDARY = f"(?!{_WORD_CHAR})"
+LEFT_BOUNDARY = f"(?<!{_WORD_CHAR})"
+RIGHT_BOUNDARY = f"(?!{_WORD_CHAR})"
 # Any run of whitespace, including a line wrap, between the words of a term.
 _WHITESPACE = r"\s+"
 
+# Kept public since backlog task 010: coverage probes match their terms by the
+# same rules as coverage entities, and a second boundary definition would be a
+# second thing to get wrong.
 
-def _is_shouted(term: str) -> bool:
+
+def is_shouted(term: str) -> bool:
     """
     True when a term is written in capitals only -- i.e. it is an acronym.
 
@@ -63,15 +71,21 @@ def _is_shouted(term: str) -> bool:
     return bool(letters) and all(char.isupper() for char in letters)
 
 
-def _term_pattern(term: str) -> str:
+def term_pattern(term: str, right_boundary: bool = True) -> str:
     """
     Regex source for one surface form.
 
     Runs of whitespace in the term match any run of whitespace in the text, so
     a name broken across a line wrap in the source still matches.
+
+    ``right_boundary=False`` anchors only the left-hand side, which turns the
+    term into a stem: it must still begin a word, but the word may continue.
+    Coverage probes use it for ``reinstat*``; coverage entities never do,
+    because an entity's surface forms are whole names.
     """
     body = _WHITESPACE.join(re.escape(token) for token in term.split())
-    return f"{_LEFT_BOUNDARY}(?:{body}){_RIGHT_BOUNDARY}"
+    tail = RIGHT_BOUNDARY if right_boundary else ""
+    return f"{LEFT_BOUNDARY}(?:{body}){tail}"
 
 
 @dataclass(frozen=True)
@@ -111,7 +125,7 @@ def compile_entities(entities: Iterable[CoverageEntity]) -> list[CompiledEntity]
         for term in entity.terms:
             if not term.strip():
                 continue
-            (shouted if _is_shouted(term) else relaxed).append(_term_pattern(term))
+            (shouted if is_shouted(term) else relaxed).append(term_pattern(term))
 
         patterns: list[re.Pattern[str]] = []
         if shouted:
