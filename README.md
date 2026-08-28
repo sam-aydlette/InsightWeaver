@@ -205,6 +205,53 @@ that decides what a brief looks like.
 
 ---
 
+## The calibration loop: staking and grading your own calls
+
+Every other ledger command reads. These four write, and they are what makes the graph
+a calibration instrument rather than a reading list -- the thing being calibrated is
+*your* judgement.
+
+```bash
+questions add "Does CMMC Phase 2 slip past its statutory date?" --cadence 90d
+predict 23 "Yes -- slips" --by 2026-12-31 --confidence 0.7
+forecast --due
+resolve 41 --outcome no --note "DFARS class deviation published 2026-11-14"
+```
+
+All four are local database work: no `ANTHROPIC_API_KEY`, no network call. The loop is
+`forecast --due` (what is due right now, at each question's own speed), grade what
+resolved, read the diff on whatever came up for review, stake anything new. **The brief
+is optional to that loop** -- ingestion is the fragile half, and the ledger should keep
+working on a week where the sources returned nothing worth reading.
+
+**A date and a confidence are required, and rejected at entry.** Nothing is stored
+without them. The tool's first 33 predictions were graded zero times: 25 were phrased
+"X would signal Y" -- an interpretation rule, which cannot be wrong -- and only 3
+carried a date, so 19 aged out unjudged. A claim with no resolution date can never come
+due. There is no confidence default either; an unstated confidence is a non-commitment
+in a different costume.
+
+**A cadence is not a deadline.** A question's `--cadence` says how often it is worth
+re-examining; a prediction's `--by` says when a specific claim resolves. A question
+reviewed quarterly can hold a claim resolving in three weeks. `forecast --due` tests
+each question against its *own* interval -- a 7d question and a 90d question come due
+independently -- and **stamps a question as reviewed whether or not anything moved**,
+because a quiet question that reappears every day trains you to skim.
+
+**`predictions track-record` counts your predictions only.** The model's are reported
+under a separate heading and never folded into the figure; a hit rate that blends the
+two measures nothing. Nothing auto-resolves from coverage: a tool that grades its
+operator's calls using the corpus that produced them is measuring agreement with itself.
+
+Schema: `questions.cadence`, `questions.last_reviewed_at`, and
+`predictions.author | due_by | confidence | outcome`, added by
+`python -m src.database.migrations.add_calibration_loop` (reversible; the downgrade
+refuses rather than misattributing an operator claim). Commands live in
+`src/cli/stake.py`, `src/cli/questions.py` and `src/cli/forecast.py`; interval
+arithmetic in `src/utils/cadence.py`.
+
+---
+
 ## Beats: briefing a subject instead of a person
 
 The user profile models *you* -- a location, a profession, a voting context. A **beat**

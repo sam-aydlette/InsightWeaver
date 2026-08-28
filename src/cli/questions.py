@@ -5,6 +5,7 @@ Questions Command - Inspect and manage the persistent Question graph.
 import click
 
 from ..context.beat_scope import owning_beat_names, question_scope_filter
+from ..context.question_matcher import normalize_question
 from ..database.connection import get_db
 from ..database.models import (
     QUESTION_STATUS_OPEN,
@@ -14,6 +15,12 @@ from ..database.models import (
     QuestionSituation,
 )
 from ..utils import utcnow
+from ..utils.cadence import (
+    CADENCE_EXAMPLES,
+    InvalidCadence,
+    describe_next_review,
+    normalize_cadence,
+)
 from .colors import accent, header, muted, success, warning
 from .scope import beat_option, resolve_beat_scope, scope_label
 
@@ -63,9 +70,68 @@ def list_questions(status, limit, beat_name):
                 f"{muted(f'asked {q.first_asked_at.date().isoformat()} ({age_days}d ago)')}"
             )
             click.echo(f"  {q.text}")
+            prefix = f"cadence {q.cadence} | " if q.cadence else ""
+            click.echo(muted(f"  {prefix}{_review_phrase(q, now)}"))
             if q.previous_question_id:
                 click.echo(muted(f"  (follows Q{q.previous_question_id})"))
             click.echo()
+
+
+def _review_phrase(q: Question, now) -> str:
+    """Time-until-next-review for one question, tolerant of a bad stored cadence."""
+    try:
+        return describe_next_review(q.cadence, q.last_reviewed_at, q.first_asked_at, now)
+    except InvalidCadence as exc:
+        return f"unreadable cadence ({exc.raw})"
+
+
+@questions_command.command(name="add")
+@click.argument("text")
+@click.option(
+    "--cadence",
+    "cadence",
+    required=True,
+    metavar="INTERVAL",
+    help=(
+        "How often this question is worth re-examining, e.g. "
+        f"{', '.join(CADENCE_EXAMPLES)}. Required: the interval is your read on "
+        "how fast the subject moves, so the tool will not guess one."
+    ),
+)
+def add_question(text, cadence):
+    """
+    Declare a question you want carried, at your own review cadence.
+
+    Lands in your own ledger. A beat's agenda is declared in the beat config,
+    not here.
+    """
+    claim = (text or "").strip()
+    if not claim:
+        raise click.UsageError("A question needs text. Nothing was stored.")
+
+    try:
+        interval = normalize_cadence(cadence)
+    except InvalidCadence as exc:
+        raise click.UsageError(f"{exc} Nothing was stored.")
+
+    with get_db() as session:
+        q = Question(
+            text=claim,
+            normalized_text=normalize_question(claim),
+            first_asked_at=utcnow(),
+            status=QUESTION_STATUS_OPEN,
+            cadence=interval,
+            # Never reviewed: the first interval counts from now, so a question
+            # declared today at 90d is not due today.
+            last_reviewed_at=None,
+        )
+        session.add(q)
+        session.commit()
+        click.echo(success(f"Added question Q{q.id} at a {interval} review cadence."))
+        click.echo(muted(f"  {claim}"))
+        click.echo(
+            muted(f'  Stake a claim on it with: predict {q.id} "..." --by DATE --confidence N')
+        )
 
 
 @questions_command.command(name="show")
@@ -91,6 +157,14 @@ def show_question(question_id):
         click.echo(muted(f"Ledger: {', '.join(owners) if owners else 'yours (no beat)'}"))
         click.echo(muted(f"First asked: {q.first_asked_at.isoformat()}"))
         click.echo(muted(f"Status: {q.status}"))
+        click.echo(
+            muted(
+                f"Cadence: {q.cadence or 'none'} | "
+                f"{_review_phrase(q, utcnow())} | "
+                f"last reviewed: "
+                f"{q.last_reviewed_at.date().isoformat() if q.last_reviewed_at else 'never'}"
+            )
+        )
         if q.resolved_at:
             click.echo(muted(f"Resolved: {q.resolved_at.isoformat()}"))
         if q.resolution_note:

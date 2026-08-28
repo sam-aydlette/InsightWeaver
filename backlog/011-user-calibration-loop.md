@@ -93,3 +93,21 @@ own speed*, then grade what resolved, read the diff on whatever came up for revi
 anything new. **The brief is optional to that loop.** That is deliberate -- ingestion coverage is
 the fragile half (see 009, 010), and the ledger should keep working on a week where the sources
 returned nothing worth reading.
+
+## Known limitation on delivery (2026-08-27)
+
+`questions add --cadence` is the only way a question acquires a cadence. The four standing
+questions already declared on the `us-public-sector-compliance` beat -- Q23 through Q26, including
+this spec's own CMMC example -- were created by `standing_agenda.py` before cadences existed and
+have none, so they do not surface in `forecast --due`.
+
+This was a deliberate boundary rather than an oversight: adding `questions set-cadence` would be a
+fifth write command against an ACCEPTANCE line that enumerates four. It is defensible on its own
+terms -- a question with no cadence is one that has not been put on a review schedule -- but it
+means the operator must re-declare the beat's standing questions through `questions add` to bring
+them into the loop.
+
+It is recorded here because the reviewer looked for it in the diff, README, CONCEPTS.md, code
+comments, task file, and commit message and found it in none of them -- it existed only in the
+report handed to the reviewer. A limitation that lives in a conversation is one nobody reads.
+Closing it is a candidate for a follow-up task, not a defect in this one.

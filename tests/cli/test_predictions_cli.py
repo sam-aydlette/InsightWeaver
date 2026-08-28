@@ -114,13 +114,20 @@ class TestContradicted:
 
 class TestTrackRecord:
     def test_track_record_summary(self, cli_runner, populated_session):
+        """
+        The fixture's predictions are all model-authored, so they are reported
+        under the model heading and produce no hit rate. Backlog task 011
+        moved the calibration figure to operator predictions only: a track
+        record that blends the two measures nothing.
+        """
         session, _, _, _ = populated_session
         with _patch_db(session):
             result = cli_runner.invoke(predictions_command, ["track-record"])
         assert result.exit_code == 0
-        assert "Predictions made:" in result.output
-        # 1 triggered + 1 contradicted resolved -> 50% triggered.
-        assert "50%" in result.output
+        assert "MODEL PREDICTIONS (not counted toward your calibration)" in result.output
+        assert "3 made | 1 triggered | 1 contradicted | 1 open" in result.output
+        assert "You have staked nothing in this window" in result.output
+        assert "Hit rate" not in result.output
 
     def test_track_record_empty_window(self, cli_runner, populated_session):
         session, _, _, _ = populated_session

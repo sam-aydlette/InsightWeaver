@@ -175,10 +175,13 @@ class TestDefaultScopeExcludesBeatRows:
         """
         The calibration number is the one figure that must never be polluted:
         four predictions exist, but only the two in this scope may be counted.
+
+        The fixture's predictions are model-authored, so the count appears
+        under the model heading (backlog task 011 split the report by author).
         """
         output = run(cli_runner, predictions_command, ["track-record"])
 
-        assert "Predictions made:     2" in output
+        assert "2 made" in output
 
 
 class TestBeatScopeShowsOnlyTheBeat:
@@ -204,7 +207,7 @@ class TestBeatScopeShowsOnlyTheBeat:
     def test_track_record_beat(self, cli_runner, two_ledgers):
         output = run(cli_runner, predictions_command, ["track-record", "--beat", BEAT_NAME])
 
-        assert "Predictions made:     2" in output
+        assert "2 made" in output
 
 
 class TestScopeIsVisibleInOutput:

@@ -18,7 +18,13 @@ A sixth concept, the **Beat**, is not a commitment but a *scope* over them: it s
 
 A **Question** is an unresolved epistemic thread the coverage is implicitly tracking. Most situations end with one — "Will the Fed cut rates in June?" — and that question persists across daily runs until it resolves.
 
-A Question has one of two origins. Most are **emergent**: the graph notices what coverage leaves unresolved. A beat can also **declare** one up front — see "Standing questions" below. Both are the same kind of row, and everything downstream (predictions, decision evidence, appearance counts) treats them identically.
+A Question has one of three origins. Most are **emergent**: the graph notices what coverage leaves unresolved. A beat can also **declare** one up front — see "Standing questions" below. Since 2026-08-27 the operator can declare one directly with `questions add "..." --cadence 90d`. All three are the same kind of row, and everything downstream (predictions, decision evidence, appearance counts) treats them identically.
+
+**Cadence.** A question the operator declared carries a `cadence` — a review interval such as `7d`, `90d`, `1y`. **A cadence is not a deadline.** It says how often the question is worth re-examining; a Prediction's `due_by` says when a specific claim resolves. A question reviewed quarterly can hold a claim resolving in three weeks, and that nesting is the point: a CISA directive deadline is a 30-day loop and whether CMMC Phase 2 slips is a multi-year one, and forcing both onto one rhythm checks the fast one too late and buries the slow one in noise.
+
+`forecast --due` surfaces a question when *its own* interval has elapsed since `last_reviewed_at` (or `first_asked_at`, if never reviewed), and **stamps it whether or not anything moved** — a quiet question that reappears every day trains the operator to skim. A cadence is itself falsifiable: a question always quiet at its interval was set too fast, one that moved twice before its next review was set too slow.
+
+Cadence is nullable, and null means "not on a review schedule". Emergent questions have none — the interval is the operator's read on how fast a subject moves, so nothing infers it from coverage volume.
 
 **When created.** Each situation's `unresolved_questions.primary` (and optional secondaries) is matched against the open question graph by a Haiku call. If today's question is the same underlying question as one already open, today's situation gets bound to that existing Question. Otherwise a new Question is created.
 
@@ -26,7 +32,7 @@ A Question has one of two origins. Most are **emergent**: the graph notices what
 
 **Reappearance.** When a previously resolved Question's text appears again in fresh coverage, a *new* Question is created with `previous_question_id` pointing at the resolved one. Resolution is never silently undone.
 
-**CLI.** `questions list [--beat NAME] | show <id> | resolve <id> --note ...`
+**CLI.** `questions add "..." --cadence 90d | list [--beat NAME] | show <id> | resolve <id> --note ...`. `questions list` shows each question's cadence and time until next review.
 
 **In the brief.** Returning questions surface their identity inline: `Q47 (run 4, asked 2026-03-12)` for repeat appearances, `Q47 (new)` for first ones.
 
@@ -34,15 +40,19 @@ A Question has one of two origins. Most are **emergent**: the graph notices what
 
 ## Predictions
 
-A **Prediction** is a falsifiable observable the synthesis committed to watching for. Each `what_to_watch` entry in a situation's output becomes a Prediction keyed to that situation's primary Question.
+A **Prediction** is a falsifiable claim about the future. Every prediction carries an `author`: `model` or `operator`.
 
-**When created.** During synthesis, after questions are resolved. Each `{observable, trigger_condition}` pair in `where_this_goes.what_to_watch` becomes a Prediction row.
+**Model predictions.** Each `what_to_watch` entry in a situation's output becomes a Prediction keyed to that situation's primary Question, created during synthesis after questions are resolved. Before each new synthesis, a check pass grades the open ledger against today's coverage: triggered, contradicted, expired (no signal after 90 days), or still open.
 
-**When resolved.** Before each new synthesis, a check pass grades the open ledger against today's coverage: triggered (observable appeared), contradicted (coverage explicitly went the other way), expired (no signal after 90 days), or still open.
+**Operator predictions.** Staked by hand: `predict <question-id> "..." --by YYYY-MM-DD --confidence 0.7`. Both flags are **required and rejected at entry** — nothing is stored without them. That is not fussiness. Of the first 33 model predictions, 25 were phrased "X would signal Y" (an interpretation rule, which cannot be wrong) and only 3 carried a date; 19 expired unjudged. A claim with no resolution date can never come due, so it can never be graded, and a confidence with a default is a non-commitment in a different costume.
 
-**Why it matters.** This makes the tool's forward-looking statements auditable. The `predictions track-record` command shows the calibration: of N predictions resolved in the last 90 days, what fraction triggered vs. were contradicted.
+**When an operator prediction resolves.** Manually: `resolve <id> --outcome yes|no --note "..."`. `resolved_at` is recorded **separately from `due_by`** — resolving three months late is itself calibration data. A resolved prediction is not editable, and resolving one twice is refused.
 
-**CLI.** `predictions open | triggered | contradicted | track-record`, each taking `--beat NAME`
+**Auto-resolution from coverage is deliberately absent.** A tool that grades its operator's calls using the same corpus that produced them is measuring agreement with itself. The friction of resolving by hand is the instrument, not an obstacle to it.
+
+**The author split.** `predictions track-record` reports the operator's plain hit rate — how often the claim, as written, came true — and reports model predictions under a separate heading. The two are never mixed: a track record blending them measures nothing. The model's stay in the ledger as *prompts*, suggestions about what is worth holding an opinion on.
+
+**CLI.** `predictions open | triggered | contradicted | track-record`, each taking `--beat NAME`; plus the write side, `predict` and `resolve`.
 
 **In the brief.** A transparency line at the top of each brief reports the check results: "Prediction check: 8 open observables graded — 1 triggered, 0 contradicted, 7 still open."
 
