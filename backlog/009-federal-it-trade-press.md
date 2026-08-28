@@ -61,3 +61,36 @@ All four declared questions are rule-shaped: statutory dates, authorization stat
 deadlines, framework divergence. None asks who runs a program or whether an office changed posture.
 That is a spec-authoring blind spot mirroring the source one. Out of scope here, noted so it is not
 lost: it belongs with a revision of `config/beats/us-public-sector-compliance.json`.
+
+## Outcome, 2026-08-27 (branch `task/009-trade-press`, STATUS left QUEUED for review)
+
+Five trade feeds configured in `config/feeds/domains/federal_it.json`, all resolving into the
+beat, all returning a non-zero live count. `tests/config/test_beats.py` now asserts the beat
+resolves at least one non-`.gov` source and names all five, and the assertion was checked by
+removing the config file and watching it fail.
+
+**The evidence that matters is not the count.** FedScoop's feed carried
+*"FedRAMP Director Pete Waterman reinstated at GSA after weeks of leave"*, and it stored with 320
+words of body text. That is the exact event this task exists because the beat missed.
+
+**Two decisions a reviewer must make rather than accept:**
+
+1. **Government Executive Media Group (Nextgov/FCW, Washington Technology) are configured under a
+   `personal, non-commercial use only` feed licence.** Their terms grant the RSS feeds in those
+   words. That covers today's private terminal brief and does not cover publication. If this beat
+   is meant to publish, these two need written permission (`feedback@govexec.com`) or removal.
+   Recorded in `SOURCES.md`; not something an IC should decide alone.
+2. **Federal News Network was rejected**, though it is a named candidate. Its `robots.txt` names
+   `ClaudeBot`, `Claude-Web`, `anthropic-ai` and `Claude` with `Disallow: /`. InsightWeaver does
+   not send those User-Agents and the wildcard group permits the feed, so this is a wish rather
+   than a barrier — but it is a wish about exactly this use. MeriTalk was rejected on its terms,
+   which forbid automated monitoring with no RSS carve-out.
+
+**Known limitation, not fixed here.** The two GEMG feeds ship `<content:encoded>` with escaped
+CDATA markers, so `feedparser` sanitizes the body to an empty string: 0 of 16 stored rows have
+non-empty `content`, while `description` carries the publisher's one-sentence dek. They are
+headline-plus-dek sources. Recovering the body would mean changing `src/rss/fetcher.py` for all
+configured feeds, which is outside this task. Worth its own backlog entry.
+
+The four standing questions are still all rule-shaped, as this file already notes. Adding the
+sources does not make the beat ask who runs a program. That remains open.
