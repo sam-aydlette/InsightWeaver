@@ -30,15 +30,21 @@ changes. Last updated 2026-08-27.
 
 **Known limitations, stated plainly**
 
-- **The calibration record is empty.** 33 predictions have been generated and **zero** ever
-  graded; 25 of them are phrased "X would signal Y", which is an interpretation rule and cannot be
-  wrong. This is the tool's central claim and it is currently unmet. `backlog/011` is the fix, and
-  it moves prediction-making to the operator.
-- **Coverage reaches documents, not events.** The first live compliance brief missed a major
-  personnel change in its own domain because no federal-IT trade outlet is configured. Across 207
-  feeds there is not one. `backlog/009` and `backlog/010`.
-- **Only one timescale.** Every question is reviewed on whatever rhythm the operator happens to
-  invoke, though the subjects move at very different speeds. Folded into `backlog/011`.
+- **The calibration record is still empty, though the machinery now exists.** 33 model-generated
+  predictions have been graded zero times; 25 are phrased "X would signal Y", an interpretation
+  rule that cannot be wrong. As of `backlog/011` an operator can stake a dated, confidence-bearing
+  claim and resolve it, and those are counted separately from the model's. **Nothing has been
+  staked yet.** Until something is, the tool's central claim remains unmet -- the fix is a
+  mechanism, not a result.
+- **Adding a feed to `config/feeds/` does not add it to the database.** `FeedManager.load_feeds_to_database()`
+  syncs config into the `rss_feeds` table, and the fetcher reads the table, not the config. A beat
+  resolves feeds from config, so a newly added source will resolve, pass its tests, and fetch
+  nothing until that sync is run. This was found on 2026-08-28 when five trade outlets were
+  configured, CI was green, and the corpus stayed empty of them.
+- **Questions declared in a beat config carry no review cadence.** The four standing questions on
+  the `us-public-sector-compliance` beat -- including the CMMC one -- predate cadences, and there is
+  no `questions set-cadence`. They are invisible to `forecast --due` until re-declared with
+  `questions add --cadence`. Per-question cadences otherwise work (`backlog/011`).
 - **Per-run cost is unmeasured.** There is no token accounting.
 - **Delta-based features need history to mean anything.** Institutional activity reports "no
   trailing average yet" until several runs have accumulated. This is by construction, not a bug.
