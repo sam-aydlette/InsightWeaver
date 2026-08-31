@@ -8,13 +8,7 @@ from datetime import datetime
 import pytest
 from sqlalchemy.exc import IntegrityError
 
-from src.database.models import (
-    AnalysisRun,
-    Article,
-    ContextSnapshot,
-    NarrativeSynthesis,
-    RSSFeed,
-)
+from src.database.models import Article, RSSFeed
 
 
 class TestRSSFeedModel:
@@ -132,90 +126,6 @@ class TestArticleModel:
         assert sample_article in sample_rss_feed.articles
 
 
-class TestAnalysisRunModel:
-    """Tests for AnalysisRun model"""
-
-    def test_create_analysis_run(self, test_session):
-        """Should create an AnalysisRun"""
-        run = AnalysisRun(
-            run_type="narrative_synthesis",
-            status="started",
-        )
-        test_session.add(run)
-        test_session.commit()
-
-        assert run.id is not None
-        assert run.started_at is not None
-
-    def test_analysis_run_completed(self, test_session):
-        """Should track completion of analysis run"""
-        run = AnalysisRun(
-            run_type="narrative_synthesis",
-            status="completed",
-            articles_processed=50,
-            context_token_count=10000,
-            claude_model="claude-3-5-sonnet",
-        )
-        test_session.add(run)
-        test_session.commit()
-
-        assert run.articles_processed == 50
-        assert run.context_token_count == 10000
-
-
-class TestNarrativeSynthesisModel:
-    """Tests for NarrativeSynthesis model"""
-
-    def test_create_narrative_synthesis(
-        self, test_session, sample_analysis_run, sample_context_snapshot
-    ):
-        """Should create a NarrativeSynthesis"""
-        synthesis = NarrativeSynthesis(
-            analysis_run_id=sample_analysis_run.id,
-            context_snapshot_id=sample_context_snapshot.id,
-            user_profile_version="1.0",
-            synthesis_data={"bottom_line": {"summary": "Test"}},
-            articles_analyzed=10,
-        )
-        test_session.add(synthesis)
-        test_session.commit()
-
-        assert synthesis.id is not None
-        assert synthesis.generated_at is not None
-
-    def test_narrative_synthesis_json_data(self, test_session, sample_narrative_synthesis):
-        """Should store complex JSON data correctly"""
-        complex_data = {
-            "bottom_line": {"summary": "Complex test", "immediate_actions": ["action1"]},
-            "trends_and_patterns": {"local": [], "national": []},
-            "priority_events": [{"event": "Test event", "impact_level": "HIGH"}],
-        }
-
-        sample_narrative_synthesis.synthesis_data = complex_data
-        test_session.commit()
-
-        retrieved = test_session.query(NarrativeSynthesis).get(sample_narrative_synthesis.id)
-        assert retrieved.synthesis_data["bottom_line"]["summary"] == "Complex test"
-        assert len(retrieved.synthesis_data["priority_events"]) == 1
-
-
-class TestContextSnapshotModel:
-    """Tests for ContextSnapshot model"""
-
-    def test_create_context_snapshot(self, test_session):
-        """Should create a ContextSnapshot"""
-        snapshot = ContextSnapshot(
-            article_ids=[1, 2, 3, 4, 5],
-            context_size_tokens=8000,
-            user_profile_hash="hash123",
-        )
-        test_session.add(snapshot)
-        test_session.commit()
-
-        assert snapshot.id is not None
-        assert snapshot.article_ids == [1, 2, 3, 4, 5]
-
-
 class TestModelIndexes:
     """Tests for database indexes"""
 
@@ -240,29 +150,30 @@ class TestModelIndexes:
             assert idx in index_names, f"Index {idx} should exist on articles table"
 
 
-class TestInstitutionalActivitySchema:
+class TestSchemaBoundaries:
     """
-    The institutional activity tables, and the boundary they are built around.
+    Structural invariants that outlived the briefing product.
 
-    `beat_entities.kind` admits org / program / document_type. There is no
-    person kind and no persons table, so there is no row a per-individual
-    activity ledger could be assembled from. A named individual may appear
-    inside a rendered situation where the source document names a signatory --
-    that is an attribute of a document and expires with it -- but never as a
-    row here, because a row here accumulates across runs.
+    The institutional-activity tables these used to guard (``beat_entities``,
+    ``entity_mentions``) were dropped by backlog task 012 along with beats. The
+    boundary they enforced did not go with them: the entity vocabulary is still
+    closed and still holds no person, it just lives with the ported matcher in
+    :mod:`src.matching.terms` now.
 
-    Added 2026-08-26 with backlog task 006.
+    A named individual may appear inside a source document that names a
+    signatory -- that is an attribute of a document and expires with it -- but
+    never as a row, because a row accumulates across runs.
     """
 
     def test_the_kind_vocabulary_is_closed_and_holds_no_person(self):
-        from src.database.models import ENTITY_KINDS
+        from src.matching.terms import ENTITY_KINDS
 
-        assert ENTITY_KINDS == ("org", "program", "document_type")
+        assert frozenset({"org", "program", "document_type"}) == ENTITY_KINDS
 
     def test_no_table_in_the_schema_is_person_shaped(self, test_engine):
         """
-        A blunt structural check over the whole schema, not just the new
-        tables: if a persons table is ever added, this fails.
+        A blunt structural check over the whole schema: if a persons table is
+        ever added, this fails.
         """
         from sqlalchemy import inspect
 
@@ -273,46 +184,12 @@ class TestInstitutionalActivitySchema:
 
         assert not [name for name in names if any(word in name.lower() for word in forbidden)]
 
-    def test_no_column_on_the_activity_tables_names_an_individual(self):
-        from src.database.models import BeatEntity, EntityMention
-
-        columns = {column.name for column in BeatEntity.__table__.columns} | {
-            column.name for column in EntityMention.__table__.columns
-        }
-
-        assert columns == {
-            "id",
-            "beat_id",
-            "kind",
-            "name",
-            "aliases",
-            "created_at",
-            "updated_at",
-            "entity_id",
-            "beat_run_id",
-            "synthesis_id",
-            "item_count",
-            "items_scanned",
-            "observed_at",
-        }
-
-    def test_one_mention_row_per_entity_per_run(self, test_session):
+    def test_only_the_two_surviving_tables_are_mapped(self):
         """
-        The uniqueness that keeps a re-run from doubling a baseline.
+        Task 012 removed nineteen models. If one comes back by accident,
+        ``create_tables()`` would recreate a concept the rewrite deleted, so the
+        mapped set is pinned rather than left to review.
         """
-        from src.database.models import Beat, BeatEntity, BeatRun, EntityMention
+        from src.database.models import Base
 
-        beat = Beat(name="b")
-        test_session.add(beat)
-        test_session.flush()
-        entity = BeatEntity(beat_id=beat.id, kind="org", name="GSA", aliases=[])
-        run = BeatRun(beat_id=beat.id)
-        test_session.add_all([entity, run])
-        test_session.flush()
-
-        test_session.add(EntityMention(entity_id=entity.id, beat_run_id=run.id, item_count=1))
-        test_session.commit()
-        test_session.add(EntityMention(entity_id=entity.id, beat_run_id=run.id, item_count=9))
-
-        with pytest.raises(IntegrityError):
-            test_session.commit()
+        assert set(Base.metadata.tables) == {"rss_feeds", "articles"}

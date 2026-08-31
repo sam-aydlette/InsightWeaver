@@ -1,8 +1,10 @@
 """
-CLI-specific test fixtures
-"""
+CLI-specific test fixtures.
 
-from unittest.mock import MagicMock
+The ``mock_api_key`` / ``mock_no_api_key`` fixtures were removed by backlog
+task 012: both patched ``src.cli.brief.settings``, and the brief command is
+gone. Nothing surviving in the CLI reads an API key.
+"""
 
 import pytest
 from click.testing import CliRunner
@@ -12,19 +14,3 @@ from click.testing import CliRunner
 def cli_runner():
     """Click CLI test runner."""
     return CliRunner()
-
-
-@pytest.fixture
-def mock_api_key(monkeypatch):
-    """Mock API key as configured for the brief command."""
-    mock = MagicMock()
-    mock.anthropic_api_key = "test-api-key"
-    monkeypatch.setattr("src.cli.brief.settings", mock)
-
-
-@pytest.fixture
-def mock_no_api_key(monkeypatch):
-    """Mock API key as not configured."""
-    mock = MagicMock()
-    mock.anthropic_api_key = None
-    monkeypatch.setattr("src.cli.brief.settings", mock)

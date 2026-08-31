@@ -1,4 +1,4 @@
-.PHONY: help install install-dev test lint format fmt typecheck check pre-commit clean clean-all coverage run-brief run-forecast db-migrate db-migrate-down db-reset update-deps
+.PHONY: help install install-dev test lint format fmt typecheck check pre-commit clean clean-all coverage db-drop-briefing update-deps
 
 # Tool resolution (added 2026-08-24).
 # Before this, every recipe called bare `pytest` / `ruff` / `mypy`, which only
@@ -43,14 +43,9 @@ help:
 	@echo "  make pre-commit      Run all pre-commit hooks"
 	@echo "  make check           Run all checks (lint + typecheck + test)"
 	@echo ""
-	@echo "Application:"
-	@echo "  make run-brief       Run intelligence brief"
-	@echo "  make run-forecast    Run forecast generation"
-	@echo ""
 	@echo "Database:"
-	@echo "  make db-migrate      Run database migrations"
-	@echo "  make db-migrate-down Rollback database migrations"
-	@echo "  make db-reset        Reset database (WARNING: deletes all data)"
+	@echo "  make db-drop-briefing  Drop the deleted briefing product's tables"
+	@echo "                         (DESTRUCTIVE; captures to a dump first)"
 	@echo ""
 	@echo "Cleanup:"
 	@echo "  make clean           Remove build artifacts and cache"
@@ -96,12 +91,11 @@ pre-commit:
 check: lint typecheck test
 	@echo "All checks passed."
 
-run-brief:
-	insightweaver brief
-
-run-forecast:
-	insightweaver forecast
-
+# run-brief / run-forecast / db-migrate / db-migrate-down / db-reset were
+# removed on 2026-08-31 (backlog task 012): every command and migration they
+# invoked was deleted with the briefing product. db-reset in particular ran
+# `rm -f data/insightweaver.db` behind a y/N prompt, which is not a guard worth
+# keeping pointed at a 55,249-row corpus.
 clean:
 	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 	find . -type d -name "*.egg-info" -exec rm -rf {} + 2>/dev/null || true
@@ -119,18 +113,9 @@ clean-all: clean
 	rm -rf venv/
 	rm -rf .venv/
 
-db-migrate:
-	python -m src.database.migrations.add_forecast_tables
-
-db-migrate-down:
-	python -m src.database.migrations.add_forecast_tables down
-
-db-reset:
-	@echo "WARNING: This will delete all data!"
-	@read -p "Are you sure? [y/N] " confirm; \
-	if [ "$$confirm" = "y" ] || [ "$$confirm" = "Y" ]; then \
-		rm -f data/insightweaver.db; \
-		python -m src.database.migrations.add_forecast_tables; \
-	else \
-		echo "Cancelled"; \
-	fi
+# Deliberately does NOT pass --confirm. The migration refuses without it, so
+# running this target prints what it would destroy and stops; the operator types
+# the real command themselves. A Makefile target that drops tables on `make` is
+# the accident this arrangement exists to prevent.
+db-drop-briefing:
+	$(PYTHON) -m src.database.migrations.drop_briefing_tables

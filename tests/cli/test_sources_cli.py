@@ -1,21 +1,24 @@
 """
-Tests for the `sources` CLI command and its calibration helpers.
+Tests for the `sources` CLI command.
+
+Rewritten by backlog task 012. The previous suite tested ``_compute_calibration``,
+which derived a frame-uniqueness and gap-filling score per feed from the
+``article_frames`` mapping and recorded ``frame_gaps``. Task 012 deleted
+narrative frames, so those signals have no inputs and the command now reports
+the feed inventory and the corpus each feed actually contributed.
+
+The assertions below are deliberately about counts rather than scores: a count
+is measured, and the command no longer derives anything it cannot measure.
 """
 
 from contextlib import contextmanager
+from datetime import datetime
 from unittest.mock import patch
 
 import pytest
 
-from src.cli.sources import _compute_calibration, sources_command
-from src.database.models import (
-    Article,
-    ArticleFrame,
-    FrameGap,
-    NarrativeFrame,
-    RSSFeed,
-    TopicCluster,
-)
+from src.cli.sources import _feed_stats, sources_command
+from src.database.models import Article, RSSFeed
 
 
 def _patch_db(session):
@@ -32,115 +35,98 @@ def _patch_db(session):
 
 
 @pytest.fixture
-def calibration_session(test_session):
-    """Two feeds, three frames. Feed A carries a unique frame; both share one;
-    a recorded frame gap matches a label Feed B carries (Feed B fills the gap)."""
-    feed_a = RSSFeed(url="https://a.com/feed", name="Feed A")
-    feed_b = RSSFeed(url="https://b.com/feed", name="Feed B")
+def feed_session(test_session):
+    """Two feeds: A has carried three articles, B has carried none."""
+    feed_a = RSSFeed(url="https://a.com/feed", name="Feed A", category="policy")
+    feed_b = RSSFeed(url="https://b.com/feed", name="Feed B", category="tech")
     test_session.add_all([feed_a, feed_b])
-    test_session.flush()
-
-    tc = TopicCluster(name="fed policy", keywords=["fed"])
-    test_session.add(tc)
-    test_session.flush()
-
-    hawk = NarrativeFrame(topic_cluster_id=tc.id, label="inflation hawk frame")
-    labor = NarrativeFrame(topic_cluster_id=tc.id, label="labor market frame")
-    consumer = NarrativeFrame(topic_cluster_id=tc.id, label="consumer welfare frame")
-    test_session.add_all([hawk, labor, consumer])
-    test_session.flush()
-
-    # Feed A: 2 articles, both tagged hawk (unique to A).
-    a1 = Article(feed_id=feed_a.id, guid="a1", title="A1")
-    a2 = Article(feed_id=feed_a.id, guid="a2", title="A2")
-    # Feed B: 2 articles, one labor (shared with A nowhere -- only B), one consumer.
-    b1 = Article(feed_id=feed_b.id, guid="b1", title="B1")
-    b2 = Article(feed_id=feed_b.id, guid="b2", title="B2")
-    test_session.add_all([a1, a2, b1, b2])
     test_session.flush()
 
     test_session.add_all(
         [
-            ArticleFrame(article_id=a1.id, frame_id=hawk.id, confidence=0.9),
-            ArticleFrame(article_id=a2.id, frame_id=hawk.id, confidence=0.8),
-            ArticleFrame(article_id=b1.id, frame_id=labor.id, confidence=0.7),
-            ArticleFrame(article_id=b2.id, frame_id=consumer.id, confidence=0.7),
+            Article(feed_id=feed_a.id, guid="a1", title="A1", published_date=datetime(2026, 8, 1)),
+            Article(feed_id=feed_a.id, guid="a2", title="A2", published_date=datetime(2026, 8, 20)),
+            Article(feed_id=feed_a.id, guid="a3", title="A3", published_date=datetime(2026, 8, 10)),
         ]
-    )
-
-    # A recorded gap whose label matches a frame Feed B carries.
-    test_session.add(
-        FrameGap(
-            topic_cluster_id=tc.id,
-            frame_label="consumer welfare frame",
-            occurrences=3,
-        )
     )
     test_session.commit()
     return test_session, feed_a, feed_b
 
 
-class TestComputeCalibration:
+class TestFeedStats:
     def test_no_feeds(self, test_session):
-        assert _compute_calibration(test_session) == {}
+        assert _feed_stats(test_session) == {}
 
-    def test_calibration_values(self, calibration_session):
-        session, feed_a, feed_b = calibration_session
-        cal = _compute_calibration(session)
+    def test_counts_articles_per_feed(self, feed_session):
+        session, feed_a, feed_b = feed_session
+        stats = _feed_stats(session)
 
-        # Feed A: 2 tagged articles, both on a frame carried only by A.
-        a = cal[feed_a.id]
-        assert a["tagged_articles"] == 2
-        assert a["uniqueness"] == 1.0  # all of A's tags are unique frames
+        assert stats[feed_a.id]["articles"] == 3
+        assert stats[feed_b.id]["articles"] == 0
 
-        # Feed B: 2 tagged articles, on two frames -- both also unique to B.
-        # gap_filling: 1 gap label total ("consumer welfare frame"), B carries it.
-        b = cal[feed_b.id]
-        assert b["tagged_articles"] == 2
-        assert b["uniqueness"] == 1.0
-        assert b["gap_filling"] == 1.0
-        # Feed A doesn't carry the gap-labeled frame.
-        assert a["gap_filling"] == 0.0
+    def test_reports_the_newest_article_not_the_last_inserted(self, feed_session):
+        """The newest published date, so an out-of-order backfill does not lie."""
+        session, feed_a, _ = feed_session
 
-    def test_zero_tagged_yields_zero_uniqueness(self, test_session):
-        feed = RSSFeed(url="https://x", name="Empty Feed")
-        test_session.add(feed)
-        test_session.commit()
-        cal = _compute_calibration(test_session)
-        assert cal[feed.id]["uniqueness"] == 0.0
-        assert cal[feed.id]["tagged_articles"] == 0
+        assert _feed_stats(session)[feed_a.id]["latest"] == datetime(2026, 8, 20)
+
+    def test_a_silent_feed_is_present_with_zero_rather_than_absent(self, feed_session):
+        """
+        A configured feed that has stored nothing is the finding, so it has a
+        row. Dropping it would make "carried nothing" and "not configured"
+        indistinguishable.
+        """
+        session, _, feed_b = feed_session
+        stats = _feed_stats(session)
+
+        assert feed_b.id in stats
+        assert stats[feed_b.id]["latest"] is None
 
 
 class TestSourcesList:
-    def test_list_renders_feeds(self, cli_runner, calibration_session):
-        session, _, _ = calibration_session
+    def test_list_renders_feeds_and_counts(self, cli_runner, feed_session):
+        session, _, _ = feed_session
         with _patch_db(session):
             result = cli_runner.invoke(sources_command, ["list"])
+
         assert result.exit_code == 0
         assert "Feed A" in result.output
         assert "Feed B" in result.output
-        assert "uniqueness" in result.output
-        assert "gap-filling" in result.output
+        assert "3 article(s)" in result.output
+        assert "no stored articles" in result.output
+
+    def test_list_reports_no_frame_derived_scores(self, cli_runner, feed_session):
+        """The deleted signals are gone from the output, not renamed."""
+        session, _, _ = feed_session
+        with _patch_db(session):
+            result = cli_runner.invoke(sources_command, ["list"])
+
+        assert "uniqueness" not in result.output
+        assert "gap-filling" not in result.output
 
     def test_list_empty(self, cli_runner, test_session):
         with _patch_db(test_session):
             result = cli_runner.invoke(sources_command, ["list"])
+
         assert result.exit_code == 0
         assert "No feeds configured" in result.output
 
 
 class TestSourcesShow:
-    def test_show_by_partial_name(self, cli_runner, calibration_session):
-        session, _, _ = calibration_session
+    def test_show_by_partial_name(self, cli_runner, feed_session):
+        session, _, _ = feed_session
         with _patch_db(session):
             result = cli_runner.invoke(sources_command, ["show", "Feed A"])
+
         assert result.exit_code == 0
         assert "SOURCE: Feed A" in result.output
-        assert "inflation hawk frame" in result.output
+        assert "https://a.com/feed" in result.output
+        assert "stored articles: 3" in result.output
 
-    def test_show_no_match(self, cli_runner, calibration_session):
-        session, _, _ = calibration_session
+    def test_show_no_match(self, cli_runner, feed_session):
+        session, _, _ = feed_session
         with _patch_db(session):
             result = cli_runner.invoke(sources_command, ["show", "Nonexistent"])
+
         assert result.exit_code == 0
         assert "No feed matching" in result.output

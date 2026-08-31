@@ -4,6 +4,8 @@ Tests for CLI App
 
 from unittest.mock import patch
 
+import pytest
+
 from src.cli.app import cli, interactive_mode, print_command_refresher
 
 
@@ -16,7 +18,7 @@ class TestCliGroup:
 
         assert result.exit_code == 0
         assert "InsightWeaver" in result.output
-        assert "RSS Feed Analysis" in result.output
+        assert "RSS feed ingestion" in result.output
 
     def test_cli_version(self, cli_runner):
         """Should show version"""
@@ -44,26 +46,36 @@ class TestPrintCommandRefresher:
         captured = capsys.readouterr()
 
         assert "Commands:" in captured.out
-        assert "brief" in captured.out
-        assert "forecast" in captured.out
+        assert "sources" in captured.out
 
 
 class TestSubcommandRegistration:
     """Tests for subcommand registration"""
 
-    def test_brief_command_registered(self, cli_runner):
-        """Should have brief command registered"""
-        result = cli_runner.invoke(cli, ["brief", "--help"])
+    def test_sources_command_registered(self, cli_runner):
+        """Should have sources command registered"""
+        result = cli_runner.invoke(cli, ["sources", "--help"])
 
         assert result.exit_code == 0
-        assert "hours" in result.output.lower()
+        assert "list" in result.output.lower()
 
-    def test_forecast_command_registered(self, cli_runner):
-        """Should have forecast command registered"""
-        result = cli_runner.invoke(cli, ["forecast", "--help"])
+    @pytest.mark.parametrize(
+        "gone",
+        ["brief", "frames", "diet", "questions", "predictions", "forecast", "decisions", "beat"],
+    )
+    def test_deleted_commands_are_not_registered(self, cli_runner, gone):
+        """
+        The briefing commands are gone from --help and from dispatch.
 
-        assert result.exit_code == 0
-        assert "forecast" in result.output.lower()
+        Pinned rather than assumed: the editable install resolves a missing
+        ``src.*`` module against the developer's other checkout, so a dangling
+        command import can appear to work locally. This asserts on the
+        registered command table instead.
+        """
+        assert gone not in cli.commands
+
+        result = cli_runner.invoke(cli, [gone, "--help"])
+        assert result.exit_code != 0
 
 
 class TestAsciiArt:

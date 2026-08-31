@@ -1,6 +1,14 @@
 """
-InsightWeaver CLI Application
-Click-based multi-command interface
+InsightWeaver CLI application.
+
+Backlog task 012 deleted the briefing product, and with it every command that
+generated, rendered, or reasoned over a brief: brief, frames, diet, questions,
+predictions, forecast, decisions, beat, stake and scope. What is left is the
+source layer, which the rewrite keeps.
+
+The command table is deliberately short. It is not a placeholder for the new
+pipeline -- building that is a separate task -- and nothing here should grow a
+command back by habit.
 """
 
 import contextlib
@@ -9,153 +17,36 @@ import time
 
 import click
 
-from .beat import beat_command
-from .brief import brief_group
 from .colors import accent, header, muted
-from .decisions import decisions_command
-from .diet import diet_command
-from .forecast import forecast_command
-from .frames import frames_command
 from .output import set_debug_mode
-from .predictions import predictions_command
-from .questions import questions_command
 from .sources import sources_command
-from .stake import predict_command, resolve_command
 
 # Maps command prefix to its Click command object.
-# Order matters: longer prefixes checked first via startswith().
-# In particular "predictions" must precede "predict", since the shorter name is
-# a prefix of the longer one (2026-08-27, backlog task 011).
+#
+# Order used to matter here: "predictions" had to precede "predict", since the
+# shorter name is a prefix of the longer one (2026-08-27, backlog task 011).
+# Both commands are gone, but the startswith() dispatch below is unchanged, so
+# the ordering constraint still applies to whatever is added next.
 COMMAND_DISPATCH = {
-    "beat": beat_command,
-    "brief": brief_group,
-    "forecast": forecast_command,
-    "frames": frames_command,
-    "questions": questions_command,
-    "predictions": predictions_command,
-    "predict": predict_command,
-    "resolve": resolve_command,
-    "decisions": decisions_command,
-    "diet": diet_command,
     "sources": sources_command,
 }
 
 
 def print_command_refresher():
     """Print a short refresher of available commands."""
-    refresher = (
-        f"\n{header('Commands:')} {accent('brief')} | {accent('beat')} | {accent('forecast')} | "
-        f"{accent('frames')} | {accent('questions')} | {accent('predictions')} | "
-        f"{accent('predict')} | {accent('resolve')} | "
-        f"{accent('decisions')} | {accent('diet')} | {accent('sources')} | "
-        f"help | exit\n"
-    )
-    click.echo(refresher)
+    click.echo(f"\n{header('Commands:')} {accent('sources')} | help | exit\n")
 
 
 def print_help():
     """Print full help text for interactive mode."""
     click.echo(header("Available commands:"))
-    click.echo(f"  {accent('brief')}               - Generate intelligence brief and report")
-    click.echo(f"  {accent('beat')}                - Test a beat's sources against real events")
-    click.echo(
-        f"  {accent('forecast')}            - View open observables and resolved track record"
-    )
-    click.echo(f"  {accent('frames')}              - Manage narrative frame glossary")
-    click.echo(f"  {accent('questions')}           - Inspect the persistent question graph")
-    click.echo(f"  {accent('predictions')}         - Inspect the predictions ledger")
-    click.echo(f"  {accent('predict')}             - Stake your own claim on a question")
-    click.echo(f"  {accent('resolve')}             - Record the outcome of a prediction")
-    click.echo(f"  {accent('decisions')}           - Manage the decision journal")
-    click.echo(f"  {accent('diet')}                - Inspect your information diet's structure")
-    click.echo(f"  {accent('sources')}             - Per-source structural calibration")
+    click.echo(f"  {accent('sources')}             - Inspect configured feeds and what they hold")
     click.echo(f"  {accent('help')}                - Show this help message")
     click.echo(f"  {accent('exit')}                - Exit InsightWeaver")
     click.echo()
-    click.echo(header("Brief command options:"))
-    click.echo(f"  {accent('--hours N')}           - Look back N hours (default: 24)")
-    click.echo(f"  {accent('--save PATH')}         - Save brief as markdown to PATH")
-    click.echo(f"  {accent('--quiet')}             - Compact output (titles only)")
-    click.echo(muted("  Topic filters:   --cybersecurity (-cs), --ai (-ai)"))
-    click.echo(
-        muted("  Scope filters:   --local (-l), --state (-s), --national (-n), --global (-g)")
-    )
-    click.echo()
-    click.echo(header("Scope a brief to a subject instead of to you:"))
-    click.echo(f"  {accent('--beat NAME')}         - Use config/beats/NAME.json for sources")
-    click.echo()
-    click.echo(header("Re-render a stored brief (no pipeline, no API key):"))
-    click.echo(f"  {accent('--from-run ID')}       - Render stored brief ID instead of running")
-    click.echo(f"  {accent('--format')}            - terminal (default), html, or email")
-    click.echo(f"  {accent('--output PATH')}       - Destination file for --format html")
-    click.echo()
-    click.echo(header("Forecast command options:"))
-    click.echo(f"  {accent('--days N')}            - Resolved-record window (default: 60)")
-    click.echo(f"  {accent('--due')}               - What is due right now, at each question's")
-    click.echo(muted("                          own cadence. Stamps what it surfaces."))
-    click.echo()
-    click.echo(header("Frames command:"))
-    click.echo(f"  {accent('frames list')}          - List all topic clusters and frames")
-    click.echo(f"  {accent('frames show')} <topic>  - Show frames for a topic")
-    click.echo(f"  {accent('frames edit')} <id>     - Edit a frame in $EDITOR")
-    click.echo(f"  {accent('frames gaps')}          - Show recurring perspective gaps")
-    click.echo()
-    click.echo(header("Questions command:"))
-    click.echo(f"  {accent('questions list')}         - List questions, cadence, next review")
-    click.echo(muted("    Add --beat NAME to any ledger view to read that beat's ledger"))
-    click.echo(f"  {accent('questions add')} '...' --cadence 90d  - Declare a question you carry")
-    click.echo(f"  {accent('questions show')} <id>    - Show a question's full history")
-    click.echo(f"  {accent('questions resolve')} <id> --note '...'  - Resolve a question")
-    click.echo()
-    click.echo(header("Predictions command:"))
-    click.echo(f"  {accent('predictions open')}         - Predictions still waiting on coverage")
-    click.echo(f"  {accent('predictions triggered')}    - Predictions later coverage confirmed")
-    click.echo(f"  {accent('predictions contradicted')} - Predictions later coverage went against")
-    click.echo(f"  {accent('predictions track-record')} - Your hit rate; model shown separately")
-    click.echo()
-    click.echo(header("Stake and resolve your own claims:"))
-    click.echo(f"  {accent('predict')} <qid> '...' --by YYYY-MM-DD --confidence 0.7")
-    click.echo(muted("    Both flags required; a claim with no date is refused, not stored"))
-    click.echo(f"  {accent('resolve')} <pid> --outcome yes|no --note '...'")
-    click.echo(muted("    You grade your own calls. Nothing grades them for you"))
-    click.echo()
-    click.echo(header("Decisions command:"))
-    click.echo(f"  {accent('decisions list')}            - List standing decisions")
-    click.echo(f"  {accent('decisions show')} <id>       - Show factors and routed evidence")
-    click.echo(f"  {accent('decisions add')} --name '...' --type ...  - Add a decision")
-    click.echo(f"  {accent('decisions factor add')} <id> --name '...'  - Add a factor")
-    click.echo(f"  {accent('decisions resolve')} <id> --note '...'  - Mark a decision decided")
-    click.echo()
-    click.echo(header("Diet command:"))
-    click.echo(f"  {accent('diet feeds')}             - Per-feed frame fingerprint")
-    click.echo(f"  {accent('diet gaps')}              - Recurring frame absences")
-    click.echo(f"  {accent('diet overlap')}           - Which frames only one feed carries")
-    click.echo()
-    click.echo(header("Beat command:"))
-    click.echo(f"  {accent('beat coverage')} <name>  - Can this beat see events that happened?")
-    click.echo(muted("    Reads config/beats/NAME.json coverage_probes. No API key, no writes."))
-    click.echo(muted("    Exits 1 if a probe is unmatched, 2 if nothing could be measured."))
-    click.echo()
     click.echo(header("Sources command:"))
-    click.echo(f"  {accent('sources list')}             - All feeds with calibration signals")
+    click.echo(f"  {accent('sources list')}             - All feeds with stored-article counts")
     click.echo(f"  {accent('sources show')} <name>      - Detailed view for one feed")
-    click.echo()
-    click.echo(header("Examples:"))
-    click.echo(muted("  brief                  (24-hour brief, all topics)"))
-    click.echo(muted("  brief -cs -n           (national cybersecurity news)"))
-    click.echo(muted("  brief --hours 48 -l    (48-hour local news brief)"))
-    click.echo(muted("  brief --save brief.md  (save brief as markdown)"))
-    click.echo(muted("  brief --from-run 176   (re-render stored brief 176)"))
-    click.echo(muted("  brief --beat us-public-sector-compliance  (subject brief)"))
-    click.echo(muted("  beat coverage us-public-sector-compliance  (can it see real events?)"))
-    click.echo(muted("  forecast               (open observables + last 60d resolved)"))
-    click.echo(muted("  forecast --days 30     (tighter resolved-record window)"))
-    click.echo(muted("  forecast --due         (what is due now, at each question's cadence)"))
-    click.echo(muted("  questions add 'Does CMMC Phase 2 slip?' --cadence 90d"))
-    click.echo(muted("  predict 23 'Yes -- slips' --by 2026-12-31 --confidence 0.7"))
-    click.echo(muted("  resolve 41 --outcome no --note 'class deviation published'"))
-    click.echo(muted("  frames list            (view narrative frame glossary)"))
-    click.echo(muted("  frames gaps            (view perspective gaps in your feeds)"))
     click.echo()
     click.echo(muted("Tip: Add --debug to any command to see detailed logs"))
     click.echo()
@@ -167,11 +58,9 @@ def _dispatch_command(command: str) -> bool:
 
     Returns True if a command was matched, False otherwise.
 
-    Argument splitting is quote-aware (shlex) as of 2026-08-27: `predict 23
-    "Yes -- slips" --by ...` takes a multi-word claim as one argument, and a
-    plain whitespace split would have handed Click four arguments instead of
-    one. The same applies to every option that takes prose, such as
-    `resolve --note`.
+    Argument splitting is quote-aware (shlex) as of 2026-08-27: an option that
+    takes prose needs its value delivered as one argument, and a plain
+    whitespace split would hand Click several instead.
     """
     for prefix, click_cmd in COMMAND_DISPATCH.items():
         if command.startswith(prefix):
@@ -187,9 +76,8 @@ def _dispatch_command(command: str) -> bool:
                 try:
                     click_cmd.main(args, standalone_mode=False)
                 except click.ClickException as exc:
-                    # standalone_mode=False re-raises instead of printing.
-                    # The write commands reject bad input this way, so the
-                    # rejection has to reach the operator intact.
+                    # standalone_mode=False re-raises instead of printing, so
+                    # the rejection has to be shown here to reach the operator.
                     exc.show()
             print_command_refresher()
             return True
@@ -266,10 +154,10 @@ def interactive_mode():
 @click.version_option(version="1.0.0", prog_name="InsightWeaver")
 def cli(ctx, debug):
     """
-    InsightWeaver - Intelligent RSS Feed Analysis System
+    InsightWeaver - RSS feed ingestion and source inspection.
 
-    Transform RSS feed data streams into coherent, actionable narratives
-    through location-specific, integrated perspectives.
+    The briefing product was removed in backlog task 012. What remains is
+    ingestion and the source layer.
     """
     set_debug_mode(debug)
     ctx.ensure_object(dict)
