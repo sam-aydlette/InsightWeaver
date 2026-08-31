@@ -5,8 +5,15 @@ Tests for RSS Fetcher
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from sqlalchemy.orm import sessionmaker
 
-from src.rss.fetcher import RSSFetcher, create_test_feed
+from src.database.models import Article, Observation, RSSFeed
+from src.rss.fetcher import (
+    LEGACY_PATH_MESSAGE,
+    LegacyWritePathClosed,
+    RSSFetcher,
+    create_test_feed,
+)
 
 
 class TestRSSFetcherInit:
@@ -193,43 +200,131 @@ class TestCleanHtml:
         assert "Paragraph two" in result
 
 
-class TestFetchAndStoreFeed:
-    """Tests for fetching and storing feeds"""
+class TestTheLegacyWritePathIsClosed:
+    """
+    The legacy article write path refuses instead of writing (task 025).
+
+    ``fetch_and_store_feed`` used to insert Article rows with no Observation
+    beside them, which is the one way the corpus could grow rows that Tier 1
+    routing can never see. It now raises. These tests drive the real entry
+    points -- no mock stands in for the function under test -- and check both
+    that the call refuses and that the database is untouched by the attempt.
+    """
+
+    @pytest.fixture
+    def db_pointed_at_test_engine(self, test_engine, monkeypatch):
+        """
+        Point src.database.connection at a throwaway engine.
+
+        The legacy path opened its own session through ``get_db`` rather than
+        taking one, so proving "it wrote nothing" means giving it a database it
+        *could* have written to and finding it empty afterwards.
+        """
+        import src.database.connection as connection
+
+        Session = sessionmaker(bind=test_engine)
+        monkeypatch.setattr(connection, "engine", test_engine)
+        monkeypatch.setattr(connection, "SessionLocal", Session)
+        session = Session()
+        yield session
+        session.close()
 
     @pytest.mark.asyncio
-    @patch("src.rss.fetcher.get_db")
-    async def test_fetch_and_store_feed_not_found(self, mock_get_db):
-        """Should return error for non-existent feed"""
-        mock_db = MagicMock()
-        mock_get_db.return_value.__enter__ = MagicMock(return_value=mock_db)
-        mock_get_db.return_value.__exit__ = MagicMock(return_value=False)
-        mock_db.query.return_value.filter.return_value.first.return_value = None
+    async def test_fetch_and_store_feed_refuses(self, db_pointed_at_test_engine):
+        """The call raises rather than returning a (success, count, error) tuple."""
+        db = db_pointed_at_test_engine
+        feed = RSSFeed(name="Test Feed", url="https://example.com/feed.rss", category="news")
+        db.add(feed)
+        db.commit()
 
         fetcher = RSSFetcher()
-
-        success, count, error = await fetcher.fetch_and_store_feed(999)
-
-        assert success is False
-        assert count == 0
-        assert "not found" in error
-
-        await fetcher.close()
+        try:
+            with pytest.raises(LegacyWritePathClosed, match="legacy RSS write path is closed"):
+                await fetcher.fetch_and_store_feed(feed.id)
+        finally:
+            await fetcher.close()
 
     @pytest.mark.asyncio
-    @patch("src.rss.fetcher.get_db")
-    async def test_fetch_and_store_inactive_feed(self, mock_get_db, mock_inactive_feed):
-        """Should return error for inactive feed"""
-        mock_db = MagicMock()
-        mock_get_db.return_value.__enter__ = MagicMock(return_value=mock_db)
-        mock_get_db.return_value.__exit__ = MagicMock(return_value=False)
-        mock_db.query.return_value.filter.return_value.first.return_value = mock_inactive_feed
+    async def test_the_refused_call_writes_no_article_and_no_observation(
+        self, db_pointed_at_test_engine
+    ):
+        """
+        Articles and observations both stay at zero -- in step, at zero.
+
+        The failure this guards against is not "it errors", it is "it errors
+        after inserting", which would leave exactly the unroutable rows the
+        task exists to prevent.
+        """
+        db = db_pointed_at_test_engine
+        feed = RSSFeed(name="Test Feed", url="https://example.com/feed.rss", category="news")
+        db.add(feed)
+        db.commit()
+        assert db.query(Article).count() == 0
+        assert db.query(Observation).count() == 0
 
         fetcher = RSSFetcher()
+        try:
+            with pytest.raises(LegacyWritePathClosed):
+                await fetcher.fetch_and_store_feed(feed.id)
+        finally:
+            await fetcher.close()
 
-        success, count, error = await fetcher.fetch_and_store_feed(2)
+        db.expire_all()
+        assert db.query(Article).count() == 0
+        assert db.query(Observation).count() == 0
 
-        assert success is False
-        assert "inactive" in error
+    @pytest.mark.asyncio
+    async def test_the_refused_call_does_not_touch_the_feed_row(self, db_pointed_at_test_engine):
+        """
+        No last_fetched stamp and no error_count bump.
+
+        The old path counted failures toward auto-deactivation at ten. A closed
+        path that still incremented that counter would quietly disable every
+        feed in the table after ten attempts.
+        """
+        db = db_pointed_at_test_engine
+        feed = RSSFeed(name="Test Feed", url="https://example.com/feed.rss", category="news")
+        db.add(feed)
+        db.commit()
+
+        fetcher = RSSFetcher()
+        try:
+            for _ in range(3):
+                with pytest.raises(LegacyWritePathClosed):
+                    await fetcher.fetch_and_store_feed(feed.id)
+        finally:
+            await fetcher.close()
+
+        db.expire_all()
+        stored = db.query(RSSFeed).one()
+        assert stored.last_fetched is None
+        assert stored.error_count == 0
+        assert stored.is_active is True
+
+    def test_the_error_names_the_supported_replacement(self):
+        """A refusal that does not say what to use instead is a dead end."""
+        assert "store_items" in LEGACY_PATH_MESSAGE
+        assert "RSSAdapter" in LEGACY_PATH_MESSAGE
+
+    @pytest.mark.asyncio
+    async def test_reading_a_feed_still_works(self, sample_rss_response):
+        """
+        Only the write is closed. fetch_feed and normalize_article are what
+        src/sources/rss_adapter.py uses, and they are untouched.
+        """
+        fetcher = RSSFetcher()
+
+        with patch.object(fetcher.session, "get", new_callable=AsyncMock) as mock_get:
+            mock_response = MagicMock()
+            mock_response.content = sample_rss_response
+            mock_response.raise_for_status = MagicMock()
+            mock_get.return_value = mock_response
+
+            success, feed_data, error = await fetcher.fetch_feed("https://example.com/feed.rss")
+
+        assert success is True
+        assert len(feed_data.entries) == 2
+        assert error is None
 
         await fetcher.close()
 

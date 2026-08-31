@@ -197,6 +197,30 @@ class TestImmutability:
         assert test_session.query(Observation).count() == 1
 
 
+def modules_constructing(class_name: str, allowed_relative_paths: set[str]) -> list[str]:
+    """
+    Every module under src/ that constructs ``class_name``, minus the allowed set.
+
+    A tree grep rather than an import-graph walk, because what is being
+    defended against is someone *adding* a construction site, and a new file is
+    exactly what an import graph rooted at today's entry points would miss.
+    ``\\b`` before the name keeps ``NewArticle(`` from matching while still
+    catching the qualified ``models.Article(`` form.
+    """
+    import re
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[2] / "src"
+    allowed = {root / relative for relative in allowed_relative_paths}
+    pattern = re.compile(rf"\b{class_name}\(")
+
+    return [
+        str(path.relative_to(root))
+        for path in sorted(root.rglob("*.py"))
+        if path not in allowed and pattern.search(path.read_text(encoding="utf-8"))
+    ]
+
+
 class TestOneWritePath:
     def test_only_the_observation_module_constructs_an_observation(self):
         """
@@ -207,19 +231,45 @@ class TestOneWritePath:
         rather than trusted. src/database/models.py is excluded because that is
         where the class is defined.
         """
-        from pathlib import Path
-
-        root = Path(__file__).resolve().parents[2] / "src"
-        allowed = {root / "sources" / "observation.py", root / "database" / "models.py"}
-
-        offenders = [
-            str(path.relative_to(root))
-            for path in sorted(root.rglob("*.py"))
-            if path not in allowed and "Observation(" in path.read_text(encoding="utf-8")
-        ]
+        offenders = modules_constructing(
+            "Observation", {"sources/observation.py", "database/models.py"}
+        )
         assert offenders == [], (
             f"these modules construct an Observation directly: {offenders}. "
             f"Every write goes through src/sources/observation.py::store_observation."
+        )
+
+    def test_only_the_store_module_constructs_an_article(self):
+        """
+        The other half of the same invariant, added 2026-08-31 for task 025.
+
+        Task 014 pinned the observation write to one path, but an *article* can
+        be written without one, and until this task ``src/rss/fetcher.py`` did
+        exactly that. Pinning the article write to ``store_items`` -- the one
+        function that writes the observation in the same transaction -- is what
+        makes "no article exists without an observation" a property of the code
+        instead of a rule someone has to remember. Reintroducing a second
+        article-writing path anywhere under src/ fails here.
+
+        What this checks is the *construction* site, not the ``session.add``
+        site, and that is deliberate: construction is the narrower chokepoint.
+        A module cannot insert an unobserved article without first obtaining an
+        ``Article``, and store_items is the only place under src/ allowed to
+        make one -- and it writes the Observation beside it before returning,
+        never handing the instance out. So a helper that merely adds an Article
+        it was passed (``src/processors/normalizer.py::ArticleStorage``, which
+        has no caller) cannot be fed an unobserved row without tripping this
+        test first. Grepping for adds instead would be brittle -- ``db.add(x)``
+        does not say what ``x`` is -- and would not be the real constraint.
+
+        src/database/models.py is excluded because it declares the class.
+        """
+        offenders = modules_constructing("Article", {"sources/store.py", "database/models.py"})
+        assert offenders == [], (
+            f"these modules construct an Article directly: {offenders}. "
+            f"Every article write goes through src/sources/store.py::store_items, "
+            f"which writes the article and its Observation in one transaction. "
+            f"See src/rss/fetcher.py::LegacyWritePathClosed for why."
         )
 
     def test_the_adapter_store_path_writes_an_observation_per_article(self, test_session, source):

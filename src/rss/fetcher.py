@@ -5,14 +5,41 @@ from datetime import datetime
 import feedparser
 import httpx
 from bs4 import BeautifulSoup
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from src.database.connection import get_db
-from src.database.models import Article, RSSFeed
-from src.utils import utcnow
+from src.database.models import RSSFeed
 
 logger = logging.getLogger(__name__)
+
+
+class LegacyWritePathClosed(RuntimeError):
+    """
+    Raised by the legacy RSS storage entry points, which no longer write.
+
+    Closed 2026-08-31 for backlog task 025. ``RSSFetcher.fetch_and_store_feed``
+    used to insert ``Article`` rows itself, which was the one remaining way to
+    grow the corpus without also writing the ``Observation`` that task 014 made
+    the authoritative record. An article stored that way can never be routed --
+    routing reads observations -- and nothing surfaces the gap: the corpus
+    grows and the coverage hole looks like a source problem.
+
+    It is closed rather than rewired because the work it did is already done
+    correctly elsewhere: ``src/sources/rss_adapter.py`` reads the same feed
+    through the same normalizer and stores through ``src/sources/store.py``,
+    which writes the article and the observation in one transaction. Wiring
+    this second entry point into ``store_items`` would have preserved a
+    duplicate ingestion path that must be kept in step with the adapter path
+    forever, for no caller. Reading a feed is unaffected: ``fetch_feed`` and
+    ``normalize_article`` are untouched and are what the adapter uses.
+    """
+
+
+LEGACY_PATH_MESSAGE = (
+    "The legacy RSS write path is closed (backlog task 025). It wrote articles "
+    "without observations, which Tier 1 routing cannot see. Ingest through "
+    "src/sources: RSSAdapter reads the feed and src.sources.store.store_items "
+    "writes the article and its observation in one transaction."
+)
 
 
 class RSSFetcher:
@@ -117,126 +144,22 @@ class RSSFetcher:
 
         return clean_text
 
-    async def fetch_and_store_feed(self, feed_id: int) -> tuple[bool, int, str | None]:
+    # ARG002: feed_id is unused on purpose. The parameter is kept so an existing
+    # caller reaches the refusal rather than a TypeError, which would read as a
+    # signature change rather than as a closed path (2026-08-31, task 025).
+    async def fetch_and_store_feed(self, feed_id: int) -> tuple[bool, int, str | None]:  # noqa: ARG002
         """
-        Fetch a specific feed and store articles in database with enhanced retry logic
-        Returns: (success, articles_count, error_message)
+        Closed. Always raises :class:`LegacyWritePathClosed`; stores nothing.
+
+        The signature is kept so that a caller outside this repository -- a
+        cron entry or a shell script -- fails loudly at the call site with a
+        message naming the replacement, rather than silently importing a name
+        that vanished or, worse, continuing to write observation-less articles.
+        Nothing is read and no session is opened before the raise, so a call
+        cannot touch the database at all: in particular it cannot stamp
+        ``last_fetched`` or increment ``error_count`` toward auto-deactivation.
         """
-        with get_db() as db:
-            feed = db.query(RSSFeed).filter(RSSFeed.id == feed_id).first()
-            if not feed:
-                return False, 0, f"Feed with ID {feed_id} not found"
-
-            if not feed.is_active:
-                return False, 0, f"Feed {feed.name} is inactive"
-
-            # Enhanced retry logic with exponential backoff
-            success, feed_data, error = await self._fetch_with_retry(feed.url, feed.name)
-
-            # Update feed status
-            feed.last_fetched = utcnow()
-
-            if not success:
-                feed.last_error = error
-                feed.error_count += 1
-
-                # Auto-deactivate feeds with too many consecutive errors
-                if feed.error_count >= 10:
-                    feed.is_active = False
-                    logger.warning(
-                        f"Auto-deactivated feed {feed.name} after {feed.error_count} consecutive errors"
-                    )
-
-                db.commit()
-                return False, 0, error
-
-            # Reset error count on success
-            if feed.error_count > 0:
-                logger.info(f"Feed {feed.name} recovered after {feed.error_count} errors")
-            feed.error_count = 0
-            feed.last_error = None
-
-            # Process articles
-            articles_count = 0
-            articles_with_errors = 0
-            duplicates_skipped = 0
-
-            for entry in feed_data.entries:
-                try:
-                    article_data = self.normalize_article(entry, feed_data.feed)
-
-                    # Skip articles with insufficient data
-                    if not article_data.get("title") or not article_data.get("guid"):
-                        continue
-
-                    # Check if article already exists (improved deduplication check)
-                    existing = (
-                        db.query(Article)
-                        .filter(Article.feed_id == feed.id, Article.guid == article_data["guid"])
-                        .first()
-                    )
-
-                    if not existing:
-                        article = Article(feed_id=feed.id, **article_data)
-                        db.add(article)
-                        articles_count += 1
-                    else:
-                        duplicates_skipped += 1
-
-                except Exception as e:
-                    articles_with_errors += 1
-                    logger.error(f"Error processing article from {feed.name}: {e}")
-                    if articles_with_errors > 5:  # Stop processing if too many article errors
-                        logger.error(
-                            f"Too many article processing errors for {feed.name}, stopping"
-                        )
-                        break
-                    continue
-
-            # Commit with integrity error handling
-            try:
-                db.commit()
-            except IntegrityError:
-                db.rollback()
-                logger.warning(
-                    f"Duplicate articles detected in {feed.name} during commit, skipping duplicates"
-                )
-                # Re-process articles one by one to identify duplicates
-                articles_count = 0
-                for entry in feed_data.entries:
-                    try:
-                        article_data = self.normalize_article(entry, feed_data.feed)
-                        if not article_data.get("title") or not article_data.get("guid"):
-                            continue
-
-                        existing = (
-                            db.query(Article)
-                            .filter(
-                                Article.feed_id == feed.id, Article.guid == article_data["guid"]
-                            )
-                            .first()
-                        )
-
-                        if not existing:
-                            article = Article(feed_id=feed.id, **article_data)
-                            db.add(article)
-                            try:
-                                db.commit()
-                                articles_count += 1
-                            except IntegrityError:
-                                db.rollback()
-                                duplicates_skipped += 1
-                    except Exception:
-                        continue
-
-            log_msg = f"Processed {articles_count} new articles from {feed.name}"
-            if duplicates_skipped > 0:
-                log_msg += f" ({duplicates_skipped} duplicates skipped)"
-            if articles_with_errors > 0:
-                log_msg += f" ({articles_with_errors} errors)"
-
-            logger.info(log_msg)
-            return True, articles_count, None
+        raise LegacyWritePathClosed(LEGACY_PATH_MESSAGE)
 
     async def _fetch_with_retry(
         self, url: str, feed_name: str
