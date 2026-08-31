@@ -187,6 +187,15 @@ def sync_watches(session: Any, watches: list[Watch]) -> dict[str, list[str]]:
 
     Takes already-validated :class:`Watch` values, so an invalid file cannot
     reach this function at all.
+
+
+    Removing a watch from the file deletes its row. That is correct while this
+    table holds nothing derived -- the file is the source of truth and a watch
+    you deleted is a watch you stopped holding. **Task 017 hangs belief history
+    off these rows**, and at that point a delete destroys the record of what you
+    believed and when, which is the calibration data the system exists to
+    accumulate. Revisit this before 017 lands: the likely answer is a soft
+    retire rather than a delete. Noted 2026-08-31 (task 013).
     """
     from src.database.models import Watch as WatchRow
 
