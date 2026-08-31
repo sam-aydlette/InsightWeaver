@@ -18,9 +18,27 @@ how `user_profile.json` is already handled.
 
 **Quarterly review degrades visibly rather than suppressing alerts** (task 024, unchanged).
 
+**Beats and questions are removed; Position replaces them.** Q5 below is answered: none of the
+beat, question, prediction, standing-agenda or institutional-activity machinery ports as a concept.
+Five modules port as *mechanics* -- see task 012 -- because they encode findings that cost real
+debugging, not because their concepts survive.
+
+**The old code is deleted, not archived.** Git history is the rollback path; a directory of dead
+code in the tree reads as current to every future reader and drags the old product's shape forward.
+Task 012 is rewritten accordingly and is now sized **large**: ~8,900 lines of source plus most of
+844 tests.
+
+**Persistence is no longer blocking.** The operator's call is to proceed and settle it later.
+**Working assumption: SQLite in S3 behind the single-writer Lambda**, on shape rather than price --
+one user, one daily invocation, and the concurrency it cannot handle is concurrency this system
+does not have. Task 020's BLOCKED-ON is cleared; the choice is revisitable before deployment and
+the cost comparison remains unverified, which is recorded rather than resolved.
+
 ---
 
-## Q1 -- Persistence. Blocks task 020. **I could not verify pricing and will not estimate it.**
+## Q1 -- ANSWERED 2026-08-31: not blocking; SQLite in S3 as the working assumption, revisitable.
+
+### Original question, kept because the pricing is still unverified
 
 The brief asks for the trade-off with current pricing verified. I could not obtain it:
 `https://aws.amazon.com/rds/postgresql/pricing/` renders its figures in interactive elements that
@@ -72,7 +90,9 @@ decision" a query; the string is faster to author and does not force Position st
 acceptance in task 013 currently assumes the key, because an invariant enforced only by prose is
 the pattern this repository has been correcting all week. Confirm or overrule.
 
-## Q5 -- What happens to the beat, questions, predictions and calibration machinery?
+## Q5 -- ANSWERED 2026-08-31: removed. Position replaces them. See the block above.
+
+### Original question, kept for the reasoning
 
 Tasks 004-011 shipped beats, standing questions, institutional activity, coverage probes and the
 operator calibration loop -- roughly 2,400 lines with 844 tests behind them. Some maps onto the new
