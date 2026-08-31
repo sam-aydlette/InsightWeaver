@@ -1,4 +1,4 @@
-.PHONY: help install install-dev test lint format fmt typecheck check pre-commit clean clean-all coverage db-drop-briefing update-deps
+.PHONY: help install install-dev test lint format fmt typecheck check pre-commit clean clean-all coverage db-add-watches db-drop-briefing update-deps
 
 # Tool resolution (added 2026-08-24).
 # Before this, every recipe called bare `pytest` / `ruff` / `mypy`, which only
@@ -44,6 +44,7 @@ help:
 	@echo "  make check           Run all checks (lint + typecheck + test)"
 	@echo ""
 	@echo "Database:"
+	@echo "  make db-add-watches    Create the watches table (additive, safe)"
 	@echo "  make db-drop-briefing  Drop the deleted briefing product's tables"
 	@echo "                         (DESTRUCTIVE; captures to a dump first)"
 	@echo ""
@@ -112,6 +113,12 @@ clean:
 clean-all: clean
 	rm -rf venv/
 	rm -rf .venv/
+
+# Additive: creates the watches table if it is absent and prints that it did
+# nothing if it is not. No --confirm, because nothing here can lose data; the
+# --down direction can, and requires one. (2026-08-31, backlog task 013.)
+db-add-watches:
+	$(PYTHON) -m src.database.migrations.add_watches_table
 
 # Deliberately does NOT pass --confirm. The migration refuses without it, so
 # running this target prints what it would destroy and stops; the operator types

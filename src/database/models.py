@@ -1,7 +1,8 @@
 """
 Database models.
 
-Two tables: the feeds we read and the articles we stored from them.
+Three tables: the feeds we read, the articles we stored from them, and the
+watches the operator has pre-registered.
 
 Everything else was deleted by backlog task 012 along with the briefing product
 that owned it -- syntheses, context snapshots, provenance, topic clusters,
@@ -13,12 +14,17 @@ rewrite removed.
 ``articles`` is deliberately untouched. It holds the corpus (55,249 rows as of
 2026-08-31) and what becomes of it is backlog task 014's decision, not this
 one's.
+
+``watches`` is the first table of the rewrite, added 2026-08-31 by backlog task
+013. Its CHECK constraints are not decoration -- see the class docstring.
 """
 
 from sqlalchemy import (
     JSON,
     Boolean,
+    CheckConstraint,
     Column,
+    Date,
     DateTime,
     Float,
     ForeignKey,
@@ -113,4 +119,62 @@ class Article(Base):
         # dropping an index is a separate, measurable decision.
         Index("idx_articles_filtered_fetched", "filtered", "fetched_at"),
         Index("idx_articles_filtered_published", "filtered", "published_date"),
+    )
+
+
+class Watch(Base):
+    """
+    One pre-registered claim, the decision it serves, and what would move it.
+
+    Rows arrive from exactly one place: ``src.position.watches.sync_watches``,
+    reading the operator's hand-authored file. Nothing else writes here.
+    Invariant 6 -- the system never authors its own watches -- is a property of
+    the code paths that exist, so no path exists.
+
+    **The constraints are the enforcement, not a formality.** Invariant 2 says
+    every Watch must name a decision; the loader rejects a blank ``so_what``,
+    and ``ck_watches_so_what_present`` rejects it again at the storage layer, so
+    a row written by hand through ``sqlite3`` fails the same way a bad YAML file
+    does. The repository's own history is the argument: 25 unfalsifiable
+    predictions accumulated in the deleted ledger because a missing field was
+    tolerated by every layer that could have refused it.
+
+    ``triggers`` is JSON, and structured JSON specifically -- a list of clauses
+    over terms, entities and source allowlists. Tier 1 compiles it into a
+    deterministic predicate. The column it replaces, ``predictions.
+    trigger_condition``, was free text; 33 rows were written against it and none
+    were ever graded, because nothing downstream could evaluate a sentence.
+    """
+
+    __tablename__ = "watches"
+
+    # The operator's own id from the file, not a surrogate. It is the name they
+    # will type and the name an alert will carry, and a watch that is renamed in
+    # the file is a different watch.
+    id = Column(String(100), primary_key=True)
+
+    claim = Column(Text, nullable=False)
+    belief = Column(Float, nullable=False)
+
+    # so_what, split: the key is what makes invariant 2 machine-checkable, the
+    # prose is what makes it readable. `decision_key` references a decision in
+    # the Position file, which is not a table -- Position lives in a private
+    # repo under git, so this is deliberately not a foreign key.
+    decision_key = Column(String(100), nullable=False)
+    so_what = Column(Text, nullable=False)
+
+    triggers = Column(JSON, nullable=False)
+    expires = Column(Date, nullable=False)
+    staleness_alert_days = Column(Integer, nullable=False)
+
+    created_at = Column(DateTime, default=utcnow)
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
+
+    __table_args__ = (
+        CheckConstraint("length(trim(so_what)) > 0", name="ck_watches_so_what_present"),
+        CheckConstraint("length(trim(decision_key)) > 0", name="ck_watches_decision_present"),
+        CheckConstraint("belief >= 0.0 AND belief <= 1.0", name="ck_watches_belief_range"),
+        CheckConstraint("staleness_alert_days >= 1", name="ck_watches_staleness_min"),
+        Index("idx_watches_decision_key", "decision_key"),
+        Index("idx_watches_expires", "expires"),
     )

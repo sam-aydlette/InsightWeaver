@@ -18,7 +18,7 @@ class TestCliGroup:
 
         assert result.exit_code == 0
         assert "InsightWeaver" in result.output
-        assert "RSS feed ingestion" in result.output
+        assert "monitoring against pre-registered watches" in result.output
 
     def test_cli_version(self, cli_runner):
         """Should show version"""
@@ -58,6 +58,23 @@ class TestSubcommandRegistration:
 
         assert result.exit_code == 0
         assert "list" in result.output.lower()
+
+    def test_watch_command_registered(self, cli_runner):
+        """Should have watch command registered (backlog task 013)"""
+        result = cli_runner.invoke(cli, ["watch", "--help"])
+
+        assert result.exit_code == 0
+        assert "list" in result.output.lower()
+        assert "sync" in result.output.lower()
+
+    def test_watch_has_no_add_subcommand(self, cli_runner):
+        """
+        Invariant 6: the system never authors its own watches.
+
+        Asserted here as well as in tests/cli/test_watch_cli.py because this is
+        the file someone reads when adding a command.
+        """
+        assert "add" not in cli.commands["watch"].commands
 
     @pytest.mark.parametrize(
         "gone",

@@ -24,6 +24,20 @@ class Settings(BaseSettings):
     data_dir: Path = project_root / "data"
     logs_dir: Path = project_root / "src" / "logs"
 
+    # Position and the watch set are hand-authored and live in the operator's
+    # *private* repository -- they name real decisions, deadlines and exposures
+    # and this repo is public. The defaults deliberately point outside any
+    # checkout so that a missing configuration cannot resolve to a file in the
+    # tree. This repo carries config/position.example.yaml and
+    # config/watches.example.yaml, and .gitignore refuses the real ones.
+    # (2026-08-31, backlog task 013.)
+    position_path: Path = Path(
+        os.getenv("POSITION_PATH", "~/.config/insightweaver/position.yaml")
+    ).expanduser()
+    watches_path: Path = Path(
+        os.getenv("WATCHES_PATH", "~/.config/insightweaver/watches.yaml")
+    ).expanduser()
+
     class Config:
         env_file = ".env"
         case_sensitive = False

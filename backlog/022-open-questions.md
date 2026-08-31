@@ -61,7 +61,17 @@ has no partial-failure story, and that migrating off it later is real work.
 **To answer:** either grant `pricing:GetProducts` and I will produce the figures, or choose on
 shape and accept that the cost comparison is unverified.
 
-## Q2 -- Watch versus the existing Decision + Factor model. Blocks task 013.
+## Q2 -- Watch versus the existing Decision + Factor model. Answered by events; confirm or overrule.
+
+**What task 013 built, 2026-08-31.** Task 012 landed first and dropped `decisions`,
+`decision_factors` and `decision_evidence`, all at 0 rows -- so there was nothing left to evolve
+and the question became "clean shape or resurrection". 013 built `watches` as a new table and put
+Decision in **Position**, not in the database: a decision is an operator commitment held in a
+hand-edited file under git, not a row the system writes. That leaves one model of the idea, not
+two. `belief` is a float and `triggers` is structured, which is the part of the old model worth
+not repeating. Overrule this and 013 is the task to revisit.
+
+### Original question
 
 The audit found the repository already models most of Watch, and has never used it:
 `decision_factors.what_would_update_me` is a trigger, `.current_state_note` is a belief state,
@@ -81,7 +91,15 @@ choice on its merits. But it is a schema decision with migration consequences an
 in six months). I have no recommendation strong enough to make silently; the task file requires the
 implementer to state the rule, but if you have a preference it belongs here first.
 
-## Q4 -- The `so_what` -> decision link. Blocks task 013.
+## Q4 -- The `so_what` -> decision link. Built as the key; confirm or overrule.
+
+**What task 013 built, 2026-08-31.** The key, with the prose as an annotation, as the acceptance
+assumed: `so_what` is a mapping of `decision` (a key into the Position's `decisions`) and
+`because` (the sentence naming what changes). A watch whose `decision` names nothing in the
+Position is rejected at load and not stored. The prose is still required and still non-empty --
+the key alone would make the invariant checkable and unreadable.
+
+### Original question
 
 Invariant 2 requires every Watch to name a specific decision. Should that be a **free-text
 `so_what` string**, or a **foreign key into the Position's decisions** with the prose as an
