@@ -7,6 +7,19 @@ OUT OF SCOPE: guessing any of them.
 ---
 Written 2026-08-31.
 
+## ANSWERED 2026-08-31
+
+**Position lives in a separate private repository.** Not primarily for safety -- a gitignore
+mostly holds -- but because Position must be under version control and cannot be public. The
+quarterly review's value is the diff: what did I believe last quarter, which decisions closed,
+which watches stopped mattering. Gitignoring the file means no history, and the outermost loop
+loses the thing that makes it a loop. The public repo carries the schema and an example, matching
+how `user_profile.json` is already handled.
+
+**Quarterly review degrades visibly rather than suppressing alerts** (task 024, unchanged).
+
+---
+
 ## Q1 -- Persistence. Blocks task 020. **I could not verify pricing and will not estimate it.**
 
 The brief asks for the trade-off with current pricing verified. I could not obtain it:
