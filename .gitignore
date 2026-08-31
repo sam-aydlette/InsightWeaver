@@ -1,6 +1,17 @@
 # Environment variables
 .env
 
+# Position and the watch set (backlog task 013, 2026-08-31).
+# These name real decisions, deadlines, exposures and beliefs. They belong in
+# the operator's PRIVATE repo -- under version control there, because the
+# quarterly review's value is the diff -- and never in this public one. Point
+# POSITION_PATH / WATCHES_PATH at them; the defaults live outside any checkout.
+# The *.example.yaml files in config/ are committed and are not matched here.
+/position.yaml
+/watches.yaml
+config/position.yaml
+config/watches.yaml
+
 # User profile and personal configuration (contains personal information)
 config/user_profile.json
 config/context_modules/core/decision_context.json

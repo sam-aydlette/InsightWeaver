@@ -1,0 +1,94 @@
+# Watches -- EXAMPLE ONLY.
+#
+# Like Position, the real file lives in your private repo. Point WATCHES_PATH at
+# it; the default is ~/.config/insightweaver/watches.yaml.
+#
+# A watch is one claim you have pre-registered, the decision it serves, and what
+# would count as evidence. Nothing but this file creates a watch. There is no
+# `watch add` command and there is no path from a model response to a row in the
+# watches table -- the system never authors its own watches (invariant 6).
+#
+# Every field is required and none of them defaults:
+#
+#   id                    slug; the name an alert will carry
+#   claim                 the thing that is or is not true, written so you could
+#                         tell afterwards which it was
+#   belief                your probability now, 0.0 to 1.0
+#   so_what.decision      a key from position.yaml -- not prose, a key, so that
+#                         "which watches serve this decision" is a query
+#   so_what.because       what changes for that decision if the claim resolves
+#   triggers              structured; see below
+#   expires               when the question stops mattering
+#   staleness_alert_days  after how much silence the silence is itself the
+#                         finding. Accepts a whole number of days or a cadence
+#                         string ("30d", "2w", "3m", "1y").
+#
+# ON TRIGGERS, which is the field people get wrong:
+#
+# `triggers` is a list of clauses, and a clause is a mapping over `terms`,
+# `entities` and `sources`. It is NOT a sentence. Within a clause, every field
+# you populate must match (AND) and any value within a field will do (OR);
+# across clauses, any clause firing fires the watch. So the shape is a
+# disjunction of conjunctions, which Tier 1 compiles into word-boundary regexes
+# and a source-membership test with no model involved anywhere.
+#
+# The reason the loader rejects prose here rather than storing it: the deleted
+# prediction ledger had a free-text `trigger_condition`, 33 rows were written
+# against it, and none of them were ever graded, because nothing downstream
+# could evaluate a sentence. A trigger you cannot compile is a trigger that
+# never fires.
+
+version: 1
+
+watches:
+  - id: fedramp-conmon-scope-expands
+    claim: >
+      FedRAMP expands continuous-monitoring requirements for Moderate systems in
+      a way that adds recurring work, before the 2027 assessment window.
+    belief: 0.35
+    so_what:
+      decision: fedramp-authorization-renewal
+      because: >
+        Scope expansion moves renewal from two engineer-quarters to three or
+        more, which is the point at which lapsing becomes the cheaper option.
+    triggers:
+      - entities: [FedRAMP PMO, GSA]
+        terms: [continuous monitoring, ConMon, significant change]
+      - sources: [Federal Register]
+        terms: [FedRAMP]
+    expires: 2027-03-31
+    staleness_alert_days: 30
+
+  - id: fedramp-20x-supersedes-rev5
+    claim: >
+      The FedRAMP 20x program replaces the Rev 5 baseline for new
+      authorizations, rather than running alongside it.
+    belief: 0.45
+    so_what:
+      decision: fedramp-authorization-renewal
+      because: >
+        If 20x supersedes rather than supplements, the renewal is a
+        re-authorization against a different baseline and the estimate is wrong
+        by a factor, not a margin.
+    triggers:
+      - terms: [FedRAMP 20x, Rev 5, revision 5]
+        entities: [FedRAMP PMO]
+    expires: 2027-06-30
+    staleness_alert_days: 3w
+
+  - id: compliance-hiring-market-tightens
+    claim: >
+      Median time-to-hire for a compliance engineer in the DC market exceeds 90
+      days through the end of 2026.
+    belief: 0.6
+    so_what:
+      decision: hire-compliance-engineer
+      because: >
+        A 90-day search started in December lands after the assessment window
+        opens, which converts "hire later if needed" into "do not hire".
+    triggers:
+      - terms: [time to hire, compliance engineer, GRC hiring]
+      - entities: [OPM]
+        terms: [cyber workforce, hiring authority]
+    expires: 2026-12-15
+    staleness_alert_days: 45

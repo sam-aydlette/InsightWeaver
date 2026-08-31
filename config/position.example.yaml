@@ -1,0 +1,52 @@
+# Position -- EXAMPLE ONLY.
+#
+# Your real Position does not live in this repository. It names real decisions,
+# real deadlines and real exposures, and this repo is public. Keep it in a
+# private repo under git -- under git because the quarterly review's value is
+# the diff -- and point POSITION_PATH at it:
+#
+#     export POSITION_PATH=~/src/position/position.yaml
+#
+# The default, if you set nothing, is ~/.config/insightweaver/position.yaml.
+# .gitignore in this repo refuses a real position.yaml, but the gitignore is a
+# seatbelt, not the seat.
+#
+# The rule this file is written against: a Position holds *stakes*, not
+# interests. A stake has a date by which you must have decided, and something
+# that is worse if you decide wrong. If you cannot write the deadline, it is an
+# interest -- interesting, possibly important, and not what this system is for.
+# The loader refuses a decision with no deadline and warns, loudly, when the
+# whole file runs past two pages, because that is what drift looks like.
+
+version: 1
+
+# When you last sat down with this file. Task 024 turns this into the quarterly
+# review loop; for now it is a date you can read.
+reviewed: 2026-08-31
+
+decisions:
+  - key: fedramp-authorization-renewal
+    name: Renew the platform's FedRAMP Moderate authorization, or let it lapse
+    deadline: 2027-03-31
+    stake: >
+      Renewal costs roughly two engineer-quarters of continuous-monitoring work.
+      Letting it lapse closes the federal pipeline, which was 40% of last year's
+      revenue. The decision has to be made before the annual assessment window
+      opens, not after the invoice arrives.
+
+  - key: hire-compliance-engineer
+    name: Hire a dedicated compliance engineer, or keep the work distributed
+    deadline: 2026-12-15
+    stake: >
+      If continuous-monitoring scope grows, the distributed arrangement stops
+      working and the failure mode is a missed POA&M deadline nobody owns.
+      Hiring ahead of that costs a salary against uncertain need; hiring after
+      it costs an authorization.
+
+  - key: second-cloud-region
+    name: Commit to a second cloud region for the government workload
+    deadline: 2027-01-31
+    stake: >
+      A second region is the only way to meet the availability commitment in the
+      renewal, and standing one up takes a quarter. Deciding in February means
+      deciding not to.

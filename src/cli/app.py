@@ -20,6 +20,7 @@ import click
 from .colors import accent, header, muted
 from .output import set_debug_mode
 from .sources import sources_command
+from .watch import watch_command
 
 # Maps command prefix to its Click command object.
 #
@@ -29,24 +30,39 @@ from .sources import sources_command
 # the ordering constraint still applies to whatever is added next.
 COMMAND_DISPATCH = {
     "sources": sources_command,
+    "watch": watch_command,
 }
 
 
 def print_command_refresher():
     """Print a short refresher of available commands."""
-    click.echo(f"\n{header('Commands:')} {accent('sources')} | help | exit\n")
+    click.echo(f"\n{header('Commands:')} {accent('sources')} | {accent('watch')} | help | exit\n")
 
 
 def print_help():
     """Print full help text for interactive mode."""
     click.echo(header("Available commands:"))
     click.echo(f"  {accent('sources')}             - Inspect configured feeds and what they hold")
+    click.echo(
+        f"  {accent('watch')}               - Pre-registered watches and the decisions they serve"
+    )
     click.echo(f"  {accent('help')}                - Show this help message")
     click.echo(f"  {accent('exit')}                - Exit InsightWeaver")
     click.echo()
     click.echo(header("Sources command:"))
     click.echo(f"  {accent('sources list')}             - All feeds with stored-article counts")
     click.echo(f"  {accent('sources show')} <name>      - Detailed view for one feed")
+    click.echo()
+    click.echo(header("Watch command:"))
+    click.echo(
+        f"  {accent('watch list')}               - Each watch, belief, decision, days to expiry"
+    )
+    click.echo(
+        f"  {accent('watch sync')}               - Load the hand-authored Position and watch files"
+    )
+    click.echo(
+        muted("  Watches are only ever created from those files -- there is no 'watch add'.")
+    )
     click.echo()
     click.echo(muted("Tip: Add --debug to any command to see detailed logs"))
     click.echo()
@@ -154,10 +170,10 @@ def interactive_mode():
 @click.version_option(version="1.0.0", prog_name="InsightWeaver")
 def cli(ctx, debug):
     """
-    InsightWeaver - RSS feed ingestion and source inspection.
+    InsightWeaver - monitoring against pre-registered watches.
 
     The briefing product was removed in backlog task 012. What remains is
-    ingestion and the source layer.
+    ingestion, the source layer, and the Position/Watch units added by task 013.
     """
     set_debug_mode(debug)
     ctx.ensure_object(dict)
