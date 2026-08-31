@@ -19,6 +19,7 @@ import click
 
 from .colors import accent, header, muted
 from .output import set_debug_mode
+from .replay import replay_command
 from .sources import sources_command
 from .watch import watch_command
 
@@ -31,12 +32,16 @@ from .watch import watch_command
 COMMAND_DISPATCH = {
     "sources": sources_command,
     "watch": watch_command,
+    "replay": replay_command,
 }
 
 
 def print_command_refresher():
     """Print a short refresher of available commands."""
-    click.echo(f"\n{header('Commands:')} {accent('sources')} | {accent('watch')} | help | exit\n")
+    click.echo(
+        f"\n{header('Commands:')} {accent('sources')} | {accent('watch')} | "
+        f"{accent('replay')} | help | exit\n"
+    )
 
 
 def print_help():
@@ -45,6 +50,9 @@ def print_help():
     click.echo(f"  {accent('sources')}             - Inspect configured feeds and what they hold")
     click.echo(
         f"  {accent('watch')}               - Pre-registered watches and the decisions they serve"
+    )
+    click.echo(
+        f"  {accent('replay')}              - Rebuild Evidence from Observations and diff it"
     )
     click.echo(f"  {accent('help')}                - Show this help message")
     click.echo(f"  {accent('exit')}                - Exit InsightWeaver")
@@ -62,6 +70,12 @@ def print_help():
     )
     click.echo(
         muted("  Watches are only ever created from those files -- there is no 'watch add'.")
+    )
+    click.echo()
+    click.echo(header("Replay command:"))
+    click.echo(f"  {accent('replay --prompt-version X')}  - Rebuild Evidence for prompt version X")
+    click.echo(
+        muted("  Prints the diff against stored Evidence and writes nothing. --commit persists.")
     )
     click.echo()
     click.echo(muted("Tip: Add --debug to any command to see detailed logs"))

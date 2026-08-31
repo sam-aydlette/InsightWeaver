@@ -20,6 +20,22 @@ class Settings(BaseSettings):
         os.getenv("SMART_RSS_FETCH_THRESHOLD_MINUTES", "60")
     )
 
+    # How similar two observations' MinHash signatures must be before they are
+    # treated as the same item published twice. 0.7 was chosen against measured
+    # values rather than picked: on the two real corpus pairs in
+    # tests/sources/fixtures/near_duplicates.json, a genuine near-duplicate (the
+    # same press release carried by two Prince William feeds, differing only in
+    # byline and footer) scores 0.89, and the hardest distinct pair -- two
+    # different articles from the same publisher about the same county clerk's
+    # wedding events -- scores 0.016. 0.7 sits in the middle of that gap with
+    # room on both sides for text this suite has not seen.
+    #
+    # This is the *only* near-duplicate parameter that belongs in config. The
+    # signature width and shingle size are format, not preference; changing them
+    # silently invalidates every signature already stored, which is why they are
+    # constants in src/sources/minhash.py. (2026-08-31, backlog task 014.)
+    near_duplicate_threshold: float = float(os.getenv("NEAR_DUPLICATE_THRESHOLD", "0.7"))
+
     project_root: Path = Path(__file__).parent.parent.parent
     data_dir: Path = project_root / "data"
     logs_dir: Path = project_root / "src" / "logs"

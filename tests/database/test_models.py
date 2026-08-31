@@ -190,9 +190,16 @@ class TestSchemaBoundaries:
         ``create_tables()`` would recreate a concept the rewrite deleted, so the
         mapped set is pinned rather than left to review.
 
-        ``watches`` joined the set on 2026-08-31 (backlog task 013). Every
-        addition to this set should be a task that says so.
+        ``watches`` joined the set on 2026-08-31 (backlog task 013);
+        ``observations`` and ``evidence`` on 2026-08-31 (backlog task 014).
+        Every addition to this set should be a task that says so.
         """
         from src.database.models import Base
 
-        assert set(Base.metadata.tables) == {"rss_feeds", "articles", "watches"}
+        assert set(Base.metadata.tables) == {
+            "rss_feeds",
+            "articles",
+            "watches",
+            "observations",
+            "evidence",
+        }

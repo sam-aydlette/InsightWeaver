@@ -14,6 +14,20 @@ re-running over unchanged upstream content inserts zero rows. Proven in
 tests/sources/test_dedup.py rather than assumed.
 
 Added 2026-08-26 for backlog task 005.
+
+**Amended 2026-08-31 (backlog task 014): this is also where an Observation is
+written.** Every adapter run reaches the database here, so putting the
+observation write here -- and only here -- is what makes "adapters emit
+observations through one path" a property of the code rather than a rule to
+remember. The article row and the observation row are written in the same
+transaction, linked by ``observations.article_id``. See
+``src/database/models.py`` for the standing rule on ``articles`` versus
+``observations``.
+
+An already-stored article still gets its observation checked, not skipped: the
+two tables have independent identities (``(feed_id, guid)`` and a content hash),
+and a re-run that found the article present but the observation missing should
+write the observation rather than assume they agree.
 """
 
 from __future__ import annotations
@@ -26,6 +40,7 @@ from sqlalchemy.orm import Session
 from ..database.models import Article, RSSFeed
 from ..utils import utcnow
 from .base import RawItem
+from .observation import store_observation
 
 logger = logging.getLogger(__name__)
 
@@ -56,15 +71,20 @@ def store_items(db: Session, source: RSSFeed, items: Iterable[RawItem]) -> tuple
     """
     Insert items that this source has not already stored.
 
-    Returns ``(inserted, duplicates)``. Duplicates are found two ways: an
+    Returns ``(inserted, duplicates)``, counting *articles* -- the return shape
+    is unchanged from task 005 and its callers. Duplicates are found two ways: an
     existing row with the same ``(feed_id, guid)``, and a repeat within this
     batch (two Federal Register queries can return the same document). The
     ``_feed_guid_uc`` constraint is left as the backstop -- if it ever fires,
     something concurrent wrote the same guid and the caller should hear about
     it as an error rather than have it counted as a duplicate and forgotten.
+
+    Observations written are logged rather than returned, for that reason. The
+    count is a property of the observations table and is read from it.
     """
     inserted = 0
     duplicates = 0
+    observations = 0
 
     seen_in_batch: set[str] = set()
     for item in items:
@@ -80,13 +100,21 @@ def store_items(db: Session, source: RSSFeed, items: Iterable[RawItem]) -> tuple
         existing = (
             db.query(Article.id).filter(Article.feed_id == source.id, Article.guid == guid).first()
         )
-        if existing is not None:
+        if existing is None:
+            article = Article(feed_id=source.id, **fields)
+            db.add(article)
+            db.flush()
+            article_id = int(article.id)
+            inserted += 1
+        else:
+            article_id = int(existing[0])
             duplicates += 1
-            continue
 
-        db.add(Article(feed_id=source.id, **fields))
-        db.flush()
-        inserted += 1
+        _, created = store_observation(db, source, item, article_id=article_id)
+        observations += int(created)
+
+    if observations:
+        logger.info(f"{source.name}: stored {observations} new observation(s)")
 
     source.last_fetched = utcnow()  # type: ignore[assignment]
     source.last_error = None  # type: ignore[assignment]

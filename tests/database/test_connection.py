@@ -116,11 +116,18 @@ class TestCreateTables:
         inspector = inspect(engine)
         table_names = inspector.get_table_names()
 
-        # Exactly three, asserted as a set rather than a subset: backlog task
-        # 012 deleted nineteen models, and a subset check would pass again the
-        # moment one of them was reintroduced by accident. `watches` was added
-        # deliberately by task 013 (2026-08-31) and is the only addition since.
-        assert set(table_names) == {"rss_feeds", "articles", "watches"}
+        # Asserted as a set rather than a subset: backlog task 012 deleted
+        # nineteen models, and a subset check would pass again the moment one of
+        # them was reintroduced by accident. `watches` was added deliberately by
+        # task 013 (2026-08-31); `observations` and `evidence` by task 014 the
+        # same day. Every addition here should be a task that says so.
+        assert set(table_names) == {
+            "rss_feeds",
+            "articles",
+            "watches",
+            "observations",
+            "evidence",
+        }
 
     def test_create_tables_is_idempotent(self, tmp_path, mocker):
         """create_tables should be safe to call multiple times"""

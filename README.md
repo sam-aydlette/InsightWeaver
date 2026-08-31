@@ -522,6 +522,68 @@ beat can select it.
 
 ---
 
+## Observations, Evidence, and replay
+
+Added 2026-08-31 (`backlog/014`). Adjudication -- deciding whether an item bears
+on a pre-registered Watch -- is the only stochastic component in the system.
+Everything either side of it is deterministic and unit-testable. This layer is
+what makes the stochastic part reviewable: hold the inputs fixed, change the
+prompt, and diff the outputs.
+
+**Observations are immutable and content-addressed.** An observation is one
+thing a source published, keyed by a SHA-256 hash of the normalized adapter
+output. Nothing per-fetch is in the hashed payload -- not the fetch time, not a
+session id -- so re-fetching an unchanged document is a no-op rather than a
+second row. Once written, a row cannot be changed: an ORM update raises
+`ObservationIsImmutable`, and a `BEFORE UPDATE` trigger refuses an `UPDATE`
+issued from anywhere else, including the `sqlite3` shell.
+
+**Evidence is derived, and every row records the prompt version that produced
+it.** `evidence` links `(observation, watch)` with a direction and a magnitude.
+The `prompt_version` column is per row, not per run, so "where did this
+judgement come from" is answerable six weeks later.
+
+```bash
+# Rebuild v2's evidence and diff it against what v1 stored. Writes nothing.
+insightweaver replay --prompt-version v2 --against v1
+
+# Re-run v1 against its own stored rows. An empty diff is the reproducibility check.
+insightweaver replay --prompt-version v1
+
+# Persist. --commit is required; a replay that wrote by default would destroy
+# the before-state at the moment you wanted to compare against it.
+insightweaver replay --prompt-version v2 --commit
+```
+
+Replay needs no `ANTHROPIC_API_KEY`. The adjudicator is a plug-in seam
+(`src/evidence/adjudicator.py`); the adjudication prompt itself is a later task,
+and the only version this build ships is `null-v0`, which returns no verdicts.
+An adjudicator that guessed a direction from a keyword match would put
+fabricated judgements into the table whose whole purpose is to make judgements
+reviewable.
+
+**Near-duplicate detection.** Two feeds carrying the same wire story with
+different boilerplate have different content hashes, correctly. A MinHash
+signature over 5-word shingles is written beside each observation and groups
+them: `settings.near_duplicate_threshold` (default 0.7, `NEAR_DUPLICATE_THRESHOLD`)
+is the tunable. Measured on two real corpus pairs, a genuine near-duplicate
+scores 0.89 and the hardest distinct pair 0.016.
+
+**`observations` versus the 55,249-row `articles` table.** They coexist, with one
+stated rule: `articles` is the pre-rewrite archive and keeps the row shape the
+older code reads; `observations` is authoritative for everything built from task
+014 onward. Exactly one code path writes an observation
+(`src/sources/observation.py`, called from the adapter store path), and each new
+article gets an observation in the same transaction, linked by
+`observations.article_id`. The pre-existing rows have no observation and are not
+migrated -- the hash is a pure function of columns they already carry, so a
+backfill is mechanical and is left to its own task.
+
+Create the tables with `make db-add-observations` (additive; it does not touch
+`articles`).
+
+---
+
 ## Requirements
 
 - Python 3.10+
