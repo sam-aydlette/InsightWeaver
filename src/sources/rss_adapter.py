@@ -2,13 +2,17 @@
 The existing RSS fetcher, wrapped in the adapter contract.
 
 This module adds *no* behaviour: ``src/rss/fetcher.py`` is not modified and not
-subclassed, and the live pipeline still fetches feeds through
-``fetch_all_active_feeds`` exactly as before. What is new is a second way to
-*read* an RSS feed -- returning :class:`~src.sources.base.RawItem` values
-instead of writing rows -- so that RSS and the Federal Register API are the
-same kind of thing to any caller.
+subclassed. It offers a way to *read* an RSS feed -- returning
+:class:`~src.sources.base.RawItem` values instead of writing rows -- so that
+RSS and the Federal Register API are the same kind of thing to any caller.
 
-Added 2026-08-26 for backlog task 005.
+Added 2026-08-26 for backlog task 005. Corrected 2026-08-31: this used to say
+the live pipeline still fetched through ``fetch_all_active_feeds`` "exactly as
+before". That is no longer true and has not been since task 025 -- both it and
+``RSSFetcher.fetch_and_store_feed`` now raise, because they wrote articles with
+no observation and Tier 1 routing cannot see those. **This adapter, through
+``src.sources.store.store_items``, is the only way an RSS article enters the
+corpus.**
 """
 
 from __future__ import annotations

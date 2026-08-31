@@ -15,3 +15,45 @@ rather than news volume -- is actually enforced. Tiers 2 through 4 can only pres
 in production metrics is one that regresses between releases and is noticed at the invoice. A test
 asserting that N observations against M watches routes fewer than K makes the property a gate.
 Pick K from a measured baseline, not from intuition, and record how it was measured.
+
+---
+
+## Done 2026-08-31 (branch `task/015-routing`)
+
+Built `src/routing/` (predicate, router, salience, gaps), `src/cli/route.py`,
+the `route_candidates` table and its migration. `make check` exits 0 and
+`env -u ANTHROPIC_API_KEY pytest tests/ -q` exits 0 (730 passed).
+
+**K = 20, measured, not guessed.** The ceiling fixture is 1,000 *real* articles
+lifted from the 55,249-row pre-rewrite archive through a read-only
+(`immutable=1`) SQLite handle, stratified 400/600 by feed category (not by
+trigger word -- that would have been circular) and stored through the real
+`store_observation` path. Measured baseline: 5 of 1,000 route, 5 links, fan-out
+0.005. A clause whose AND became an OR routes 33; dropping the term/entity
+constraints routes 1,000. K = 20 sits between. Full derivation, including what
+the ceiling does *not* gate, is in `tests/routing/test_ceiling.py`'s docstring.
+Nothing was written to any database that outlives the measurement; this is not a
+backfill and must not be read as one.
+
+**Word boundaries were verified by deletion, not by assertion.** With
+`LEFT_BOUNDARY`/`RIGHT_BOUNDARY` emptied, `TestWordBoundariesAreLoadBearing`
+goes 15 failed / 3 passed; restored, 18 passed. Every case in that class uses a
+non-shouted term (`nist`, `mail`, `ai`, `rev 5`), so the case rule cannot reject
+them first -- which is the trap task 010 fell into.
+
+### Two things for you, neither of them blocking
+
+1. **`sources:` is matched by exact equality, and that is a live question.** A
+   clause saying `sources: [Federal Register]` matches a feed *named* exactly
+   that. The corpus has three: "Federal Register", "Federal Register - Public
+   Inspection", "Federal Register - Documents API", and only the last carries
+   articles -- so `config/watches.example.yaml`'s own source clause matches
+   nothing here. Equality was chosen because it can only under-route, and
+   under-routing surfaces in the unrouted clusters rather than on an invoice.
+   If you meant the family of feeds, say so and it becomes a prefix or a
+   category match.
+2. **Trigger `entities:` currently match only the surface form you wrote.** The
+   alias registry that used to supply `CoverageEntity.aliases` died with the
+   beat files in task 012 and nothing replaced it. So `entities: [FedRAMP PMO]`
+   does not also match "FedRAMP Program Management Office". The one place that
+   changes is `src.routing.predicate._entity_terms`.

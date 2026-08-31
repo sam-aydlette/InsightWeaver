@@ -1,4 +1,4 @@
-.PHONY: help install install-dev test lint format fmt typecheck check pre-commit clean clean-all coverage db-add-watches db-add-observations db-drop-briefing update-deps
+.PHONY: help install install-dev test lint format fmt typecheck check pre-commit clean clean-all coverage db-add-watches db-add-observations db-add-routes db-drop-briefing update-deps
 
 # Tool resolution (added 2026-08-24).
 # Before this, every recipe called bare `pytest` / `ruff` / `mypy`, which only
@@ -46,6 +46,7 @@ help:
 	@echo "Database:"
 	@echo "  make db-add-watches    Create the watches table (additive, safe)"
 	@echo "  make db-add-observations  Create observations and evidence (additive, safe)"
+	@echo "  make db-add-routes     Create the route_candidates table (additive, safe)"
 	@echo "  make db-drop-briefing  Drop the deleted briefing product's tables"
 	@echo "                         (DESTRUCTIVE; captures to a dump first)"
 	@echo ""
@@ -126,6 +127,13 @@ db-add-watches:
 # src/database/models.py. (2026-08-31, backlog task 014.)
 db-add-observations:
 	$(PYTHON) -m src.database.migrations.add_observations_and_evidence
+
+# Additive. Creates Tier 1's output table. The unique constraint on
+# (observation_hash, watch_id) it carries is what makes routing idempotent, so
+# the table is created from the model rather than from hand-written DDL.
+# (2026-08-31, backlog task 015.)
+db-add-routes:
+	$(PYTHON) -m src.database.migrations.add_route_candidates
 
 # Deliberately does NOT pass --confirm. The migration refuses without it, so
 # running this target prints what it would destroy and stops; the operator types

@@ -20,6 +20,7 @@ import click
 from .colors import accent, header, muted
 from .output import set_debug_mode
 from .replay import replay_command
+from .route import route_command
 from .sources import sources_command
 from .watch import watch_command
 
@@ -33,6 +34,7 @@ COMMAND_DISPATCH = {
     "sources": sources_command,
     "watch": watch_command,
     "replay": replay_command,
+    "route": route_command,
 }
 
 
@@ -40,7 +42,7 @@ def print_command_refresher():
     """Print a short refresher of available commands."""
     click.echo(
         f"\n{header('Commands:')} {accent('sources')} | {accent('watch')} | "
-        f"{accent('replay')} | help | exit\n"
+        f"{accent('route')} | {accent('replay')} | help | exit\n"
     )
 
 
@@ -50,6 +52,9 @@ def print_help():
     click.echo(f"  {accent('sources')}             - Inspect configured feeds and what they hold")
     click.echo(
         f"  {accent('watch')}               - Pre-registered watches and the decisions they serve"
+    )
+    click.echo(
+        f"  {accent('route')}               - Match Observations to Watches, deterministically"
     )
     click.echo(
         f"  {accent('replay')}              - Rebuild Evidence from Observations and diff it"
@@ -71,6 +76,11 @@ def print_help():
     click.echo(
         muted("  Watches are only ever created from those files -- there is no 'watch add'.")
     )
+    click.echo()
+    click.echo(header("Route command:"))
+    click.echo(f"  {accent('route --dry-run')}         - Per watch, how many of the last N route")
+    click.echo(muted("  Reports the unrouted count and its clusters -- the coverage-gap signal."))
+    click.echo(muted("  No model is involved anywhere in this tier."))
     click.echo()
     click.echo(header("Replay command:"))
     click.echo(f"  {accent('replay --prompt-version X')}  - Rebuild Evidence for prompt version X")
