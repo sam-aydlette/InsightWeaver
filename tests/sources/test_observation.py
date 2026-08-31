@@ -240,29 +240,13 @@ class TestOneWritePath:
         )
 
     def test_only_the_store_module_constructs_an_article(self):
-        """
-        The other half of the same invariant, added 2026-08-31 for task 025.
+        """No module outside store.py constructs an Article.
 
-        Task 014 pinned the observation write to one path, but an *article* can
-        be written without one, and until this task ``src/rss/fetcher.py`` did
-        exactly that. Pinning the article write to ``store_items`` -- the one
-        function that writes the observation in the same transaction -- is what
-        makes "no article exists without an observation" a property of the code
-        instead of a rule someone has to remember. Reintroducing a second
-        article-writing path anywhere under src/ fails here.
-
-        What this checks is the *construction* site, not the ``session.add``
-        site, and that is deliberate: construction is the narrower chokepoint.
-        A module cannot insert an unobserved article without first obtaining an
-        ``Article``, and store_items is the only place under src/ allowed to
-        make one -- and it writes the Observation beside it before returning,
-        never handing the instance out. So a helper that merely adds an Article
-        it was passed (``src/processors/normalizer.py::ArticleStorage``, which
-        has no caller) cannot be fed an unobserved row without tripping this
-        test first. Grepping for adds instead would be brittle -- ``db.add(x)``
-        does not say what ``x`` is -- and would not be the real constraint.
-
-        src/database/models.py is excluded because it declares the class.
+        The grep catches construction, which is where an article write begins. A
+        module that only ``db.add()``s an Article it was handed would slip past it --
+        ``src/processors/normalizer.py::ArticleStorage`` was exactly that, dead code
+        kept alive by its own tests, and it was deleted in task 025 rather than
+        documented, because a documented hole in an invariant is still a hole.
         """
         offenders = modules_constructing("Article", {"sources/store.py", "database/models.py"})
         assert offenders == [], (
