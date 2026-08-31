@@ -220,8 +220,11 @@ def build_configured_adapters(feeds_dir: Path | str | None = None) -> list[Sourc
     """
     Instantiate an adapter for every configured non-RSS source.
 
-    RSS feeds are excluded here because the existing ``fetch_all_active_feeds``
-    path still owns them, unchanged.
+    RSS feeds were excluded here because ``fetch_all_active_feeds`` owned them.
+    That path was closed on 2026-08-31 (backlog task 025) because it wrote
+    articles without observations; RSS feeds are still excluded from *this*
+    function, which only builds the non-RSS adapters named in config, and are
+    now read through ``src.sources.rss_adapter.RSSAdapter`` instead.
     """
     adapters: list[SourceAdapter] = []
     for name in sorted(non_rss_adapter_names(feeds_dir)):

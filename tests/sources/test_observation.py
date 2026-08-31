@@ -197,6 +197,30 @@ class TestImmutability:
         assert test_session.query(Observation).count() == 1
 
 
+def modules_constructing(class_name: str, allowed_relative_paths: set[str]) -> list[str]:
+    """
+    Every module under src/ that constructs ``class_name``, minus the allowed set.
+
+    A tree grep rather than an import-graph walk, because what is being
+    defended against is someone *adding* a construction site, and a new file is
+    exactly what an import graph rooted at today's entry points would miss.
+    ``\\b`` before the name keeps ``NewArticle(`` from matching while still
+    catching the qualified ``models.Article(`` form.
+    """
+    import re
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[2] / "src"
+    allowed = {root / relative for relative in allowed_relative_paths}
+    pattern = re.compile(rf"\b{class_name}\(")
+
+    return [
+        str(path.relative_to(root))
+        for path in sorted(root.rglob("*.py"))
+        if path not in allowed and pattern.search(path.read_text(encoding="utf-8"))
+    ]
+
+
 class TestOneWritePath:
     def test_only_the_observation_module_constructs_an_observation(self):
         """
@@ -207,19 +231,29 @@ class TestOneWritePath:
         rather than trusted. src/database/models.py is excluded because that is
         where the class is defined.
         """
-        from pathlib import Path
-
-        root = Path(__file__).resolve().parents[2] / "src"
-        allowed = {root / "sources" / "observation.py", root / "database" / "models.py"}
-
-        offenders = [
-            str(path.relative_to(root))
-            for path in sorted(root.rglob("*.py"))
-            if path not in allowed and "Observation(" in path.read_text(encoding="utf-8")
-        ]
+        offenders = modules_constructing(
+            "Observation", {"sources/observation.py", "database/models.py"}
+        )
         assert offenders == [], (
             f"these modules construct an Observation directly: {offenders}. "
             f"Every write goes through src/sources/observation.py::store_observation."
+        )
+
+    def test_only_the_store_module_constructs_an_article(self):
+        """No module outside store.py constructs an Article.
+
+        The grep catches construction, which is where an article write begins. A
+        module that only ``db.add()``s an Article it was handed would slip past it --
+        ``src/processors/normalizer.py::ArticleStorage`` was exactly that, dead code
+        kept alive by its own tests, and it was deleted in task 025 rather than
+        documented, because a documented hole in an invariant is still a hole.
+        """
+        offenders = modules_constructing("Article", {"sources/store.py", "database/models.py"})
+        assert offenders == [], (
+            f"these modules construct an Article directly: {offenders}. "
+            f"Every article write goes through src/sources/store.py::store_items, "
+            f"which writes the article and its Observation in one transaction. "
+            f"See src/rss/fetcher.py::LegacyWritePathClosed for why."
         )
 
     def test_the_adapter_store_path_writes_an_observation_per_article(self, test_session, source):

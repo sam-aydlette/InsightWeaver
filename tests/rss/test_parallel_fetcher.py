@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from src.rss.fetcher import LegacyWritePathClosed
 from src.rss.parallel_fetcher import FetchResult, ParallelRSSFetcher, fetch_all_active_feeds
 
 
@@ -243,42 +244,42 @@ class TestEmptyResults:
 
 
 class TestFetchAllActiveFeeds:
-    """Tests for fetch_all_active_feeds convenience function"""
+    """
+    The convenience entry point refuses too (task 025, 2026-08-31).
+
+    It is closed at the top rather than left to fail per-feed underneath:
+    ``_rate_limited_fetch`` catches every exception and folds it into the
+    summary dict, so a raise further down would return normally with zero
+    articles and a zero exit code -- indistinguishable from "the feeds were
+    quiet today", which is the silent failure this task removes.
+    """
 
     @pytest.mark.asyncio
-    @patch("src.rss.parallel_fetcher.get_db")
-    async def test_fetch_all_active_feeds_no_feeds(self, mock_get_db):
-        """Should handle no active feeds"""
-        mock_db = MagicMock()
-        mock_get_db.return_value.__enter__ = MagicMock(return_value=mock_db)
-        mock_get_db.return_value.__exit__ = MagicMock(return_value=False)
-        mock_db.query.return_value.filter.return_value.all.return_value = []
-
-        result = await fetch_all_active_feeds()
-
-        assert result["total_feeds"] == 0
+    async def test_fetch_all_active_feeds_refuses(self):
+        with pytest.raises(LegacyWritePathClosed, match="legacy RSS write path is closed"):
+            await fetch_all_active_feeds()
 
     @pytest.mark.asyncio
-    @patch("src.rss.parallel_fetcher.ParallelRSSFetcher")
-    @patch("src.rss.parallel_fetcher.get_db")
-    async def test_fetch_all_active_feeds_with_feeds(self, mock_get_db, mock_parallel_class):
-        """Should fetch active feeds from database"""
-        mock_db = MagicMock()
-        mock_get_db.return_value.__enter__ = MagicMock(return_value=mock_db)
-        mock_get_db.return_value.__exit__ = MagicMock(return_value=False)
+    async def test_it_refuses_before_reading_the_database(self):
+        """
+        No session is opened, so there is nothing to mock away.
 
-        feed_data = MagicMock()
-        feed_data.id = 1
-        feed_data.name = "Test Feed"
-        feed_data.url = "https://example.com/feed.rss"
-        feed_data.category = "news"
-        mock_db.query.return_value.filter.return_value.all.return_value = [feed_data]
+        The module no longer imports ``get_db`` at all, which is the strongest
+        available statement that this function cannot reach the database: the
+        old tests for it had to patch ``src.rss.parallel_fetcher.get_db``, and
+        that name is now absent.
+        """
+        import src.rss.parallel_fetcher as module
 
-        mock_fetcher = MagicMock()
-        mock_parallel_class.return_value = mock_fetcher
-        mock_fetcher.fetch_all_feeds = AsyncMock(return_value={"total_feeds": 1})
+        assert not hasattr(module, "get_db")
+        with pytest.raises(LegacyWritePathClosed):
+            await fetch_all_active_feeds(max_concurrent=5, rate_limit=1.0)
 
-        result = await fetch_all_active_feeds(max_concurrent=5, rate_limit=1.0)
-
-        mock_parallel_class.assert_called_with(max_concurrent_feeds=5, requests_per_second=1.0)
-        assert result["total_feeds"] == 1
+    @pytest.mark.asyncio
+    async def test_it_does_not_return_a_zero_article_summary(self):
+        """The failure mode being ruled out is returning normally."""
+        try:
+            result = await fetch_all_active_feeds()
+        except LegacyWritePathClosed:
+            return
+        raise AssertionError(f"returned a summary instead of refusing: {result}")

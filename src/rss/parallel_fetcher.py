@@ -8,9 +8,8 @@ import logging
 import time
 from dataclasses import dataclass
 
-from src.database.connection import get_db
 from src.database.models import RSSFeed
-from src.rss.fetcher import RSSFetcher
+from src.rss.fetcher import LEGACY_PATH_MESSAGE, LegacyWritePathClosed, RSSFetcher
 from src.utils import utcnow
 
 logger = logging.getLogger(__name__)
@@ -197,53 +196,22 @@ class ParallelRSSFetcher:
         }
 
 
+# ARG001: both arguments are unused on purpose, for the same reason as
+# RSSFetcher.fetch_and_store_feed -- an existing caller should hit the refusal,
+# not a TypeError about an argument that used to exist (2026-08-31, task 025).
 async def fetch_all_active_feeds(
-    max_concurrent: int = 10, rate_limit: float = 2.0
+    max_concurrent: int = 10,  # noqa: ARG001
+    rate_limit: float = 2.0,  # noqa: ARG001
 ) -> dict[str, any]:
     """
-    Convenience function to fetch all active feeds from database
+    Closed. Always raises :class:`~src.rss.fetcher.LegacyWritePathClosed`.
+
+    This is the function an operator reaches for to refresh the corpus, and
+    every article it produced arrived through ``fetch_and_store_feed``, which
+    no longer writes (backlog task 025, 2026-08-31). It refuses here rather
+    than further down for one reason: ``_rate_limited_fetch`` catches every
+    exception per feed and folds it into a summary dict, so a raise underneath
+    would return normally with "0 of 44 feeds succeeded" and a zero exit code
+    -- the same quiet nothing-happened this task exists to remove.
     """
-    # Get active feed IDs and basic info from database
-    with get_db() as db:
-        active_feeds_data = (
-            db.query(RSSFeed.id, RSSFeed.name, RSSFeed.url, RSSFeed.category)
-            .filter(RSSFeed.is_active.is_(True))
-            .all()
-        )
-
-    # Sources read by a non-RSS adapter live in the same table (it is the
-    # sources table in everything but name) but must not be handed to
-    # feedparser: a JSON API endpoint would fail to parse every run and be
-    # auto-deactivated after ten attempts. Added 2026-08-26 for backlog task
-    # 005; with no such sources configured this filters nothing and behaviour
-    # is byte-identical to before.
-    from src.sources.runner import non_rss_source_urls
-
-    adapter_urls = non_rss_source_urls()
-    if adapter_urls:
-        skipped = [f.name for f in active_feeds_data if f.url in adapter_urls]
-        active_feeds_data = [f for f in active_feeds_data if f.url not in adapter_urls]
-        if skipped:
-            logger.info(
-                f"Skipping {len(skipped)} non-RSS source(s) in the RSS fetch stage "
-                f"(handled by src/sources adapters): {', '.join(skipped)}"
-            )
-
-    if not active_feeds_data:
-        logger.warning("No active feeds found in database")
-        return ParallelRSSFetcher()._empty_results()
-
-    # Convert to simple feed objects for processing
-    active_feeds = []
-    for feed_data in active_feeds_data:
-        feed_obj = RSSFeed(
-            id=feed_data.id, name=feed_data.name, url=feed_data.url, category=feed_data.category
-        )
-        active_feeds.append(feed_obj)
-
-    # Create parallel fetcher and process feeds
-    parallel_fetcher = ParallelRSSFetcher(
-        max_concurrent_feeds=max_concurrent, requests_per_second=rate_limit
-    )
-
-    return await parallel_fetcher.fetch_all_feeds(active_feeds)
+    raise LegacyWritePathClosed(LEGACY_PATH_MESSAGE)
