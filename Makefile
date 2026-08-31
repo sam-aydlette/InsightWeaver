@@ -1,4 +1,4 @@
-.PHONY: help install install-dev test lint format fmt typecheck check pre-commit clean clean-all coverage db-add-watches db-drop-briefing update-deps
+.PHONY: help install install-dev test lint format fmt typecheck check pre-commit clean clean-all coverage db-add-watches db-add-observations db-drop-briefing update-deps
 
 # Tool resolution (added 2026-08-24).
 # Before this, every recipe called bare `pytest` / `ruff` / `mypy`, which only
@@ -45,6 +45,7 @@ help:
 	@echo ""
 	@echo "Database:"
 	@echo "  make db-add-watches    Create the watches table (additive, safe)"
+	@echo "  make db-add-observations  Create observations and evidence (additive, safe)"
 	@echo "  make db-drop-briefing  Drop the deleted briefing product's tables"
 	@echo "                         (DESTRUCTIVE; captures to a dump first)"
 	@echo ""
@@ -119,6 +120,12 @@ clean-all: clean
 # --down direction can, and requires one. (2026-08-31, backlog task 013.)
 db-add-watches:
 	$(PYTHON) -m src.database.migrations.add_watches_table
+
+# Additive in the same way, and specifically does NOT touch the 55,249-row
+# articles table: observations coexist with it under the rule written in
+# src/database/models.py. (2026-08-31, backlog task 014.)
+db-add-observations:
+	$(PYTHON) -m src.database.migrations.add_observations_and_evidence
 
 # Deliberately does NOT pass --confirm. The migration refuses without it, so
 # running this target prints what it would destroy and stops; the operator types
