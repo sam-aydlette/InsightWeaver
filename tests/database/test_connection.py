@@ -116,21 +116,10 @@ class TestCreateTables:
         inspector = inspect(engine)
         table_names = inspector.get_table_names()
 
-        expected_tables = [
-            "rss_feeds",
-            "articles",
-            "analysis_runs",
-            "narrative_syntheses",
-            "context_snapshots",
-            "provenance_records",
-            "topic_clusters",
-            "narrative_frames",
-            "article_frames",
-            "frame_gaps",
-        ]
-
-        for table in expected_tables:
-            assert table in table_names, f"Table {table} should be created"
+        # Exactly two, asserted as a set rather than a subset: backlog task 012
+        # deleted the other nineteen models, and a subset check would pass again
+        # the moment one of them was reintroduced by accident.
+        assert set(table_names) == {"rss_feeds", "articles"}
 
     def test_create_tables_is_idempotent(self, tmp_path, mocker):
         """create_tables should be safe to call multiple times"""

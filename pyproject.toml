@@ -173,14 +173,18 @@ module = [
 ]
 ignore_errors = true
 
+# Updated 2026-08-31 (backlog task 012). `src.context.*`, `src.pipeline.*` and
+# `src.prompts.*` were deleted; `src.forecast.*` had not existed for some time.
+# `src.matching.*` and `src.llm.*` are the new homes of the five modules ported
+# out of `src.context`, and they inherit the suppression those files already had
+# rather than gaining a new one -- the annotations here are SQLAlchemy Column
+# descriptors mypy reads as their column type, which predates this task.
 [[tool.mypy.overrides]]
 module = [
     "src.processors.*",
     "src.rss.*",
-    "src.context.*",
-    "src.forecast.*",
-    "src.pipeline.*",
-    "src.prompts.*",
+    "src.matching.*",
+    "src.llm.*",
     "src.feed_manager",
 ]
 ignore_errors = true

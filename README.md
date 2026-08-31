@@ -1,5 +1,24 @@
 # InsightWeaver
 
+> **Superseded 2026-08-31 (backlog task 012).** The briefing product this
+> document describes -- `brief`, beats, questions, predictions, frames,
+> synthesis and rendering -- has been **deleted**. Roughly 8,900 lines of source
+> and most of the test suite went with it, in a single commit, because the
+> operator's call was that git history is the rollback path and dead code in the
+> tree reads as current. `insightweaver` now exposes one command, `sources`.
+>
+> What survives is ingestion: `src/sources/`, `src/rss/`, `src/processors/`, the
+> feed config, and five modules ported for tiers not yet built
+> (`src/matching/entity_matcher.py`, `src/matching/coverage_probe.py`,
+> `src/llm/claude_client.py`, `src/utils/cadence.py`,
+> `src/processors/deduplicator.py`).
+>
+> **Everything below this banner describes the deleted product and has not been
+> rewritten.** Rewriting it needs the new pipeline to exist first, which task 012
+> explicitly puts out of scope. Read it as history until it is replaced.
+
+---
+
 **A tool for building warranted, inspectable understanding from RSS feeds.**
 
 ---

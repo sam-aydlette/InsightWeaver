@@ -1,161 +1,126 @@
 """
-Sources Command - Calibration by structural behavior, not by static dial.
+Sources command - what is configured, and what it has actually stored.
 
-Two derived signals per feed, computed on demand from the article_frames
-mapping and recorded frame gaps:
+**This command was reduced, not designed, on 2026-08-31 (backlog task 012).**
+It used to report two derived calibration signals per feed -- ``frame
+uniqueness`` and ``gap filling`` -- both computed from the ``article_frames``
+mapping and recorded frame gaps. Task 012 deleted narrative frames, so both
+signals lost their inputs. They are removed rather than reimplemented against
+some other proxy: the original module refused to report claim survival because
+computing it "would require structured claim extraction we have not built", and
+inventing a replacement metric here would break the same rule in the same file.
 
-- frame_uniqueness: fraction of this feed's frame-tagged articles whose
-  frame is carried by no other feed (a high score means this source is
-  a single point of exposure for those frames).
-- gap_filling: fraction of recorded frame-gap labels that this feed's
-  articles have been tagged with (a high score means this source carries
-  perspectives the rest of the corpus has been missing).
-
-Claim survival -- the third signal from the original plan -- is deliberately
-omitted. Computing it would require structured claim extraction we have not
-built. We do not fabricate metrics; revisit if claim extraction lands.
+What is left is the part that does not depend on the deleted product: the feed
+inventory and the corpus each feed has actually contributed. That is a real
+answer to "which of my sources are pulling their weight" and it is measured, not
+derived. Whatever the new pipeline wants to calibrate on, it can add here once
+it exists.
 """
 
 import click
 from sqlalchemy import func
 
 from ..database.connection import get_db
-from ..database.models import (
-    Article,
-    ArticleFrame,
-    FrameGap,
-    NarrativeFrame,
-    RSSFeed,
-)
+from ..database.models import Article, RSSFeed
 from .colors import accent, header, muted
 
 
-def _compute_calibration(session) -> dict[int, dict]:
-    """Returns ``{feed_id: {name, uniqueness, gap_filling, tagged_articles}}``."""
+def _feed_stats(session) -> dict[int, dict]:
+    """Returns ``{feed_id: {name, category, is_active, articles, latest, ...}}``."""
     feeds = session.query(RSSFeed).all()
     if not feeds:
         return {}
 
-    # frame_id -> distinct feed count
-    frame_feed_counts = dict(
-        session.query(
-            NarrativeFrame.id,
-            func.count(func.distinct(RSSFeed.id)),
-        )
-        .join(ArticleFrame, ArticleFrame.frame_id == NarrativeFrame.id)
-        .join(Article, ArticleFrame.article_id == Article.id)
-        .join(RSSFeed, Article.feed_id == RSSFeed.id)
-        .group_by(NarrativeFrame.id)
+    counts = dict(
+        session.query(Article.feed_id, func.count(Article.id)).group_by(Article.feed_id).all()
+    )
+    latest = dict(
+        session.query(Article.feed_id, func.max(Article.published_date))
+        .group_by(Article.feed_id)
         .all()
     )
-    unique_frame_ids = {fid for fid, n in frame_feed_counts.items() if n == 1}
 
-    # Distinct gap frame_labels (case-normalized) we have on record.
-    gap_labels = {
-        row[0].strip().lower()
-        for row in session.query(FrameGap.frame_label).distinct().all()
-        if row[0]
-    }
-
-    result: dict[int, dict] = {}
-    for feed in feeds:
-        # All frame-tagged articles in this feed.
-        tagged_q = (
-            session.query(ArticleFrame, NarrativeFrame.label, NarrativeFrame.id)
-            .join(NarrativeFrame, ArticleFrame.frame_id == NarrativeFrame.id)
-            .join(Article, ArticleFrame.article_id == Article.id)
-            .filter(Article.feed_id == feed.id)
-            .all()
-        )
-        tagged = len(tagged_q)
-        unique_tags = sum(1 for _af, _label, fid in tagged_q if fid in unique_frame_ids)
-        uniqueness = (unique_tags / tagged) if tagged else 0.0
-
-        # Distinct frame labels this feed carries (case-normalized).
-        feed_labels = {label.strip().lower() for _af, label, _fid in tagged_q if label}
-        gap_filling = len(gap_labels & feed_labels) / len(gap_labels) if gap_labels else 0.0
-
-        result[feed.id] = {
+    return {
+        feed.id: {
             "name": feed.name,
-            "uniqueness": uniqueness,
-            "gap_filling": gap_filling,
-            "tagged_articles": tagged,
+            "category": feed.category,
+            "is_active": feed.is_active,
+            "articles": counts.get(feed.id, 0),
+            "latest": latest.get(feed.id),
+            "last_fetched": feed.last_fetched,
+            "error_count": feed.error_count or 0,
+            "last_error": feed.last_error,
         }
-    return result
+        for feed in feeds
+    }
 
 
 @click.group(name="sources")
 def sources_command():
-    """Calibration of each feed by structural behavior."""
+    """Configured feeds and the corpus they have contributed."""
     pass
 
 
 @sources_command.command(name="list")
 def list_sources():
-    """Show all feeds with derived calibration signals."""
+    """Show all feeds with stored-article counts."""
     with get_db() as session:
-        cal = _compute_calibration(session)
-        if not cal:
+        stats = _feed_stats(session)
+        if not stats:
             click.echo(muted("No feeds configured."))
             return
 
-        click.echo(header("SOURCE CALIBRATION"))
+        click.echo(header("SOURCES"))
         click.echo(
             muted(
-                "Frame uniqueness: how much of what this source carries no other "
-                "feed does.\nGap filling: share of recorded frame gaps this source covers."
+                "Stored articles per feed. A feed with zero has been configured "
+                "but has contributed nothing to the corpus."
             )
         )
         click.echo("=" * 80)
 
-        # Sort by uniqueness descending so the standout sources surface first.
-        for _fid, row in sorted(cal.items(), key=lambda kv: -kv[1]["uniqueness"]):
-            tagged = row["tagged_articles"]
-            click.echo(accent(row["name"]))
-            if tagged == 0:
-                click.echo(muted("  no frame-tagged articles yet"))
+        # Most productive first, so the silent feeds collect at the bottom where
+        # they read as the finding they are.
+        for _fid, row in sorted(stats.items(), key=lambda kv: -kv[1]["articles"]):
+            label = row["name"] if row["is_active"] else f"{row['name']} (inactive)"
+            click.echo(accent(label))
+            if row["articles"] == 0:
+                click.echo(muted("  no stored articles"))
             else:
-                click.echo(
-                    f"  uniqueness:  {row['uniqueness']:.0%}  "
-                    f"gap-filling: {row['gap_filling']:.0%}  "
-                    f"{muted(f'({tagged} tagged article(s))')}"
-                )
+                newest = row["latest"].date().isoformat() if row["latest"] else "undated"
+                click.echo(f"  {row['articles']} article(s)  {muted(f'newest {newest}')}")
+            if row["error_count"]:
+                click.echo(muted(f"  {row['error_count']} fetch error(s)"))
             click.echo()
 
 
 @sources_command.command(name="show")
 @click.argument("name")
 def show_source(name):
-    """Show detailed calibration for a feed by exact or partial name."""
+    """Show detail for a feed by exact or partial name."""
     with get_db() as session:
         feed = session.query(RSSFeed).filter(RSSFeed.name.ilike(f"%{name}%")).first()
         if not feed:
             click.echo(muted(f"No feed matching '{name}'."))
             return
 
-        cal = _compute_calibration(session).get(feed.id)
-        if cal is None:
-            click.echo(muted(f"No calibration available for {feed.name}."))
+        row = _feed_stats(session).get(feed.id)
+        if row is None:
+            click.echo(muted(f"No detail available for {feed.name}."))
             return
 
         click.echo(header(f"SOURCE: {feed.name}"))
         click.echo("=" * 80)
-        click.echo(f"  uniqueness:    {cal['uniqueness']:.0%}")
-        click.echo(f"  gap-filling:   {cal['gap_filling']:.0%}")
-        click.echo(f"  tagged articles: {cal['tagged_articles']}")
+        click.echo(f"  url:             {feed.url}")
+        click.echo(f"  category:        {row['category'] or 'none'}")
+        click.echo(f"  active:          {'yes' if row['is_active'] else 'no'}")
+        click.echo(f"  stored articles: {row['articles']}")
+        newest = row["latest"].date().isoformat() if row["latest"] else "none"
+        click.echo(f"  newest article:  {newest}")
+        fetched = row["last_fetched"].isoformat(sep=" ") if row["last_fetched"] else "never"
+        click.echo(f"  last fetched:    {fetched}")
+        if row["error_count"]:
+            click.echo(f"  fetch errors:    {row['error_count']}")
+            if row["last_error"]:
+                click.echo(muted(f"  last error: {row['last_error']}"))
         click.echo()
-
-        rows = (
-            session.query(NarrativeFrame.label, func.count(ArticleFrame.id))
-            .select_from(ArticleFrame)
-            .join(NarrativeFrame, ArticleFrame.frame_id == NarrativeFrame.id)
-            .join(Article, ArticleFrame.article_id == Article.id)
-            .filter(Article.feed_id == feed.id)
-            .group_by(NarrativeFrame.label)
-            .order_by(func.count(ArticleFrame.id).desc())
-            .all()
-        )
-        if rows:
-            click.echo(header("Frames carried"))
-            for label, count in rows:
-                click.echo(f"  {label} {muted(f'({count} article(s))')}")

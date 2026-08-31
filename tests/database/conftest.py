@@ -1,20 +1,18 @@
 """
-Database-specific test fixtures
-Provides sample model instances for database tests.
-test_engine and test_session are inherited from tests/conftest.py.
+Database-specific test fixtures.
+
+Provides sample model instances for database tests. test_engine and
+test_session are inherited from tests/conftest.py.
+
+The sample_analysis_run / sample_context_snapshot / sample_narrative_synthesis
+fixtures were removed by backlog task 012 along with the models they built.
 """
 
 from datetime import datetime, timedelta
 
 import pytest
 
-from src.database.models import (
-    AnalysisRun,
-    Article,
-    ContextSnapshot,
-    NarrativeSynthesis,
-    RSSFeed,
-)
+from src.database.models import Article, RSSFeed
 
 
 @pytest.fixture
@@ -51,53 +49,3 @@ def sample_article(test_session, sample_rss_feed):
     test_session.add(article)
     test_session.commit()
     return article
-
-
-@pytest.fixture
-def sample_analysis_run(test_session):
-    """Create a sample AnalysisRun for testing"""
-    run = AnalysisRun(
-        run_type="narrative_synthesis",
-        status="completed",
-        started_at=datetime.utcnow() - timedelta(minutes=5),
-        completed_at=datetime.utcnow(),
-        articles_processed=10,
-        context_token_count=5000,
-        claude_model="claude-sonnet-4-20250514",
-    )
-    test_session.add(run)
-    test_session.commit()
-    return run
-
-
-@pytest.fixture
-def sample_context_snapshot(test_session):
-    """Create a sample ContextSnapshot for testing"""
-    snapshot = ContextSnapshot(
-        synthesis_id=None,
-        article_ids=[1, 2, 3],
-        context_size_tokens=5000,
-        user_profile_hash="abc123def456",
-        historical_summaries="Previous analysis summary",
-        instructions="Generate narrative synthesis",
-    )
-    test_session.add(snapshot)
-    test_session.commit()
-    return snapshot
-
-
-@pytest.fixture
-def sample_narrative_synthesis(test_session, sample_analysis_run, sample_context_snapshot):
-    """Create a sample NarrativeSynthesis for testing"""
-    synthesis = NarrativeSynthesis(
-        analysis_run_id=sample_analysis_run.id,
-        context_snapshot_id=sample_context_snapshot.id,
-        user_profile_version="1.0",
-        synthesis_data={"bottom_line": {"summary": "Test summary"}},
-        executive_summary="Executive summary text",
-        articles_analyzed=10,
-        temporal_scope="immediate,near,medium",
-    )
-    test_session.add(synthesis)
-    test_session.commit()
-    return synthesis
