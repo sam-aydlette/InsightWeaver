@@ -42,9 +42,11 @@ __all__ = [
     "RIGHT_BOUNDARY",
     "CompiledEntity",
     "compile_entities",
+    "compile_terms",
     "count_item_mentions",
     "is_shouted",
     "item_text",
+    "matches_any",
     "term_pattern",
 ]
 
@@ -91,6 +93,50 @@ def term_pattern(term: str, right_boundary: bool = True) -> str:
     return f"{LEFT_BOUNDARY}(?:{body}){tail}"
 
 
+def compile_terms(terms: Iterable[str]) -> tuple[re.Pattern[str], ...]:
+    """
+    A group of surface forms compiled to the fewest regexes that can hold them.
+
+    Shouted and unshouted terms go into separate alternations so each group can
+    carry the case flag it needs -- ``BOD`` must not be matched by ``body`` and
+    ``FedRAMP PMO`` must be matched by ``fedramp pmo``. A term that is only
+    whitespace is dropped rather than compiled into a pattern that matches
+    everywhere.
+
+    Extracted from :func:`compile_entities` on 2026-08-31 (backlog task 015) so
+    that Tier 1 routing compiles a trigger clause's ``terms`` and ``entities``
+    through *this* function rather than through a second boundary
+    implementation. The repository has already been bitten by substring
+    matching: ``nist`` is a substring of 5,364 article titles in the corpus and
+    a word-boundary match in 73. One matcher, one set of anchors.
+    """
+    shouted: list[str] = []
+    relaxed: list[str] = []
+    for term in terms:
+        if not term.strip():
+            continue
+        (shouted if is_shouted(term) else relaxed).append(term_pattern(term))
+
+    patterns: list[re.Pattern[str]] = []
+    if shouted:
+        patterns.append(re.compile("|".join(shouted)))
+    if relaxed:
+        patterns.append(re.compile("|".join(relaxed), re.IGNORECASE))
+    return tuple(patterns)
+
+
+def matches_any(patterns: Iterable[re.Pattern[str]], text: str) -> bool:
+    """
+    Whether any of ``patterns`` hits ``text``. Presence, not frequency.
+
+    An empty ``patterns`` is False: nothing was looked for, so nothing was
+    found. Callers that mean "unconstrained" must not reach here at all --
+    see :class:`src.routing.predicate.CompiledClause`, which refuses to build a
+    clause whose declared field compiled to no patterns.
+    """
+    return any(pattern.search(text) for pattern in patterns)
+
+
 @dataclass(frozen=True)
 class CompiledEntity:
     """One coverage entity with its surface forms compiled to regexes."""
@@ -110,33 +156,19 @@ class CompiledEntity:
         item that mentioned CISA, and counting the repetitions would make a
         verbose outlet look like institutional activity.
         """
-        return any(pattern.search(text) for pattern in self.patterns)
+        return matches_any(self.patterns, text)
 
 
 def compile_entities(entities: Iterable[CoverageEntity]) -> list[CompiledEntity]:
     """
     Compile every entity's surface forms once, for reuse across all items.
 
-    Shouted and unshouted terms are grouped into separate alternations so each
-    group can carry the case flag it needs; a term that is only whitespace is
-    dropped rather than compiled into a pattern that matches everywhere.
+    The grouping and case rules live in :func:`compile_terms`; this function is
+    the entity-shaped wrapper around them.
     """
-    compiled: list[CompiledEntity] = []
-    for entity in entities:
-        shouted: list[str] = []
-        relaxed: list[str] = []
-        for term in entity.terms:
-            if not term.strip():
-                continue
-            (shouted if is_shouted(term) else relaxed).append(term_pattern(term))
-
-        patterns: list[re.Pattern[str]] = []
-        if shouted:
-            patterns.append(re.compile("|".join(shouted)))
-        if relaxed:
-            patterns.append(re.compile("|".join(relaxed), re.IGNORECASE))
-        compiled.append(CompiledEntity(entity=entity, patterns=tuple(patterns)))
-    return compiled
+    return [
+        CompiledEntity(entity=entity, patterns=compile_terms(entity.terms)) for entity in entities
+    ]
 
 
 def item_text(item: Mapping[str, Any]) -> str:

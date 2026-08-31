@@ -58,6 +58,7 @@ __all__ = [
     "observation_hash",
     "observation_payload",
     "observe",
+    "payload_text",
     "store_observation",
 ]
 
@@ -112,16 +113,29 @@ def observation_hash(payload: dict[str, Any]) -> str:
     return content_hash(*(_render(payload[key]) for key in OBSERVATION_FIELDS))
 
 
-def minhash_text(payload: dict[str, Any]) -> str:
+def payload_text(payload: dict[str, Any]) -> str:
     """
-    The text a near-duplicate signature is computed over: title plus body.
+    The readable text of a stored observation: title plus body.
 
     ``normalized_content`` is preferred over ``description`` because it is the
     HTML-stripped full text; ``description`` is the fallback for feeds that
-    carry only a summary.
+    carry only a summary. Raw ``content`` is never used -- it still carries
+    markup, and a word-boundary matcher pointed at markup matches attribute
+    values.
+
+    Every deterministic reader of an observation reads *this*. Near-duplicate
+    signatures did first; Tier 1 routing joined on 2026-08-31 (backlog task
+    015). Two definitions of "the text of an observation" would let a
+    near-duplicate group and a routing decision disagree about what a document
+    says.
     """
     body = payload.get("normalized_content") or payload.get("description") or ""
     return f"{payload.get('title') or ''} {body}".strip()
+
+
+def minhash_text(payload: dict[str, Any]) -> str:
+    """The text a near-duplicate signature is computed over. See :func:`payload_text`."""
+    return payload_text(payload)
 
 
 @dataclass(frozen=True)

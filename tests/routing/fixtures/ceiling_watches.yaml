@@ -1,0 +1,118 @@
+# The five watches the Tier 1 ceiling test routes against.
+#
+# NOT an operator watch set and not a proposal for one. It exists so that the
+# ceiling in tests/routing/test_ceiling.py is measured against a *fixed* watch
+# side: if the watch set could drift, a widening in the routing predicate and a
+# widening in the triggers would be indistinguishable, and the test would stop
+# being a gate on the thing it is meant to gate.
+#
+# Provenance, so the number the ceiling rests on can be argued with:
+#
+#   * The first three watches are copied verbatim from
+#     config/watches.example.yaml -- the hand-authored, checked-in set. Their
+#     triggers were not touched (tuning the shipped triggers is out of scope for
+#     backlog task 015).
+#   * The last two were written for this fixture on 2026-08-31, in the same
+#     domain and the same shape, because the acceptance criterion names five
+#     watches and the shipped set has three. They are pointed at subjects the
+#     measurement corpus actually carries (CISA advisories, NIST publications)
+#     so that the measured baseline is not identically zero -- a ceiling over a
+#     baseline of zero gates only against catastrophic widening. The three
+#     shipped watches above route zero against that corpus, which is a real
+#     finding about the feed list and not a defect in this fixture.
+#
+# Decision keys are the three in config/position.example.yaml, because the
+# loader refuses a watch whose so_what.decision names no decision, and the test
+# loads this file through the real loader rather than around it.
+
+version: 1
+
+watches:
+  - id: fedramp-conmon-scope-expands
+    claim: >
+      FedRAMP expands continuous-monitoring requirements for Moderate systems in
+      a way that adds recurring work, before the 2027 assessment window.
+    belief: 0.35
+    so_what:
+      decision: fedramp-authorization-renewal
+      because: >
+        Scope expansion moves renewal from two engineer-quarters to three or
+        more, which is the point at which lapsing becomes the cheaper option.
+    triggers:
+      - entities: [FedRAMP PMO, GSA]
+        terms: [continuous monitoring, ConMon, significant change]
+      - sources: [Federal Register]
+        terms: [FedRAMP]
+    expires: 2027-03-31
+    staleness_alert_days: 30
+
+  - id: fedramp-20x-supersedes-rev5
+    claim: >
+      The FedRAMP 20x program replaces the Rev 5 baseline for new
+      authorizations, rather than running alongside it.
+    belief: 0.45
+    so_what:
+      decision: fedramp-authorization-renewal
+      because: >
+        If 20x supersedes rather than supplements, the renewal is a
+        re-authorization against a different baseline and the estimate is wrong
+        by a factor, not a margin.
+    triggers:
+      - terms: [FedRAMP 20x, Rev 5, revision 5]
+        entities: [FedRAMP PMO]
+    expires: 2027-06-30
+    staleness_alert_days: 3w
+
+  - id: compliance-hiring-market-tightens
+    claim: >
+      Median time-to-hire for a compliance engineer in the DC market exceeds 90
+      days through the end of 2026.
+    belief: 0.6
+    so_what:
+      decision: hire-compliance-engineer
+      because: >
+        A 90-day search started in December lands after the assessment window
+        opens, which converts "hire later if needed" into "do not hire".
+    triggers:
+      - terms: [time to hire, compliance engineer, GRC hiring]
+      - entities: [OPM]
+        terms: [cyber workforce, hiring authority]
+    expires: 2026-12-15
+    staleness_alert_days: 45
+
+  - id: cisa-kev-cadence-holds
+    claim: >
+      CISA keeps adding to the Known Exploited Vulnerabilities catalog at its
+      current cadence through 2027 rather than slowing it.
+    belief: 0.55
+    so_what:
+      decision: fedramp-authorization-renewal
+      because: >
+        The KEV catalog is what the remediation-timeline control points at, so
+        its cadence is what the renewal's continuous-monitoring effort costs.
+    triggers:
+      - entities: [CISA]
+        terms: [Known Exploited Vulnerabilities, KEV, binding operational directive,
+                emergency directive]
+      - entities: [CISA]
+        terms: [advisory, advisories, alert]
+    expires: 2027-12-31
+    staleness_alert_days: 21
+
+  - id: nist-800-53-revision-lands
+    claim: >
+      NIST issues a further revision to the SP 800-53 control catalog before the
+      2027 assessment window.
+    belief: 0.4
+    so_what:
+      decision: fedramp-authorization-renewal
+      because: >
+        A revised control catalog re-baselines the assessment, which is the
+        difference between a delta review and a full re-authorization.
+    triggers:
+      - entities: [NIST]
+        terms: [Special Publication, SP 800, 800-53, control catalog, revision]
+      - entities: [NIST, OMB]
+        terms: [zero trust architecture]
+    expires: 2027-09-30
+    staleness_alert_days: 45

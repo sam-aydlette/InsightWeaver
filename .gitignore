@@ -23,6 +23,11 @@ config/api_sources.json
 # Philosophical documentation (not for version control)
 docs/philosophical_docs/
 
+# Tier 1's coverage-gap report (backlog task 015, 2026-08-31). Derived: it is
+# rewritten from the observations on every `insightweaver route` run, and it
+# quotes the operator's corpus. Task 021 reads it from disk, not from git.
+data/routing/
+
 # Database files
 *.db
 *.db-journal

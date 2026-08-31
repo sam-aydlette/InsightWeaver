@@ -584,6 +584,63 @@ Create the tables with `make db-add-observations` (additive; it does not touch
 
 ---
 
+## Tier 1: deterministic routing
+
+Added 2026-08-31 (`backlog/015`). Adjudication is the only tier that calls a
+model, and it costs money per item. Tier 1 is what decides which items it ever
+sees, so **notification volume scales with the number of live watches rather
+than with news volume** -- and that is a property of the code in `src/routing/`,
+not an aspiration.
+
+**Triggers compile; they are not interpreted and not read by a model.** A
+watch's `triggers` is a list of clauses over `terms`, `entities` and `sources`.
+Within a clause every populated field must match (AND) and any value in a field
+will do (OR); across clauses, any clause firing fires the watch. That compiles
+directly into two regex alternations and a set-membership test. Nothing in
+`src/routing/` imports an Anthropic client, and the test that says so removes it
+from the interpreter entirely and drives the whole path
+(`tests/routing/test_no_model.py`).
+
+**Word boundaries are load-bearing.** Every pattern comes from
+`src/matching/entity_matcher.py`'s `compile_terms`, which owns the anchors and
+the shouted-acronym case rule -- there is deliberately no second matcher. The
+scale being defended, measured on this repository's own 55,249-article corpus:
+`nist` appears as a substring in 5,364 titles and at a word boundary in 73;
+`mail` is 1,842 against 339.
+
+**Routing is idempotent.** A match becomes a `route_candidates` row, unique on
+`(observation_hash, watch_id)`; routing the same observation twice produces one
+link. The row also records which clause fired, which is the difference between
+"this watch routed 400 observations" and "clause 2 of this watch routed 400".
+
+```bash
+# Per watch, how many of the last 500 observations would route -- plus the
+# unrouted count and its clusters. Writes no route_candidates rows.
+insightweaver route --dry-run
+
+# The same, over every stored observation, recording the links.
+insightweaver route --limit 0
+```
+
+**Read the unrouted number first.** A high one is the healthy state. A low one
+means a trigger is too loose, and a trigger that is too loose does not fail --
+it bills. The unrouted observations are clustered by their stored MinHash
+signatures and written to `data/routing/unrouted_clusters.json` alongside a
+document-frequency histogram of their salient terms. That file is the
+coverage-gap signal: the only place a *missing* watch is visible before a
+staleness alert fires. `backlog/021` reads it.
+
+**The ceiling test.** `tests/routing/test_ceiling.py` asserts that 1,000
+observations against 5 watches route fewer than 20. The number was measured, not
+guessed: the corpus is 1,000 real articles sampled from the pre-rewrite archive
+and stratified by feed category, the measured baseline is 5 routed / 5 links,
+and a clause whose AND became an OR routes 33. The test's docstring records the
+measurement and is explicit about what it cannot see.
+
+Create the table with `make db-add-routes` (additive).
+
+---
+
 ## Requirements
 
 - Python 3.10+

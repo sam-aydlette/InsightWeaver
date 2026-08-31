@@ -15,7 +15,9 @@ rewrite removed.
 013. Its CHECK constraints are not decoration -- see the class docstring.
 
 ``observations`` and ``evidence`` are the second and third, added 2026-08-31 by
-backlog task 014.
+backlog task 014. ``route_candidates`` is the fourth, added 2026-08-31 by
+backlog task 015: it holds Tier 1's output, which is candidacy rather than
+evidence.
 
 **The rule for ``articles`` versus ``observations``, decided by task 014 and
 written here because this is the file both of them live in.** They coexist, with
@@ -381,4 +383,57 @@ class Evidence(Base):
         ),
         Index("idx_evidence_prompt_version", "prompt_version"),
         Index("idx_evidence_watch", "watch_id"),
+    )
+
+
+class RouteCandidate(Base):
+    """
+    One observation that a Watch's compiled triggers selected as *candidate* evidence.
+
+    Tier 1's output, and nothing more than that. A row here says "this
+    observation matched this watch's triggers", which is a claim about regexes
+    and a source allowlist -- not a claim that the observation is evidence, and
+    not a direction. Adjudication produces :class:`Evidence`; this table is what
+    adjudication is allowed to read. Keeping them separate is what makes the
+    cost claim checkable: the number of rows in this table is the number of
+    observations the one stochastic tier will ever see.
+
+    **The unique constraint is the idempotency.** Routing the same observation
+    twice produces one link, because ``(observation_hash, watch_id)`` is unique
+    and :func:`src.routing.router.persist` skips what is already there. Tier 1
+    is deterministic, so re-running it over an unchanged corpus is a no-op --
+    and if it ever is not, the constraint says so with an IntegrityError rather
+    than doubling a watch's candidate count.
+
+    ``clause_index`` records *which* trigger clause fired. It is the difference
+    between "this watch is routing 400 observations" and "clause 2 of this watch
+    is routing 400 observations", which is the difference between knowing a
+    trigger is too loose and knowing which line of the file to edit. It is
+    excluded from the unique key on purpose: an observation matching two clauses
+    of the same watch is still one candidate, and the first clause in file order
+    is the one recorded.
+
+    There is no ``routed_by`` or model column, because there is no model. The
+    test that proves it is
+    tests/routing/test_no_model.py::TestRoutingNeedsNoAnthropicClient.
+
+    Added 2026-08-31 for backlog task 015.
+    """
+
+    __tablename__ = "route_candidates"
+
+    id = Column(Integer, primary_key=True)
+
+    observation_hash = Column(String(80), ForeignKey("observations.content_hash"), nullable=False)
+    watch_id = Column(String(100), ForeignKey("watches.id"), nullable=False)
+
+    clause_index = Column(Integer, nullable=False)
+
+    routed_at = Column(DateTime, default=utcnow, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("observation_hash", "watch_id", name="_route_observation_watch_uc"),
+        CheckConstraint("clause_index >= 0", name="ck_route_clause_index"),
+        Index("idx_route_watch", "watch_id"),
+        Index("idx_route_observation", "observation_hash"),
     )

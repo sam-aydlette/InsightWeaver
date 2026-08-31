@@ -120,13 +120,15 @@ class TestCreateTables:
         # nineteen models, and a subset check would pass again the moment one of
         # them was reintroduced by accident. `watches` was added deliberately by
         # task 013 (2026-08-31); `observations` and `evidence` by task 014 the
-        # same day. Every addition here should be a task that says so.
+        # same day; `route_candidates` by task 015, also 2026-08-31. Every
+        # addition here should be a task that says so.
         assert set(table_names) == {
             "rss_feeds",
             "articles",
             "watches",
             "observations",
             "evidence",
+            "route_candidates",
         }
 
     def test_create_tables_is_idempotent(self, tmp_path, mocker):
