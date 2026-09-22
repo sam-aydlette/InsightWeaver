@@ -35,7 +35,7 @@ from dataclasses import dataclass, field
 
 from sqlalchemy.orm import Session
 
-from ..database.models import Evidence, Observation, Watch
+from ..database.models import Evidence, Observation, Route, Watch
 from .adjudicator import Adjudicator, ObservationView
 
 logger = logging.getLogger(__name__)
@@ -108,23 +108,39 @@ def rebuild(
     limit: int | None = None,
 ) -> list[EvidenceRow]:
     """
-    Run ``adjudicator`` over the stored observations and return what it produced.
+    Run ``adjudicator`` over the routed pairs and return what it produced.
 
-    Reads observations and watches. Writes nothing, ever -- committing is
-    :func:`commit`, and keeping them separate is what makes a diff safe to run
-    against a corpus you care about.
+    Reads observations, watches and ``routes``: the adjudicator sees, per
+    observation, only the watches Tier 1 routed it to, which is exactly the
+    pair set ``insightweaver adjudicate`` asks about (changed 2026-09-22,
+    backlog task 029; before that every observation was judged against every
+    watch). ``limit`` counts routed observations, in hash order, so a bounded
+    replay of a model version judges at least one pair. Writes nothing, ever
+    -- committing is :func:`commit`, and keeping them separate is what makes a
+    diff safe to run against a corpus you care about.
     """
-    watches = db.query(Watch).order_by(Watch.id).all()
-    query = db.query(Observation.content_hash, Observation.payload).order_by(
-        Observation.content_hash
+    watches = {str(w.id): w for w in db.query(Watch).order_by(Watch.id).all()}
+    routed: dict[str, list[str]] = {}
+    for content_hash, watch_id in (
+        db.query(Route.observation_hash, Route.watch_id)
+        .order_by(Route.observation_hash, Route.watch_id)
+        .all()
+    ):
+        routed.setdefault(str(content_hash), []).append(str(watch_id))
+
+    query = (
+        db.query(Observation.content_hash, Observation.payload)
+        .filter(Observation.content_hash.in_(list(routed)))
+        .order_by(Observation.content_hash)
     )
     if limit is not None:
         query = query.limit(limit)
 
     rows: list[EvidenceRow] = []
     for content_hash, payload in query.all():
+        routed_watches = [watches[w] for w in routed.get(content_hash, ()) if w in watches]
         view = ObservationView(content_hash=content_hash, payload=dict(payload or {}))
-        for verdict in adjudicator.adjudicate(view, watches):
+        for verdict in adjudicator.adjudicate(view, routed_watches):
             rows.append(
                 EvidenceRow(
                     observation_hash=content_hash,
@@ -249,6 +265,7 @@ def format_diff(
     baseline_version: str,
     observations: int,
     watches: int,
+    pairs: int | None = None,
 ) -> str:
     """
     The diff as text, deterministic to the byte.
@@ -259,7 +276,8 @@ def format_diff(
     """
     lines = [
         f"replay: prompt-version={prompt_version} against={baseline_version}",
-        f"corpus: {observations} observation(s), {watches} watch(es)",
+        f"corpus: {observations} observation(s), {watches} watch(es)"
+        + (f", {pairs} routed pair(s)" if pairs is not None else ""),
         (
             f"diff: {result.counts['added']} added, "
             f"{result.counts['removed']} removed, "

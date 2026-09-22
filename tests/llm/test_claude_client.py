@@ -2,9 +2,9 @@
 The client: keychain key, role-chosen model, and an audited send path.
 
 No test here makes a network call. The SDK's ``messages.create`` is replaced
-with an async stub that returns a response-shaped object, so what is under test
-is what the client does around the call: what it sends, what it records, what
-it returns, and what it refuses.
+with a stub that returns a response-shaped object, so what is under test is
+what the client does around the call: what it sends, what it records, what it
+returns, and what it refuses. Synchronous since backlog task 029 (2026-09-22).
 """
 
 import json
@@ -14,7 +14,7 @@ import pytest
 
 from src.config import credentials
 from src.config.settings import settings
-from src.llm.claude_client import ROLES, ClaudeClient, ModelResponse
+from src.llm.claude_client import ROLES, ClaudeClient, ModelCallFailed, ModelResponse
 
 # Not a credential: the SDK is stubbed and nothing here reaches a network.
 FAKE_KEY = "sk-test"  # pragma: allowlist secret
@@ -63,7 +63,7 @@ def _stub_create(client, response=None, error=None):
     """Replace the SDK call; record what it was called with."""
     calls = []
 
-    async def create(**kwargs):
+    def create(**kwargs):
         calls.append(kwargs)
         if error is not None:
             raise error
@@ -95,10 +95,10 @@ class TestConstruction:
 
 
 class TestSend:
-    async def test_returns_text_and_usage(self, client):
+    def test_returns_text_and_usage(self, client):
         _stub_create(client, _response())
 
-        result = await client.analyze("sys", "hello")
+        result = client.analyze("sys", "hello")
 
         assert isinstance(result, ModelResponse)
         assert result.text == "answer"
@@ -107,10 +107,10 @@ class TestSend:
         assert (result.input_tokens, result.output_tokens) == (11, 7)
         assert result.cache_creation_input_tokens == 0  # None from the API reads as zero
 
-    async def test_effort_goes_in_output_config_not_extra_body(self, client):
+    def test_effort_goes_in_output_config_not_extra_body(self, client):
         calls = _stub_create(client, _response())
 
-        await client.analyze("sys", "hello", effort="low", max_tokens=99)
+        client.analyze("sys", "hello", effort="low", max_tokens=99)
 
         (sent,) = calls
         assert sent["output_config"] == {"effort": "low"}
@@ -119,33 +119,76 @@ class TestSend:
         assert sent["model"] == "test-model"
         assert sent["messages"] == [{"role": "user", "content": "hello"}]
 
-    async def test_an_invalid_effort_is_refused_before_anything_is_sent(self, client, audit_dir):
+    def test_a_schema_goes_in_output_config_format_as_a_request_parameter(self, client):
+        """Structured output is a request parameter, not a parsing convention."""
+        calls = _stub_create(client, _response(text='{"ok": true}'))
+        schema = {"type": "object", "properties": {"ok": {"type": "boolean"}}}
+
+        client.analyze("sys", "hello", output_schema=schema)
+
+        (sent,) = calls
+        assert sent["output_config"] == {
+            "effort": "high",
+            "format": {"type": "json_schema", "schema": schema},
+        }
+
+    def test_an_invalid_effort_is_refused_before_anything_is_sent(self, client, audit_dir):
         calls = _stub_create(client, _response())
 
         with pytest.raises(ValueError, match="effort"):
-            await client.analyze("sys", "hello", effort="maximum")
+            client.analyze("sys", "hello", effort="maximum")
 
         assert calls == []
         assert not audit_dir.exists()
 
-    async def test_text_is_selected_by_block_type_not_position(self, client):
+    def test_text_is_selected_by_block_type_not_position(self, client):
         """2026-08-26: content[0] is a ThinkingBlock on thinking models."""
         _stub_create(client, _response(thinking=True))
 
-        assert (await client.analyze("sys", "hello")).text == "answer"
+        assert client.analyze("sys", "hello").text == "answer"
 
-    async def test_a_refusal_is_raised_not_returned_as_empty(self, client):
+    def test_a_refusal_is_raised_not_returned_as_empty(self, client):
         _stub_create(client, _response(stop_reason="refusal"))
 
-        with pytest.raises(RuntimeError, match="declined"):
-            await client.analyze("sys", "hello")
+        with pytest.raises(ModelCallFailed, match="declined") as excinfo:
+            client.analyze("sys", "hello")
+
+        # The failure carries what the audit log recorded: the id and the cost.
+        assert excinfo.value.audit_id
+        assert (excinfo.value.input_tokens, excinfo.value.output_tokens) == (11, 7)
+        assert excinfo.value.stop_reason == "refusal"
+
+    def test_an_api_error_is_a_typed_failure_carrying_its_audit_id(self, client):
+        _stub_create(client, error=ConnectionError("no route"))
+
+        with pytest.raises(ModelCallFailed, match="ConnectionError: no route") as excinfo:
+            client.analyze("sys", "hello")
+
+        assert excinfo.value.audit_id
+        assert (excinfo.value.input_tokens, excinfo.value.output_tokens) == (0, 0)
+        assert excinfo.value.misconfigured is False
+
+    def test_a_rejected_request_is_marked_as_a_misconfiguration(self, client):
+        import anthropic
+        import httpx2
+
+        request = httpx2.Request("POST", "https://api.example/v1/messages")
+        rejected = anthropic.BadRequestError(
+            "invalid schema", response=httpx2.Response(400, request=request), body=None
+        )
+        _stub_create(client, error=rejected)
+
+        with pytest.raises(ModelCallFailed) as excinfo:
+            client.analyze("sys", "hello")
+
+        assert excinfo.value.misconfigured is True
 
 
 class TestAudit:
-    async def test_request_is_logged_before_the_send_and_response_after(self, client, audit_dir):
+    def test_request_is_logged_before_the_send_and_response_after(self, client, audit_dir):
         calls = _stub_create(client, _response())
 
-        result = await client.analyze("sys", "hello", effort="medium")
+        result = client.analyze("sys", "hello", effort="medium")
 
         request, response = _audit_events(audit_dir)
         assert request["event"] == "request"
@@ -158,11 +201,11 @@ class TestAudit:
         assert response["stop_reason"] == "end_turn"
         assert response["model"] == "served-model"
 
-    async def test_a_failed_send_leaves_the_request_and_an_error_line(self, client, audit_dir):
+    def test_a_failed_send_leaves_the_request_and_an_error_line(self, client, audit_dir):
         _stub_create(client, error=ConnectionError("no route"))
 
-        with pytest.raises(ConnectionError):
-            await client.analyze("sys", "hello")
+        with pytest.raises(ModelCallFailed):
+            client.analyze("sys", "hello")
 
         request, error = _audit_events(audit_dir)
         assert request["event"] == "request"
@@ -170,11 +213,11 @@ class TestAudit:
         assert error["id"] == request["id"]
         assert "no route" in error["error"]
 
-    async def test_a_refusal_is_audited_as_a_response_before_it_is_raised(self, client, audit_dir):
+    def test_a_refusal_is_audited_as_a_response_before_it_is_raised(self, client, audit_dir):
         _stub_create(client, _response(stop_reason="refusal"))
 
-        with pytest.raises(RuntimeError):
-            await client.analyze("sys", "hello")
+        with pytest.raises(ModelCallFailed):
+            client.analyze("sys", "hello")
 
         _request, response = _audit_events(audit_dir)
         assert response["stop_reason"] == "refusal"
@@ -189,7 +232,7 @@ def test_only_the_client_constructs_a_model_request():
     from pathlib import Path
 
     root = Path(__file__).resolve().parents[2] / "src"
-    pattern = re.compile(r"\bAsyncAnthropic\(|\bAnthropic\(|messages\.create\(")
+    pattern = re.compile(r"\bAnthropic\(|messages\.create\(")
     offenders = [
         str(p.relative_to(root))
         for p in sorted(root.rglob("*.py"))

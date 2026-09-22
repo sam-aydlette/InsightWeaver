@@ -2,8 +2,8 @@
 Minimal Claude API client: the one place a model request is constructed.
 
 Moved here from ``src/context/`` by backlog task 012 for Tier 2 adjudication.
-Rewritten 2026-09-22 by task 026 (Phase 0 of ``docs/PLAN.md``) with
-three changes and two outages kept:
+Rewritten 2026-09-22 by task 026 (Phase 0 of ``docs/PLAN.md``) with three
+changes and two outages kept, and made synchronous by task 029 the same day.
 
 **Changes.**
 
@@ -18,13 +18,13 @@ three changes and two outages kept:
 3. **The model is chosen by role, not at the call site.** ``role="triage"``
    reads ``settings.llm_triage_model``; ``role="synthesis"`` reads
    ``settings.llm_synthesis_model``. Decided 2026-09-22: Sonnet 5 adjudicates,
-   Opus 5 writes. ``effort`` is now the ``output_config`` named parameter,
-   which the SDK has had since 1.x; the ``extra_body`` workaround is gone with
-   the pin that needed it.
+   Opus 5 writes. ``effort`` is the ``output_config`` named parameter, and a
+   structured-output schema goes beside it as ``output_config.format`` -- a
+   request parameter, not a parsing convention.
 
-``analyze_with_context`` and ``_build_system_prompt`` were deleted here: they
-formatted ``user_profile`` and ``articles`` sections for the briefing product
-task 012 removed, had no caller, and would have been the next thing to drift.
+**Synchronous** (task 029): the only caller is the adjudication loop inside a
+click command, one pair at a time. The async client was a leftover from the
+deleted pipeline and forced an event loop into every caller for nothing.
 
 **Outages kept**, because a rewrite from a blank file reintroduces them: see
 :data:`_response_text` (the ``ThinkingBlock`` shape change and the refusal
@@ -38,7 +38,13 @@ import logging
 from dataclasses import dataclass
 from typing import Any
 
-from anthropic import AsyncAnthropic
+from anthropic import (
+    Anthropic,
+    AuthenticationError,
+    BadRequestError,
+    NotFoundError,
+    PermissionDeniedError,
+)
 
 from ..config import credentials
 from ..config.settings import settings
@@ -46,7 +52,7 @@ from . import audit
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["EFFORT_LEVELS", "ROLES", "ClaudeClient", "ModelResponse"]
+__all__ = ["EFFORT_LEVELS", "ROLES", "ClaudeClient", "ModelCallFailed", "ModelResponse"]
 
 EFFORT_LEVELS = ("low", "medium", "high", "xhigh", "max")
 
@@ -56,6 +62,43 @@ ROLES: dict[str, str] = {
     "triage": "llm_triage_model",
     "synthesis": "llm_synthesis_model",
 }
+
+
+class ModelCallFailed(RuntimeError):
+    """
+    An audited call that yielded no usable text: an API error, a refusal, or a
+    reply with no text block. Carries the audit id the request was logged
+    under and the usage the API reported (zeros when it never answered), so a
+    caller recording the failure can cite the log entry and the cost.
+
+    ``misconfigured`` is True when the API rejected the request itself -- a
+    400 (malformed request or schema), 401, 403 or 404 (retired model). That
+    is the operator's problem, not the model's answer, and a caller that
+    records failures per pair must abort on it rather than record it.
+
+    Added 2026-09-22 (backlog task 029).
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        audit_id: str,
+        input_tokens: int = 0,
+        output_tokens: int = 0,
+        stop_reason: str | None = None,
+        misconfigured: bool = False,
+    ) -> None:
+        super().__init__(message)
+        self.audit_id = audit_id
+        self.input_tokens = input_tokens
+        self.output_tokens = output_tokens
+        self.stop_reason = stop_reason
+        self.misconfigured = misconfigured
+
+
+# The API errors that mean the request, not the answer, is wrong.
+_REQUEST_ERRORS = (BadRequestError, AuthenticationError, PermissionDeniedError, NotFoundError)
 
 
 @dataclass(frozen=True)
@@ -127,7 +170,11 @@ class ClaudeClient:
             raise ValueError(f"role must be one of {sorted(ROLES)}, got {role!r}")
         self.role = role
         self.api_key = api_key or credentials.read(credentials.ANTHROPIC)
-        self.client = AsyncAnthropic(api_key=self.api_key, timeout=300.0)
+        # The SDK resends an identical request up to twice on a connection
+        # error, a 429 or a 5xx. That is a transport retry of the same request,
+        # not a second question, and the adjudicator's never-retried rule sits
+        # above it; the audit log records the request once. (2026-09-22.)
+        self.client = Anthropic(api_key=self.api_key, timeout=300.0)
         # 2026-08-26: claude-sonnet-4-20250514 was RETIRED on 2026-06-15 and returned
         # 404 for ten weeks while the CLI printed a duration and exited 0. The model
         # is a setting now so that the next retirement is a one-line change in one
@@ -137,62 +184,88 @@ class ClaudeClient:
         # think by default, so a low ceiling truncates a full answer mid-sentence.
         self.max_tokens = 32000
 
-    async def analyze(
+    def analyze(
         self,
         system_prompt: str,
         user_message: str,
         effort: str = "high",
         max_tokens: int | None = None,
+        output_schema: dict[str, Any] | None = None,
     ) -> ModelResponse:
         """One user turn."""
-        return await self.analyze_conversation(
-            system_prompt, [{"role": "user", "content": user_message}], effort, max_tokens
+        return self.analyze_conversation(
+            system_prompt,
+            [{"role": "user", "content": user_message}],
+            effort,
+            max_tokens,
+            output_schema,
         )
 
-    async def analyze_conversation(
+    def analyze_conversation(
         self,
         system_prompt: str,
         messages: list[dict[str, Any]],
         effort: str = "high",
         max_tokens: int | None = None,
+        output_schema: dict[str, Any] | None = None,
     ) -> ModelResponse:
         """
         Send a conversation and return the text with its usage.
 
         The request is written to the audit log before the call, the usage after
         it, and the exception in between if the call fails. A refusal is
-        recorded as a response (it is one) and then raised.
+        recorded as a response (it is one) and then raised. With
+        ``output_schema`` the API constrains the reply to that JSON schema; the
+        caller still validates what comes back.
         """
         if effort not in EFFORT_LEVELS:
             raise ValueError(f"effort must be one of {EFFORT_LEVELS}, got {effort!r}")
 
+        output_config: dict[str, Any] = {"effort": effort}
+        if output_schema is not None:
+            output_config["format"] = {"type": "json_schema", "schema": output_schema}
         request: dict[str, Any] = {
             "model": self.model,
             "max_tokens": max_tokens or self.max_tokens,
             "system": system_prompt,
             "messages": messages,
-            "output_config": {"effort": effort},
+            "output_config": output_config,
         }
         audit_id = audit.record_request(self.role, request)
 
         try:
-            response = await self.client.messages.create(**request)
+            response = self.client.messages.create(**request)
         except Exception as exc:
             audit.record_error(audit_id, exc)
             logger.error(f"Claude API error: {exc}")
-            raise
+            raise ModelCallFailed(
+                f"{type(exc).__name__}: {exc}",
+                audit_id=audit_id,
+                misconfigured=isinstance(exc, _REQUEST_ERRORS),
+            ) from exc
 
         usage = _usage(response)
+        stop_reason = getattr(response, "stop_reason", None)
         audit.record_response(
             audit_id,
             model=str(getattr(response, "model", self.model)),
-            stop_reason=getattr(response, "stop_reason", None),
+            stop_reason=stop_reason,
             usage=usage,
         )
+        try:
+            text = _response_text(response)
+        except RuntimeError as exc:
+            raise ModelCallFailed(
+                str(exc),
+                audit_id=audit_id,
+                input_tokens=usage["input_tokens"],
+                output_tokens=usage["output_tokens"],
+                stop_reason=stop_reason,
+            ) from exc
         return ModelResponse(
-            text=_response_text(response),
+            text=text,
             model=str(getattr(response, "model", self.model)),
-            stop_reason=getattr(response, "stop_reason", None),
+            stop_reason=stop_reason,
             audit_id=audit_id,
             **usage,
         )

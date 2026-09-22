@@ -163,3 +163,20 @@ def add_observations(session):
     store_items(session, source, list(CORPUS_ITEMS))
     session.flush()
     return source
+
+
+def add_routes(session):
+    """
+    Route the stub corpus with the real router.
+
+    Since backlog task 029 (2026-09-22) the adjudicator sees only routed
+    pairs, so a replay over an unrouted corpus judges nothing. Two of the four
+    items carry a watch's terms and route; the other two do not.
+    """
+    from datetime import date, datetime
+
+    from src.routing import route
+
+    report = route(session, since=datetime(2026, 1, 1), today=date(2026, 9, 1))
+    session.flush()
+    return report

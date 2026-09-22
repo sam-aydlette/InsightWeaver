@@ -13,10 +13,9 @@ has been applied anywhere yet: the tables arrive here as tasks 028 to 031 land
 holds. Re-running it after a later task creates only what is new.
 
 ``downgrade()`` drops the tables and requires ``--confirm``. ``routes`` is
-derived and rebuildable from observations and watches, so dropping it loses
-nothing that ``route --rebuild`` cannot restore. That stops being true when
-the belief ledger joins this list (backlog task 030), and the help text must
-change in the same commit.
+derived and rebuildable from observations and watches; ``adjudications``
+(task 029) is a ledger of what the model was asked and what it cost, and
+nothing rebuilds it, which the help text says.
 
 Added 2026-09-22 for backlog task 028.
 """
@@ -31,19 +30,20 @@ from sqlalchemy import inspect
 from sqlalchemy.engine import Engine
 
 from src.database.connection import engine
-from src.database.models import Route
+from src.database.models import Adjudication, Route
 
 __all__ = ["TABLES", "downgrade", "upgrade"]
 
 # Creation order. Reversed on the way down.
-TABLES = ("routes",)
+TABLES = ("routes", "adjudications")
 
-_MODELS: dict[str, Any] = {"routes": Route}
+_MODELS: dict[str, Any] = {"routes": Route, "adjudications": Adjudication}
 
 _CONFIRM_HELP = (
-    "Dropping the monitor tables discards routing links. Routes are derived and\n"
-    "`insightweaver route --rebuild` restores them from observations and watches.\n"
-    "Re-run with --confirm if that is what you want:\n\n"
+    "Dropping the monitor tables discards routing links and the adjudication\n"
+    "ledger. Routes are derived and `insightweaver route --rebuild` restores them;\n"
+    "the ledger is the record of what the model was asked and what it cost, and\n"
+    "nothing restores it. Re-run with --confirm if that is what you want:\n\n"
     "    python -m src.database.migrations.add_monitor_tables --down --confirm\n"
 )
 

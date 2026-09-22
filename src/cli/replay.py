@@ -27,8 +27,9 @@ Added 2026-08-31 for backlog task 014.
 
 import click
 
+from ..config.credentials import MissingCredential
 from ..database.connection import get_db
-from ..database.models import Observation, Watch
+from ..database.models import Observation, Route, Watch
 from ..evidence import (
     NondeterministicReplay,
     UnknownPromptVersion,
@@ -40,6 +41,7 @@ from ..evidence import (
     resolve,
     stored_evidence,
 )
+from ..evidence.claude_adjudicator import AdjudicationFailed
 from .colors import accent, header, muted, warning
 
 
@@ -86,7 +88,12 @@ def _adjudicator_for(prompt_version: str, path: str | None):
     default=None,
     help="Load 'module:attr' instead of the registered adjudicator for this version.",
 )
-@click.option("--limit", type=int, default=None, help="Replay only the first N observations.")
+@click.option(
+    "--limit",
+    type=click.IntRange(min=1),
+    default=None,
+    help="Replay only the first N routed observations (hash order).",
+)
 @click.option(
     "--commit",
     "do_commit",
@@ -113,12 +120,25 @@ def replay_command(prompt_version, against, adjudicator_path, limit, do_commit):
             )
             return
 
-        replayed = rebuild(session, adjudicator, limit=limit)
+        pairs = session.query(Route).count()
+        if pairs == 0 and watches:
+            raise click.ClickException(
+                "nothing is routed: a replay over an unrouted corpus judges no pair, and with "
+                "--commit it would delete this version's stored evidence. Run "
+                "'insightweaver route' first."
+            )
+
+        try:
+            replayed = rebuild(session, adjudicator, limit=limit)
+        except (MissingCredential, AdjudicationFailed) as exc:
+            raise click.ClickException(str(exc))
         baseline = stored_evidence(session, baseline_version)
         result = diff(replayed, baseline)
 
         click.echo(header("REPLAY"))
-        click.echo(format_diff(result, prompt_version, baseline_version, observations, watches))
+        click.echo(
+            format_diff(result, prompt_version, baseline_version, observations, watches, pairs)
+        )
         click.echo()
 
         if not do_commit:

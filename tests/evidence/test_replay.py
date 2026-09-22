@@ -29,7 +29,7 @@ from src.evidence import (
     stored_evidence,
 )
 
-from .stubs import CountingAdjudicator, KeywordAdjudicator
+from .stubs import CountingAdjudicator, KeywordAdjudicator, add_routes
 
 
 class TestReplayIsDeterministic:
@@ -205,11 +205,23 @@ class TestCommitBehaviour:
 
 
 class TestRebuildScope:
-    def test_limit_narrows_the_corpus(self, test_session, watches, observations):
+    def test_limit_counts_routed_observations_so_a_bounded_replay_judges_something(
+        self, test_session, watches, observations
+    ):
+        """
+        Two of the four observations are routed. limit=1 must judge the first
+        routed one, not the first stored one (which may route to nothing).
+        """
         everything = rebuild(test_session, KeywordAdjudicator("v1"))
-        assert len(rebuild(test_session, KeywordAdjudicator("v1"), limit=1)) <= len(everything)
+        bounded = rebuild(test_session, KeywordAdjudicator("v1"), limit=1)
 
-    def test_an_empty_watch_set_produces_no_evidence(self, test_session, observations):
+        assert len(everything) == 2
+        assert len(bounded) == 1
+        assert bounded[0] in everything
+
+    def test_an_empty_watch_set_produces_no_evidence(self, test_session, source):
+        """No watches means nothing routes, so the adjudicator is never asked."""
+        add_routes(test_session)
         assert rebuild(test_session, KeywordAdjudicator("v1")) == []
 
     def test_the_adjudicator_sees_only_the_stored_payload(
@@ -258,14 +270,14 @@ class TestAdjudicatorRegistry:
         with pytest.raises(ValueError, match="already registered"):
             register(NULL_PROMPT_VERSION, NullAdjudicator)
 
-    def test_the_registry_ships_no_llm_adjudicator(self):
+    def test_the_registry_ships_exactly_one_model_adjudicator(self):
         """
-        The adjudication prompt is backlog task 016, not this task.
-
-        Asserted so that a shipped placeholder cannot quietly become the thing
-        producing evidence.
+        Invariant 4: one stochastic component. Since backlog task 029
+        (2026-09-22) that is ``claude-v1``; the null adjudicator is the other
+        entry and finds nothing. A second model version is a deliberate
+        addition to this list, not a drift.
         """
-        assert known_prompt_versions() == [NULL_PROMPT_VERSION]
+        assert known_prompt_versions() == ["claude-v1", NULL_PROMPT_VERSION]
 
     def test_an_adjudicator_can_be_loaded_by_path(self):
         adjudicator = load_adjudicator("tests.evidence.stubs:make_v1")

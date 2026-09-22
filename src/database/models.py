@@ -44,6 +44,11 @@ rule is: **new tiers read observations; articles is the pre-rewrite archive.**
 observations are candidates for which watch. It is derived and rebuildable,
 which is why it may be deleted by ``route --rebuild`` and ``evidence`` may not
 be deleted by anything but ``replay --commit``.
+
+``adjudications`` is Tier 2's run ledger, added 2026-09-22 by backlog task 029:
+every pair the model was asked about, whatever it answered, with the tokens it
+cost. ``evidence`` keeps holding the verdicts; the ledger is why a pair is not
+asked twice and where a failed call is recorded rather than retried.
 """
 
 from sqlalchemy import (
@@ -420,4 +425,63 @@ class Route(Base):
         CheckConstraint("clause_index >= 0", name="ck_routes_clause_index"),
         Index("idx_routes_watch", "watch_id"),
         Index("idx_routes_observation", "observation_hash"),
+    )
+
+
+class Adjudication(Base):
+    """
+    One model call about one routed pair, whatever it answered.
+
+    ``outcome`` is ``evidence`` (a verdict was written to ``evidence``),
+    ``none`` (the model judged the item not to bear on the claim) or ``failed``
+    (a refusal, an API error, or a response that failed validation; the text
+    is in ``error``). A failed pair is left here and never retried: a retry
+    that produced a different answer to the same input would break the replay
+    determinism that is the only way to review a prompt change.
+
+    Unique per ``(observation, watch, prompt_version)``, which is what makes
+    ``insightweaver adjudicate`` idempotent: run twice, the second run asks
+    nothing. ``audit_id`` finds the exact request in the local audit log;
+    ``input_tokens`` and ``output_tokens`` are what the API reported, so the
+    cost of a run is a sum over this table and not a guess. ``confidence``,
+    ``satisfies_clause`` and ``rationale`` keep the rest of a validated
+    verdict, for 'none' verdicts too, since ``evidence`` holds only evidence.
+
+    Added 2026-09-22 for backlog task 029.
+    """
+
+    __tablename__ = "adjudications"
+
+    id = Column(Integer, primary_key=True)
+    observation_hash = Column(String(80), ForeignKey("observations.content_hash"), nullable=False)
+    watch_id = Column(String(100), ForeignKey("watches.id"), nullable=False)
+    prompt_version = Column(String(100), nullable=False)
+    outcome = Column(String(20), nullable=False)
+    error = Column(Text)
+    audit_id = Column(String(40))
+    input_tokens = Column(Integer, nullable=False, default=0)
+    output_tokens = Column(Integer, nullable=False, default=0)
+    # The parts of a validated verdict that `evidence` does not hold: the
+    # model's confidence in its reading, the clause it named, and the
+    # rationale for a 'none' verdict as well as for evidence. Null on failure.
+    confidence = Column(Float)
+    satisfies_clause = Column(Integer)
+    rationale = Column(Text)
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "observation_hash",
+            "watch_id",
+            "prompt_version",
+            name="_adjudication_pair_version_uc",
+        ),
+        CheckConstraint(
+            "outcome IN ('evidence', 'none', 'failed')", name="ck_adjudications_outcome"
+        ),
+        CheckConstraint(
+            "length(trim(prompt_version)) > 0", name="ck_adjudications_prompt_version_present"
+        ),
+        Index("idx_adjudications_version", "prompt_version"),
+        Index("idx_adjudications_watch", "watch_id"),
     )

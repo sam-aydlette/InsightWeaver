@@ -23,7 +23,7 @@ def blank_engine(tmp_path):
 
 class TestUpgrade:
     def test_creates_routes_and_returns_its_name(self, blank_engine):
-        assert mig.upgrade(blank_engine) == ["routes"]
+        assert mig.upgrade(blank_engine) == ["routes", "adjudications"]
         assert inspect(blank_engine).has_table("routes")
 
     def test_is_idempotent(self, blank_engine):
@@ -54,7 +54,7 @@ class TestUpgrade:
     def test_touches_nothing_else(self, blank_engine):
         """Additive means additive: it creates one table and no others."""
         mig.upgrade(blank_engine)
-        assert inspect(blank_engine).get_table_names() == ["routes"]
+        assert set(inspect(blank_engine).get_table_names()) == {"routes", "adjudications"}
 
 
 class TestDowngrade:
@@ -67,7 +67,7 @@ class TestDowngrade:
 
     def test_drops_with_confirm(self, blank_engine):
         mig.upgrade(blank_engine)
-        assert mig.downgrade(blank_engine, confirmed=True) == ["routes"]
+        assert mig.downgrade(blank_engine, confirmed=True) == ["adjudications", "routes"]
         assert not inspect(blank_engine).has_table("routes")
 
     def test_drop_on_a_missing_table_is_a_no_op(self, blank_engine):

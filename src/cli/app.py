@@ -14,11 +14,13 @@ exits.
 
 The command table grows one task at a time as the decision monitor lands
 (``docs/PLAN.md`` section 4): ``ingest`` and ``route`` on 2026-09-22 (backlog
-task 028). Nothing here should grow a command back by habit.
+task 028), ``adjudicate`` the same day (task 029). Nothing here should grow a
+command back by habit.
 """
 
 import click
 
+from .adjudicate import adjudicate_command
 from .auth import auth
 from .ingest import ingest_command
 from .output import set_debug_mode
@@ -36,9 +38,9 @@ def cli(ctx, debug):
     """
     InsightWeaver - monitoring against pre-registered watches.
 
-    Ingest sources and route observations to pre-registered watches. The
-    briefing product was removed in backlog task 012; adjudication and the
-    brief are the next tasks in docs/PLAN.md.
+    Ingest sources, route observations to pre-registered watches, and ask
+    the model whether each routed pair is evidence. The briefing product was
+    removed in backlog task 012; the brief is the next task in docs/PLAN.md.
     """
     set_debug_mode(debug)
     ctx.ensure_object(dict)
@@ -55,6 +57,7 @@ cli.add_command(sources_command, name="sources")
 cli.add_command(ingest_command, name="ingest")
 cli.add_command(watch_command, name="watch")
 cli.add_command(route_command, name="route")
+cli.add_command(adjudicate_command, name="adjudicate")
 cli.add_command(replay_command, name="replay")
 
 

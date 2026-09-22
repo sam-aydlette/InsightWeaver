@@ -9,7 +9,7 @@ key to test the reproducibility of a replay would be testing the wrong thing.
 
 import pytest
 
-from .stubs import add_observations, add_watches
+from .stubs import add_observations, add_routes, add_watches
 
 
 @pytest.fixture
@@ -23,5 +23,7 @@ def source(test_session):
 
 
 @pytest.fixture
-def observations(test_session, source):
+def observations(test_session, watches, source):
+    """The stored corpus, routed: what the adjudicator is allowed to see."""
+    add_routes(test_session)
     return source
