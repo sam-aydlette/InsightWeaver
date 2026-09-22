@@ -7,12 +7,14 @@ this prompt version has already answered -- a row in ``adjudications``, or an
 ``adjudications`` row per pair asked, whatever the answer, and an ``evidence``
 row when the answer was evidence. Run twice, the second run asks nothing.
 
-**Which pairs.** Every routed pair. Expiry is Tier 1's gate: ``route`` links
-only watches live on the day it runs, so a routed pair is one that was live
-when it was routed, and adjudication and replay both read exactly that set
-with no date-dependent filter of their own (decided 2026-09-22 after review;
-the two tiers had briefly disagreed). Retirement and resolution join the gate
-in backlog task 030.
+**Which pairs.** Every routed pair on an open watch. Expiry is Tier 1's gate:
+``route`` links only watches live on the day it runs, so a routed pair is one
+that was live when it was routed, and adjudication and replay both read
+exactly that set with no date-dependent filter of their own (decided
+2026-09-22 after review; the two tiers had briefly disagreed). Retired and
+resolved watches are skipped by both (task 030): a state, not a date, and
+asking the model about a watch the operator has closed would cost money for
+nothing.
 
 **Progress survives interruption.** Each pair's ledger row is committed as
 soon as it is written, so a run interrupted at pair forty keeps thirty-nine
@@ -31,6 +33,7 @@ from dataclasses import dataclass, field
 from sqlalchemy.orm import Session
 
 from ..database.models import Adjudication, Evidence, Observation, Route, Watch
+from ..position.ledger import open_clause
 from .adjudicator import ObservationView
 from .claude_adjudicator import ClaudeAdjudicator
 from .prompt import build_messages, estimate_tokens
@@ -74,7 +77,7 @@ def pending_pairs(db: Session, prompt_version: str, *, limit: int | None = None)
     if limit is not None and limit < 1:
         raise ValueError(f"limit must be at least 1, got {limit}")
     done = _answered(db, prompt_version)
-    watches = {str(w.id): w for w in db.query(Watch).all()}
+    watches = {str(w.id): w for w in db.query(Watch).filter(open_clause()).all()}
     rows = (
         db.query(Route.observation_hash, Route.watch_id, Observation.payload)
         .join(Observation, Observation.content_hash == Route.observation_hash)
@@ -83,7 +86,7 @@ def pending_pairs(db: Session, prompt_version: str, *, limit: int | None = None)
     )
     pairs = []
     for content_hash, watch_id, payload in rows:
-        if (str(content_hash), str(watch_id)) in done:
+        if str(watch_id) not in watches or (str(content_hash), str(watch_id)) in done:
             continue
         view = ObservationView(content_hash=str(content_hash), payload=dict(payload))
         pairs.append(Pair(view=view, watch=watches[str(watch_id)]))

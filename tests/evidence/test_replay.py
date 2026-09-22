@@ -300,3 +300,41 @@ class TestAdjudicatorRegistry:
         """
         monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
         assert rebuild(test_session, KeywordAdjudicator("v1"))
+
+
+class TestClosedWatches:
+    """Task 030: retired and resolved watches are outside a replay; expired ones are not."""
+
+    def test_rebuild_skips_a_retired_watch_and_keeps_an_expired_one(
+        self, test_session, watches, observations
+    ):
+        from datetime import date, datetime
+
+        from src.database.models import Watch
+
+        test_session.get(Watch, "conmon-scope-expands").retired_at = datetime(2026, 8, 30)
+        test_session.get(Watch, "hiring-market-tightens").expires = date(2020, 1, 1)
+        test_session.flush()
+
+        rows = rebuild(test_session, KeywordAdjudicator("v1"))
+
+        assert [r.watch_id for r in rows] == ["hiring-market-tightens"]
+
+    def test_commit_never_deletes_a_closed_watch_s_stored_rows(
+        self, test_session, watches, observations
+    ):
+        from datetime import datetime
+
+        from src.database.models import Evidence, Watch
+
+        commit(test_session, "v1", rebuild(test_session, KeywordAdjudicator("v1")))
+        assert test_session.query(Evidence).count() == 2
+        test_session.get(Watch, "conmon-scope-expands").retired_at = datetime(2026, 8, 30)
+        test_session.flush()
+
+        written = commit(test_session, "v1", rebuild(test_session, KeywordAdjudicator("v1")))
+
+        assert written == {"inserted": 0, "deleted": 0}
+        assert test_session.query(Evidence).count() == 2
+        assert len(stored_evidence(test_session, "v1")) == 1
+        assert len(stored_evidence(test_session, "v1", open_only=False)) == 2

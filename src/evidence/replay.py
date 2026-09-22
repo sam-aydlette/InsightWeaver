@@ -36,6 +36,7 @@ from dataclasses import dataclass, field
 from sqlalchemy.orm import Session
 
 from ..database.models import Evidence, Observation, Route, Watch
+from ..position.ledger import open_clause
 from .adjudicator import Adjudicator, ObservationView
 
 logger = logging.getLogger(__name__)
@@ -114,12 +115,16 @@ def rebuild(
     observation, only the watches Tier 1 routed it to, which is exactly the
     pair set ``insightweaver adjudicate`` asks about (changed 2026-09-22,
     backlog task 029; before that every observation was judged against every
-    watch). ``limit`` counts routed observations, in hash order, so a bounded
-    replay of a model version judges at least one pair. Writes nothing, ever
-    -- committing is :func:`commit`, and keeping them separate is what makes a
-    diff safe to run against a corpus you care about.
+    watch). Retired and resolved watches are skipped, as ``adjudicate`` skips
+    them; expired ones are not, because expiry is routing's gate and a
+    date-dependent filter here would make a replay depend on the day it ran
+    (task 030; the rule is stated in ``src/position/ledger.py``). ``limit``
+    counts routed observations, in hash order, so a bounded replay of a model
+    version judges at least one pair. Writes nothing, ever -- committing is
+    :func:`commit`, and keeping them separate is what makes a diff safe to run
+    against a corpus you care about.
     """
-    watches = {str(w.id): w for w in db.query(Watch).order_by(Watch.id).all()}
+    watches = {str(w.id): w for w in db.query(Watch).filter(open_clause()).order_by(Watch.id).all()}
     routed: dict[str, list[str]] = {}
     for content_hash, watch_id in (
         db.query(Route.observation_hash, Route.watch_id)
@@ -139,6 +144,8 @@ def rebuild(
     rows: list[EvidenceRow] = []
     for content_hash, payload in query.all():
         routed_watches = [watches[w] for w in routed.get(content_hash, ()) if w in watches]
+        if not routed_watches:
+            continue  # every route on this observation is to a retired or resolved watch
         view = ObservationView(content_hash=content_hash, payload=dict(payload or {}))
         for verdict in adjudicator.adjudicate(view, routed_watches):
             rows.append(
@@ -153,19 +160,27 @@ def rebuild(
     return sorted(rows)
 
 
-def stored_evidence(db: Session, prompt_version: str) -> list[EvidenceRow]:
-    """The evidence already stored for one prompt version, in the same order."""
-    rows = (
-        db.query(
-            Evidence.observation_hash,
-            Evidence.watch_id,
-            Evidence.direction,
-            Evidence.magnitude,
-            Evidence.rationale,
-        )
-        .filter(Evidence.prompt_version == prompt_version)
-        .all()
-    )
+def stored_evidence(
+    db: Session, prompt_version: str, *, open_only: bool = True
+) -> list[EvidenceRow]:
+    """
+    The evidence already stored for one prompt version, in the same order.
+
+    ``open_only`` (the default since backlog task 030) restricts the rows to
+    watches that are neither retired nor resolved, which is the set a replay
+    judges; without it a replay would read a closed watch's rows as removed
+    and ``commit`` would delete them.
+    """
+    query = db.query(
+        Evidence.observation_hash,
+        Evidence.watch_id,
+        Evidence.direction,
+        Evidence.magnitude,
+        Evidence.rationale,
+    ).filter(Evidence.prompt_version == prompt_version)
+    if open_only:
+        query = query.join(Watch, Watch.id == Evidence.watch_id).filter(open_clause())
+    rows = query.all()
     return sorted(EvidenceRow(row[0], row[1], row[2], float(row[3]), row[4] or "") for row in rows)
 
 
@@ -207,9 +222,11 @@ def commit(
     nothing here can touch one.
 
     Refuses, before writing anything, if a key exists for this version with a
-    different verdict. See :class:`NondeterministicReplay`.
+    different verdict. See :class:`NondeterministicReplay`. Rows belonging to
+    retired or resolved watches are outside the comparison and are never
+    deleted here: the replay did not judge them (task 030).
     """
-    current = stored_evidence(db, prompt_version)
+    current = stored_evidence(db, prompt_version, open_only=True)
     against_self = diff(replayed, current)
 
     if against_self.changed:
@@ -276,7 +293,7 @@ def format_diff(
     """
     lines = [
         f"replay: prompt-version={prompt_version} against={baseline_version}",
-        f"corpus: {observations} observation(s), {watches} watch(es)"
+        f"corpus: {observations} observation(s), {watches} open watch(es)"
         + (f", {pairs} routed pair(s)" if pairs is not None else ""),
         (
             f"diff: {result.counts['added']} added, "

@@ -103,6 +103,18 @@ class TestRouting:
             wet.clusters_omitted,
         )
 
+    def test_a_retired_or_resolved_watch_is_not_live(self, corpus):
+        from src.position.ledger import resolve_watch
+
+        corpus.get(Watch, "conmon-scope-expands").retired_at = datetime(2026, 8, 30)
+        resolve_watch(corpus, "hiring-market-tightens", outcome="no", note="settled")
+        corpus.flush()
+
+        assert live_watches(corpus, TODAY) == []
+        report = route(corpus, since=SINCE, today=TODAY)
+        assert report.watches == []
+        assert corpus.query(Route).count() == 0
+
     def test_an_expired_watch_is_not_live(self, corpus):
         assert {w.watch_id for w in live_watches(corpus, date(2027, 1, 1))} == {
             "conmon-scope-expands"

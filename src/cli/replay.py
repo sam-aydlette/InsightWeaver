@@ -42,6 +42,7 @@ from ..evidence import (
     stored_evidence,
 )
 from ..evidence.claude_adjudicator import AdjudicationFailed
+from ..position.ledger import open_clause
 from .colors import accent, header, muted, warning
 
 
@@ -108,7 +109,7 @@ def replay_command(prompt_version, against, adjudicator_path, limit, do_commit):
 
     with get_db() as session:
         observations = session.query(Observation).count()
-        watches = session.query(Watch).count()
+        watches = session.query(Watch).filter(open_clause()).count()
 
         if observations == 0:
             click.echo(

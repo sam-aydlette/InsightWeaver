@@ -26,6 +26,7 @@ from sqlalchemy.orm import Session
 
 from src.config.settings import settings
 from src.database.models import Observation, Route, RSSFeed, Watch
+from src.position.ledger import live_clause
 from src.sources.minhash import group_near_duplicates
 from src.sources.observation import observation_text
 
@@ -81,10 +82,10 @@ def live_watches(db: Session, today: date) -> list[CompiledWatch]:
     """
     Every watch routing may link to, compiled.
 
-    Live means not expired. Backlog task 030 adds retired and resolved to this
-    filter; until then those states do not exist.
+    Live means not expired, not retired and not resolved; the definition is
+    :func:`src.position.ledger.live_clause` and this is one of its readers.
     """
-    rows = db.query(Watch.id, Watch.triggers).filter(Watch.expires >= today).order_by(Watch.id)
+    rows = db.query(Watch.id, Watch.triggers).filter(live_clause(today)).order_by(Watch.id)
     return [compile_triggers(str(watch_id), triggers) for watch_id, triggers in rows.all()]
 
 

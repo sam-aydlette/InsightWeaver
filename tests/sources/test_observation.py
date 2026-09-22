@@ -228,11 +228,11 @@ class TestOneWritePath:
 
         The guarantee that observations are content-addressed is only as strong
         as the number of places that can write one, so the count is asserted
-        rather than trusted. src/database/models.py is excluded because that is
+        rather than trusted. The model module is excluded because that is
         where the class is defined.
         """
         offenders = modules_constructing(
-            "Observation", {"sources/observation.py", "database/models.py"}
+            "Observation", {"sources/observation.py", "database/models/observations.py"}
         )
         assert offenders == [], (
             f"these modules construct an Observation directly: {offenders}. "
@@ -248,7 +248,9 @@ class TestOneWritePath:
         kept alive by its own tests, and it was deleted in task 025 rather than
         documented, because a documented hole in an invariant is still a hole.
         """
-        offenders = modules_constructing("Article", {"sources/store.py", "database/models.py"})
+        offenders = modules_constructing(
+            "Article", {"sources/store.py", "database/models/sources.py"}
+        )
         assert offenders == [], (
             f"these modules construct an Article directly: {offenders}. "
             f"Every article write goes through src/sources/store.py::store_items, "

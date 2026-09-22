@@ -180,29 +180,44 @@ def sync_watches(session: Any, watches: list[Watch]) -> dict[str, list[str]]:
     """
     Make the ``watches`` table match the file, and report what moved.
 
-    The file is authoritative: a watch removed from it is removed from the
-    table. That is the whole write path -- there is no other way a row gets into
-    this table, and there is deliberately no argument by which a caller could
-    describe a watch that is not in the file.
+    The file is authoritative for what a watch *is*: claim, decision, triggers,
+    expiry, staleness. That is the whole write path -- there is no other way a
+    row gets into this table, and there is deliberately no argument by which a
+    caller could describe a watch that is not in the file.
+
+    Two things the file does not overwrite, since 2026-09-22 (backlog task 030):
+
+    * **Belief.** ``watches.belief`` is the value at registration. Every value
+      is a ledger row (``src.position.ledger``); sync writes a ``file`` row
+      when a watch is first stored and whenever the file's belief differs from
+      the current one, so a file that is behind the operator's own updates
+      shows up as a change with a source, not as a silent overwrite.
+    * **Existence.** A watch absent from the file is *retired*, not deleted:
+      its belief history is the calibration record and a delete would take it.
+      A retired id that returns to the file is restored. A resolved watch is
+      updated but never un-resolved; the file cannot grade or ungrade.
 
     Takes already-validated :class:`Watch` values, so an invalid file cannot
     reach this function at all.
-
-
-    Removing a watch from the file deletes its row. That is correct while this
-    table holds nothing derived -- the file is the source of truth and a watch
-    you deleted is a watch you stopped holding. **Task 017 hangs belief history
-    off these rows**, and at that point a delete destroys the record of what you
-    believed and when, which is the calibration data the system exists to
-    accumulate. Revisit this before 017 lands: the likely answer is a soft
-    retire rather than a delete. Noted 2026-08-31 (task 013).
     """
     from src.database.models import Watch as WatchRow
+    from src.utils import utcnow
+
+    from .ledger import current_beliefs, record_belief
 
     incoming = {w.id: w for w in watches}
     existing = {row.id: row for row in session.query(WatchRow).all()}
+    beliefs = current_beliefs(session)
 
-    summary: dict[str, list[str]] = {"added": [], "updated": [], "removed": []}
+    summary: dict[str, list[str]] = {
+        "added": [],
+        "updated": [],
+        "retired": [],
+        "restored": [],
+        "belief_changed": [],
+        "resolved": [],
+    }
+    now = utcnow()
 
     for watch_id, watch in incoming.items():
         row = existing.get(watch_id)
@@ -219,21 +234,55 @@ def sync_watches(session: Any, watches: list[Watch]) -> dict[str, list[str]]:
                     staleness_alert_days=watch.staleness_alert_days,
                 )
             )
+            session.flush()
+            record_belief(
+                session,
+                watch_id,
+                watch.belief,
+                source="file",
+                note="registered from the watch file",
+                observed_at=now,
+            )
             summary["added"].append(watch_id)
             continue
-        row.claim = watch.claim
-        row.belief = watch.belief
-        row.so_what = watch.so_what
-        row.decision_key = watch.decision_key
-        row.triggers = watch.triggers_json()
-        row.expires = watch.expires
-        row.staleness_alert_days = watch.staleness_alert_days
-        summary["updated"].append(watch_id)
+
+        if row.retired_at is not None:
+            row.retired_at = None
+            summary["restored"].append(watch_id)
+        definition = {
+            "claim": watch.claim,
+            "so_what": watch.so_what,
+            "decision_key": watch.decision_key,
+            "triggers": watch.triggers_json(),
+            "expires": watch.expires,
+            "staleness_alert_days": watch.staleness_alert_days,
+        }
+        changed = {k: v for k, v in definition.items() if getattr(row, k) != v}
+        for key, value in changed.items():
+            setattr(row, key, value)
+        if changed:
+            summary["updated"].append(watch_id)
+
+        if row.resolved_at is not None:
+            summary["resolved"].append(watch_id)
+            continue
+        current = beliefs[watch_id].belief
+        if abs(current - watch.belief) > 1e-9:
+            session.flush()
+            record_belief(
+                session,
+                watch_id,
+                watch.belief,
+                source="file",
+                note=f"the watch file changed the belief from {current:g}",
+                observed_at=now,
+            )
+            summary["belief_changed"].append(watch_id)
 
     for watch_id, row in existing.items():
-        if watch_id not in incoming:
-            session.delete(row)
-            summary["removed"].append(watch_id)
+        if watch_id not in incoming and row.retired_at is None:
+            row.retired_at = now
+            summary["retired"].append(watch_id)
 
     session.flush()
     return summary

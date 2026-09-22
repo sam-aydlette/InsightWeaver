@@ -85,7 +85,35 @@ class TestPendingPairs:
 
     def test_expiry_is_routing_s_gate_not_adjudication_s(self, corpus):
         """A routed pair on a watch that has since expired is still asked once."""
-        assert len(pending_pairs(corpus, PROMPT_VERSION)) == 2
+        from datetime import date
+
+        from src.database.models import Watch
+
+        corpus.get(Watch, "hiring-market-tightens").expires = date(2020, 1, 1)
+        corpus.flush()
+
+        assert {p.watch.id for p in pending_pairs(corpus, PROMPT_VERSION)} == {
+            "conmon-scope-expands",
+            "hiring-market-tightens",
+        }
+        assert {r.watch_id for r in rebuild(corpus, KeywordAdjudicator("v1"))} == {
+            "conmon-scope-expands",
+            "hiring-market-tightens",
+        }
+
+    def test_a_retired_or_resolved_watch_s_pairs_are_not_pending(self, corpus):
+        """A state the operator set, not a date: asking about a closed watch costs for nothing."""
+        from datetime import datetime
+
+        from src.database.models import Watch
+        from src.position.ledger import resolve_watch
+
+        corpus.get(Watch, "conmon-scope-expands").retired_at = datetime(2026, 8, 30)
+        resolve_watch(corpus, "hiring-market-tightens", outcome="yes", note="settled")
+        corpus.flush()
+
+        assert pending_pairs(corpus, PROMPT_VERSION) == []
+        assert rebuild(corpus, KeywordAdjudicator("v1")) == []
 
     def test_limit_narrows_the_run_and_zero_is_refused(self, corpus):
         assert len(pending_pairs(corpus, PROMPT_VERSION, limit=1)) == 1
