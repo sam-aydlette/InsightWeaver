@@ -12,6 +12,18 @@
 config/position.yaml
 config/watches.yaml
 
+# Estate (docs/ESTATE_PLAN.md, backlog task 026, 2026-09-22).
+# A real estate directory at the repo root would hold the principal's nodes; it
+# belongs in the private repo beside Position. The audit log holds every model
+# payload that left the machine. Exports are the operator's data.
+/estate/
+data/llm-audit/
+data/exports/
+# OAuth artefacts by name, in case a sensor library ever writes one to disk.
+client_secret*.json
+token*.json
+.secrets.baseline.tmp
+
 # User profile and personal configuration (contains personal information)
 config/user_profile.json
 config/context_modules/core/decision_context.json

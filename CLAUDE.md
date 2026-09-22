@@ -70,7 +70,13 @@ You are working on InsightWeaver, a CLI tool that processes RSS feeds into exami
 4. Epistemic autonomy as the goal -- the tool equips reasoning, does not deliver conclusions.
 5. Honest self-awareness about the tool's own narrative.
 
-**The architectural through-line:** Questions are the join key. Predictions key off Questions. DecisionEvidence keys off Questions. The forecast command is a derived view over the predictions ledger, not a separate engine. There is no "unknown unknowns" bucket -- the tool does not fabricate observables it cannot ground.
+**The architectural through-line** (rewritten 2026-09-22 for the estate plan, `docs/ESTATE_PLAN.md`;
+Questions, Predictions and Frames were deleted on 2026-08-31): nodes are the join key. A Watch is
+the standing requirement and names the decision node it serves. Evidence keys off Watches. Grid
+observations key off nodes and are append-only; current state is a view over them, and a value
+past its horizon is reported as "not observed since", never carried forward. The brief is a derived
+view over grid state, evidence and watch state, not a separate engine. There is no "unknown
+unknowns" bucket -- the tool does not fabricate observables it cannot ground.
 
 Reference `docs/CONCEPTS.md` for the entity-by-entity model.
 

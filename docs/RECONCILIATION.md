@@ -51,3 +51,17 @@ several genuinely careful pieces of engineering -- the offline render path, the 
 the person-tracking boundary. It was wrong because a document of constant length emitted on a fixed
 schedule cannot carry information about whether anything happened. That is a property of the shape,
 not of the implementation quality, which is exactly why better synthesis was never going to fix it.
+
+## Addendum, 2026-09-22: the estate plan is now the plan
+
+The monitoring re-architecture above resolved *which product this is* -- a commitment graph, not
+a briefing generator -- and built its first three tasks. The operator's brief of 2026-09-22 keeps
+that resolution and adds the half it lacked: the principal's own estate as a graph of nodes and
+edges backed by append-only observations, with the world side joining to it through watches.
+
+`docs/ESTATE_PLAN.md` is the plan from here. Its section 1 is the audit, its section 2 lists where
+it disagrees with the Stage 0 plan and how each was decided, and its section 7 records the
+decisions. Two of them change this note's own claims: there is no notification path and no
+deployment -- everything runs on demand on the operator's laptop and nothing sends anything -- so
+the "notification is the update event" line above is now "the brief is the update event, run by
+hand". The graph is still the artifact.

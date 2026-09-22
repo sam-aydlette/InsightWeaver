@@ -23,7 +23,9 @@ classifiers = [
 ]
 
 dependencies = [
-    "anthropic>=0.39.0",
+    # 1.x: output_config is a named parameter and messages.parse() exists,
+    # which Tier 2's structured output needs (2026-09-22, backlog task 026).
+    "anthropic>=1.7,<2",
     "aiohttp>=3.10.11",
     "feedparser>=6.0.11",
     "python-dotenv>=1.0.1",
@@ -35,7 +37,10 @@ dependencies = [
     "lxml>=5.3.0",
     "sqlalchemy>=2.0.0",
     "pydantic-settings>=2.0.0",
+    "pydantic>=2.0",
     "click>=8.0.0",
+    # Credentials live in the OS keychain (src/estate/credentials.py).
+    "keyring>=25.0",
 ]
 
 [project.optional-dependencies]
@@ -49,10 +54,16 @@ dev = [
     "mypy>=1.13.0",
     "pre-commit>=4.0.1",
     "pip-tools>=7.4.1",
+    # Secret scanning, in pre-commit and CI (2026-09-22, backlog task 026).
+    "detect-secrets>=1.5.0",
+    # `make typecheck` needs the PyYAML stubs; pre-commit already installed them
+    # for its own mypy hook, so the gate passed there and failed in a plain venv.
+    "types-PyYAML",
 ]
 
 [project.scripts]
 insightweaver = "src.cli.app:cli"
+estate = "src.estate.cli:cli"
 
 [project.urls]
 Homepage = "https://github.com/yourusername/insightweaver"

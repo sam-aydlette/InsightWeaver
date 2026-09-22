@@ -106,8 +106,16 @@ jobs:
       with:
         python-version: '3.11'
 
+    # Fails the build on a new secret. `safety` below never could (its `|| true`
+    # is a deliberate soft check of dependency advisories), so before 2026-09-22
+    # this job could not fail on anything. (backlog task 026)
+    - name: Scan for secrets
+      run: |  # pragma: allowlist secret
+        python -m pip install --upgrade pip
+        pip install detect-secrets==1.5.0
+        git ls-files -z | xargs -0 detect-secrets-hook --baseline .secrets.baseline
+
     - name: Check for security vulnerabilities
       run: |
-        python -m pip install --upgrade pip
         pip install safety
         safety check --json || true

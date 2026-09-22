@@ -1,21 +1,75 @@
 """
-Minimal Claude API client.
+Minimal Claude API client: the one place a model request is constructed.
 
 Moved here from ``src/context/`` by backlog task 012 for Tier 2 adjudication.
-The synthesis product that used to call it is deleted; this file is not,
-because it encodes two outages that cost live runs and that a rewrite from a
-blank file would reintroduce -- see :data:`DEFAULT_MODEL` and
-:func:`_response_text` below.
+Rewritten 2026-09-22 by task 026 (Phase 0 of ``docs/ESTATE_PLAN.md``) with
+three changes and two outages kept:
+
+**Changes.**
+
+1. **Every request is audited before it is sent** (:mod:`src.llm.audit`), and
+   the usage the API reports is audited after. There is no argument that turns
+   this off. The repository had no token accounting at all before this; the
+   cost claims in the monitoring plan were unfalsifiable.
+2. **The key comes from the OS keychain** (:mod:`src.estate.credentials`), read
+   when the client is constructed, never at import. A missing key is
+   :class:`~src.estate.credentials.MissingCredential`, raised where the request
+   would have been built, with the command that fixes it.
+3. **The model is chosen by role, not at the call site.** ``role="triage"``
+   reads ``settings.llm_triage_model``; ``role="synthesis"`` reads
+   ``settings.llm_synthesis_model``. Decided 2026-09-22: Sonnet 5 adjudicates,
+   Opus 5 writes. ``effort`` is now the ``output_config`` named parameter,
+   which the SDK has had since 1.x; the ``extra_body`` workaround is gone with
+   the pin that needed it.
+
+``analyze_with_context`` and ``_build_system_prompt`` were deleted here: they
+formatted ``user_profile`` and ``articles`` sections for the briefing product
+task 012 removed, had no caller, and would have been the next thing to drift.
+
+**Outages kept**, because a rewrite from a blank file reintroduces them: see
+:data:`_response_text` (the ``ThinkingBlock`` shape change and the refusal
+rule) and the model note in ``__init__`` (a retired model that failed silently
+for ten weeks).
 """
 
+from __future__ import annotations
+
 import logging
+from dataclasses import dataclass
 from typing import Any
 
 from anthropic import AsyncAnthropic
 
 from ..config.settings import settings
+from ..estate import credentials
+from . import audit
 
 logger = logging.getLogger(__name__)
+
+__all__ = ["EFFORT_LEVELS", "ROLES", "ClaudeClient", "ModelResponse"]
+
+EFFORT_LEVELS = ("low", "medium", "high", "xhigh", "max")
+
+# role -> the settings attribute naming its model. Two roles, two settings, no
+# model string anywhere else.
+ROLES: dict[str, str] = {
+    "triage": "llm_triage_model",
+    "synthesis": "llm_synthesis_model",
+}
+
+
+@dataclass(frozen=True)
+class ModelResponse:
+    """What a call returned, and what it cost. ``audit_id`` finds it in the log."""
+
+    text: str
+    model: str
+    stop_reason: str | None
+    input_tokens: int
+    output_tokens: int
+    cache_read_input_tokens: int
+    cache_creation_input_tokens: int
+    audit_id: str
 
 
 def _response_text(response) -> str:
@@ -43,31 +97,44 @@ def _response_text(response) -> str:
     return "".join(parts)
 
 
+def _usage(response) -> dict[str, int]:
+    """The four token counts, as plain ints, zero when the API omits one."""
+    usage = getattr(response, "usage", None)
+    return {
+        name: int(getattr(usage, name, None) or 0)
+        for name in (
+            "input_tokens",
+            "output_tokens",
+            "cache_read_input_tokens",
+            "cache_creation_input_tokens",
+        )
+    }
+
+
 class ClaudeClient:
-    """Minimal Claude API client for context-driven analysis"""
+    """One role, one model, one audited send path."""
 
-    def __init__(self, api_key: str | None = None, model: str | None = None):
+    def __init__(
+        self, role: str = "triage", *, api_key: str | None = None, model: str | None = None
+    ):
         """
-        Initialize Claude client
-
         Args:
-            api_key: Anthropic API key (defaults to settings.anthropic_api_key)
-            model: Model id to use; defaults to Sonnet for synthesis workloads.
-                Pass a Haiku id for cheap classification / matching calls.
+            role: ``triage`` or ``synthesis``; picks the model from settings.
+            api_key: Only for tests. Everything else reads the keychain.
+            model: Only for tests. Everything else reads the role's setting.
         """
-        self.api_key = api_key or settings.anthropic_api_key
-        if not self.api_key:
-            raise ValueError("ANTHROPIC_API_KEY not configured")
-
+        if role not in ROLES:
+            raise ValueError(f"role must be one of {sorted(ROLES)}, got {role!r}")
+        self.role = role
+        self.api_key = api_key or credentials.read(credentials.ANTHROPIC)
         self.client = AsyncAnthropic(api_key=self.api_key, timeout=300.0)
-        # Changed 2026-08-26: claude-sonnet-4-20250514 was RETIRED on 2026-06-15 and
-        # returns 404. Every synthesis run since then has failed at the API call. The
-        # documented replacement for that model is claude-sonnet-5.
-        self.model = model or "claude-sonnet-5"
-        # Raised from 16384 the same day. max_tokens caps thinking AND response text
-        # together, and this model thinks by default, so the old ceiling would truncate
-        # a full-length synthesis mid-answer. Its tokenizer also produces more tokens
-        # for the same text than the retired model's did.
+        # 2026-08-26: claude-sonnet-4-20250514 was RETIRED on 2026-06-15 and returned
+        # 404 for ten weeks while the CLI printed a duration and exited 0. The model
+        # is a setting now so that the next retirement is a one-line change in one
+        # place, and the audit log records which model actually served each call.
+        self.model = model or str(getattr(settings, ROLES[role]))
+        # max_tokens caps thinking AND response text together, and these models
+        # think by default, so a low ceiling truncates a full answer mid-sentence.
         self.max_tokens = 32000
 
     async def analyze(
@@ -76,142 +143,56 @@ class ClaudeClient:
         user_message: str,
         effort: str = "high",
         max_tokens: int | None = None,
-    ) -> str:
-        """
-        Send analysis request to Claude
-
-        Args:
-            system_prompt: System context and instructions
-            user_message: User query/request
-            effort: Reasoning depth -- "low" | "medium" | "high" | "xhigh" | "max"
-            max_tokens: Maximum tokens in response
-
-        Returns:
-            Claude's response text
-        """
-        try:
-            response = await self.client.messages.create(
-                model=self.model,
-                max_tokens=max_tokens or self.max_tokens,
-                # Sent via extra_body: the pinned SDK predates output_config as a
-                # named parameter and raises TypeError on it, but forwards extra_body
-                # into the request unchanged. Added 2026-08-26 -- once the SDK pin
-                # moves past that, this becomes output_config={"effort": effort}.
-                extra_body={"output_config": {"effort": effort}},
-                system=system_prompt,
-                messages=[{"role": "user", "content": user_message}],
-            )
-
-            return _response_text(response)
-
-        except Exception as e:
-            logger.error(f"Claude API error: {e}")
-            raise
+    ) -> ModelResponse:
+        """One user turn."""
+        return await self.analyze_conversation(
+            system_prompt, [{"role": "user", "content": user_message}], effort, max_tokens
+        )
 
     async def analyze_conversation(
         self,
         system_prompt: str,
-        messages: list[dict[str, str]],
+        messages: list[dict[str, Any]],
         effort: str = "high",
         max_tokens: int | None = None,
-    ) -> str:
+    ) -> ModelResponse:
         """
-        Send conversation request to Claude with message history
+        Send a conversation and return the text with its usage.
 
-        Args:
-            system_prompt: System context and instructions
-            messages: List of message dicts with 'role' and 'content' keys
-                      Roles must alternate: user, assistant, user, assistant...
-            effort: Reasoning depth -- "low" | "medium" | "high" | "xhigh" | "max"
-            max_tokens: Maximum tokens in response
-
-        Returns:
-            Claude's response text
+        The request is written to the audit log before the call, the usage after
+        it, and the exception in between if the call fails. A refusal is
+        recorded as a response (it is one) and then raised.
         """
+        if effort not in EFFORT_LEVELS:
+            raise ValueError(f"effort must be one of {EFFORT_LEVELS}, got {effort!r}")
+
+        request: dict[str, Any] = {
+            "model": self.model,
+            "max_tokens": max_tokens or self.max_tokens,
+            "system": system_prompt,
+            "messages": messages,
+            "output_config": {"effort": effort},
+        }
+        audit_id = audit.record_request(self.role, request)
+
         try:
-            response = await self.client.messages.create(
-                model=self.model,
-                max_tokens=max_tokens or self.max_tokens,
-                # Sent via extra_body: the pinned SDK predates output_config as a
-                # named parameter and raises TypeError on it, but forwards extra_body
-                # into the request unchanged. Added 2026-08-26 -- once the SDK pin
-                # moves past that, this becomes output_config={"effort": effort}.
-                extra_body={"output_config": {"effort": effort}},
-                system=system_prompt,
-                messages=messages,
-            )
-
-            return _response_text(response)
-
-        except Exception as e:
-            logger.error(f"Claude API error: {e}")
+            response = await self.client.messages.create(**request)
+        except Exception as exc:
+            audit.record_error(audit_id, exc)
+            logger.error(f"Claude API error: {exc}")
             raise
 
-    async def analyze_with_context(
-        self, context: dict[str, Any], task: str, effort: str = "high"
-    ) -> str:
-        """
-        Analyze using curated context
-
-        Args:
-            context: Curated context dictionary supplied by the caller
-            task: Task description/question
-            effort: Reasoning depth
-
-        Returns:
-            Claude's response text
-        """
-        system_prompt = self._build_system_prompt(context)
-        return await self.analyze(system_prompt, task, effort)
-
-    def _build_system_prompt(self, context: dict[str, Any]) -> str:
-        """
-        Build system prompt from curated context with few-shot examples
-
-        Args:
-            context: Curated context dictionary
-
-        Returns:
-            Formatted system prompt
-        """
-        parts = []
-
-        # Add user profile context
-        if "user_profile" in context:
-            profile = context["user_profile"]
-            parts.append("## User Context")
-            parts.append(f"Location: {profile.get('location', 'Unknown')}")
-            parts.append(
-                f"Professional Domains: {', '.join(profile.get('professional_domains', []))}"
-            )
-            parts.append(f"Civic Interests: {', '.join(profile.get('civic_interests', []))}")
-            parts.append("")
-
-        # Add recent articles context
-        if "articles" in context:
-            parts.append(f"## Recent Articles ({len(context['articles'])} total)")
-            for i, article in enumerate(context["articles"][:20], 1):  # Limit to top 20
-                parts.append(f"\n### Article {i}")
-                parts.append(f"**Title:** {article.get('title', 'Untitled')}")
-                parts.append(f"**Source:** {article.get('source', 'Unknown')}")
-                if article.get("published_date"):
-                    parts.append(f"**Date:** {article['published_date']}")
-                if article.get("content"):
-                    parts.append(f"**Content:** {article['content'][:500]}...")
-                if article.get("entities"):
-                    parts.append(f"**Entities:** {', '.join(article['entities'][:10])}")
-            parts.append("")
-
-        # Add memory/historical context
-        if "memory" in context:
-            parts.append("## Historical Context")
-            parts.append(context["memory"])
-            parts.append("")
-
-        # Add instructions
-        if "instructions" in context:
-            parts.append("## Instructions")
-            parts.append(context["instructions"])
-            parts.append("")
-
-        return "\n".join(parts)
+        usage = _usage(response)
+        audit.record_response(
+            audit_id,
+            model=str(getattr(response, "model", self.model)),
+            stop_reason=getattr(response, "stop_reason", None),
+            usage=usage,
+        )
+        return ModelResponse(
+            text=_response_text(response),
+            model=str(getattr(response, "model", self.model)),
+            stop_reason=getattr(response, "stop_reason", None),
+            audit_id=audit_id,
+            **usage,
+        )
