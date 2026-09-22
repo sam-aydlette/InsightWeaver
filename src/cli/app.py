@@ -12,16 +12,18 @@ idempotent command has no use for a banner, a sleep or a prefix dispatcher.
 Invoking ``insightweaver`` with no subcommand now prints the group's help and
 exits.
 
-The command table is deliberately short. It is not a placeholder for the new
-pipeline -- building that is a separate task -- and nothing here should grow a
-command back by habit.
+The command table grows one task at a time as the decision monitor lands
+(``docs/PLAN.md`` section 4): ``ingest`` and ``route`` on 2026-09-22 (backlog
+task 028). Nothing here should grow a command back by habit.
 """
 
 import click
 
 from .auth import auth
+from .ingest import ingest_command
 from .output import set_debug_mode
 from .replay import replay_command
+from .route import route_command
 from .sources import sources_command
 from .watch import watch_command
 
@@ -34,8 +36,9 @@ def cli(ctx, debug):
     """
     InsightWeaver - monitoring against pre-registered watches.
 
-    The briefing product was removed in backlog task 012. What remains is
-    ingestion, the source layer, and the Position/Watch units added by task 013.
+    Ingest sources and route observations to pre-registered watches. The
+    briefing product was removed in backlog task 012; adjudication and the
+    brief are the next tasks in docs/PLAN.md.
     """
     set_debug_mode(debug)
     ctx.ensure_object(dict)
@@ -46,11 +49,13 @@ def cli(ctx, debug):
         ctx.exit(0)
 
 
-# Register commands
-cli.add_command(sources_command, name="sources")
-cli.add_command(watch_command, name="watch")
-cli.add_command(replay_command, name="replay")
+# Register commands, in the order a morning runs them.
 cli.add_command(auth, name="auth")
+cli.add_command(sources_command, name="sources")
+cli.add_command(ingest_command, name="ingest")
+cli.add_command(watch_command, name="watch")
+cli.add_command(route_command, name="route")
+cli.add_command(replay_command, name="replay")
 
 
 if __name__ == "__main__":

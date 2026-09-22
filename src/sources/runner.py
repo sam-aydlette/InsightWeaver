@@ -24,6 +24,7 @@ Added 2026-08-26 for backlog task 005.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import Callable, Iterator, Sequence
 from contextlib import AbstractContextManager
@@ -38,6 +39,7 @@ from ..database.connection import get_db
 from ..utils import utcnow
 from .base import SourceAdapter, SourceUnavailable
 from .federal_register import FederalRegisterAdapter, FederalRegisterConfigError
+from .rss_adapter import RSSAdapter
 from .store import ensure_source, source_article_count, store_items
 
 logger = logging.getLogger(__name__)
@@ -205,26 +207,46 @@ async def run_adapters(
     adapters: Sequence[SourceAdapter],
     since: datetime,
     db_factory: DbFactory = get_db,
+    *,
+    concurrency: int = 1,
 ) -> AdapterRunSummary:
-    """Run adapters one after another. Sequential on purpose: these are guests
-    on public APIs and the whole set is a handful of requests."""
-    summary = AdapterRunSummary()
-    for adapter in adapters:
-        summary.results.append(await run_adapter(adapter, since, db_factory=db_factory))
+    """
+    Run adapters, at most ``concurrency`` at a time, and keep their order.
+
+    Sequential was right for two API adapters that are guests on public
+    services. It is not right for dozens of RSS feeds with thirty-second
+    timeouts, so ``ingest`` passes a small bound (2026-09-22, backlog task
+    028). Database work inside :func:`run_adapter` happens between awaits,
+    never across one, so sessions never interleave mid-transaction whatever
+    the bound.
+    """
+    if concurrency < 1:
+        raise ValueError(f"concurrency must be at least 1, got {concurrency}")
+    semaphore = asyncio.Semaphore(concurrency)
+
+    async def one(adapter: SourceAdapter) -> IngestResult:
+        async with semaphore:
+            return await run_adapter(adapter, since, db_factory=db_factory)
+
+    results = await asyncio.gather(*(one(adapter) for adapter in adapters))
+    summary = AdapterRunSummary(results=list(results))
     for line in summary.alerts:
         logger.error(f"SOURCE ALERT: {line}")
     return summary
 
 
-def build_configured_adapters(feeds_dir: Path | str | None = None) -> list[SourceAdapter]:
+def build_configured_adapters(
+    feeds_dir: Path | str | None = None, *, include_rss: bool = False
+) -> list[SourceAdapter]:
     """
-    Instantiate an adapter for every configured non-RSS source.
+    Instantiate an adapter for every configured source.
 
-    RSS feeds were excluded here because ``fetch_all_active_feeds`` owned them.
-    That path was closed on 2026-08-31 (backlog task 025) because it wrote
-    articles without observations; RSS feeds are still excluded from *this*
-    function, which only builds the non-RSS adapters named in config, and are
-    now read through ``src.sources.rss_adapter.RSSAdapter`` instead.
+    Non-RSS sources always; RSS feeds too when ``include_rss`` is set, one
+    :class:`~src.sources.rss_adapter.RSSAdapter` per feed in ``config/feeds/``.
+    RSS was excluded here while ``fetch_all_active_feeds`` owned it; that path
+    was closed on 2026-08-31 (backlog task 025) because it wrote articles
+    without observations, and since 2026-09-22 (task 028) ``ingest`` reads
+    every feed through this function and the one store path.
     """
     adapters: list[SourceAdapter] = []
     for name in sorted(non_rss_adapter_names(feeds_dir)):
@@ -240,6 +262,12 @@ def build_configured_adapters(feeds_dir: Path | str | None = None) -> list[Sourc
             adapters.append(factory())
         except FederalRegisterConfigError as exc:
             raise ValueError(f"adapter '{name}' is configured but unusable: {exc}")
+    if include_rss:
+        for feed in _configured_feeds(feeds_dir):
+            if feed.adapter != "rss":
+                continue
+            category = feed.domain_tags[0] if feed.domain_tags else "uncategorized"
+            adapters.append(RSSAdapter(name=feed.name, url=feed.url, category=category))
     return adapters
 
 
@@ -258,13 +286,16 @@ async def run_configured_adapters(
     since: datetime | None = None,
     feeds_dir: Path | str | None = None,
     db_factory: DbFactory = get_db,
+    *,
+    include_rss: bool = False,
+    concurrency: int = 1,
 ) -> AdapterRunSummary:
-    """Run every configured non-RSS source. Used by the pipeline's fetch stage."""
-    adapters = build_configured_adapters(feeds_dir)
+    """Run every configured source (non-RSS only unless ``include_rss``)."""
+    adapters = build_configured_adapters(feeds_dir, include_rss=include_rss)
     if not adapters:
         return AdapterRunSummary()
     window_start = since or (utcnow() - timedelta(days=DEFAULT_LOOKBACK_DAYS))
-    logger.info(
-        f"Running {len(adapters)} non-RSS source adapter(s) since {window_start.isoformat()}"
+    logger.info(f"Running {len(adapters)} source adapter(s) since {window_start.isoformat()}")
+    return await run_adapters(
+        adapters, window_start, db_factory=db_factory, concurrency=concurrency
     )
-    return await run_adapters(adapters, window_start, db_factory=db_factory)

@@ -39,6 +39,11 @@ one direction of authority and one writer:
 
 The one thing that was not acceptable was two corpora with no stated rule. The
 rule is: **new tiers read observations; articles is the pre-rewrite archive.**
+
+``routes`` is Tier 1's output, added 2026-09-22 by backlog task 028: which
+observations are candidates for which watch. It is derived and rebuildable,
+which is why it may be deleted by ``route --rebuild`` and ``evidence`` may not
+be deleted by anything but ``replay --commit``.
 """
 
 from sqlalchemy import (
@@ -381,4 +386,38 @@ class Evidence(Base):
         ),
         Index("idx_evidence_prompt_version", "prompt_version"),
         Index("idx_evidence_watch", "watch_id"),
+    )
+
+
+class Route(Base):
+    """
+    One observation routed to one watch by a deterministic trigger clause.
+
+    Tier 1's whole job is to keep the model from seeing the bulk of the corpus:
+    every row here is a candidate pair the adjudicator may be asked about, and
+    every observation with no row here is one it never sees. ``clause_index``
+    records which of the watch's trigger clauses fired first, so a route can be
+    explained by reading the watch file rather than by re-running the matcher.
+
+    Unique per ``(observation, watch)`` so that routing is idempotent: the same
+    observation routed twice is one link. Derived from ``observations`` and
+    ``watches.triggers`` alone, with no model call, so the table can be dropped
+    and rebuilt (``route --rebuild``) whenever a trigger changes.
+
+    Added 2026-09-22 for backlog task 028.
+    """
+
+    __tablename__ = "routes"
+
+    id = Column(Integer, primary_key=True)
+    observation_hash = Column(String(80), ForeignKey("observations.content_hash"), nullable=False)
+    watch_id = Column(String(100), ForeignKey("watches.id"), nullable=False)
+    clause_index = Column(Integer, nullable=False)
+    routed_at = Column(DateTime, default=utcnow, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("observation_hash", "watch_id", name="_route_observation_watch_uc"),
+        CheckConstraint("clause_index >= 0", name="ck_routes_clause_index"),
+        Index("idx_routes_watch", "watch_id"),
+        Index("idx_routes_observation", "observation_hash"),
     )

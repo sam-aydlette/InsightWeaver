@@ -191,8 +191,9 @@ class TestSchemaBoundaries:
         deleted, so the mapped set is pinned rather than left to review.
 
         ``watches`` joined the set on 2026-08-31 (backlog task 013);
-        ``observations`` and ``evidence`` on 2026-08-31 (backlog task 014).
-        Every addition to this set should be a task that says so.
+        ``observations`` and ``evidence`` on 2026-08-31 (backlog task 014);
+        ``routes`` on 2026-09-22 (backlog task 028). Every addition to this set
+        should be a task that says so.
         """
         from src.database.models import Base
 
@@ -202,4 +203,5 @@ class TestSchemaBoundaries:
             "watches",
             "observations",
             "evidence",
+            "routes",
         }

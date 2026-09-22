@@ -57,6 +57,7 @@ __all__ = [
     "near_duplicate_groups",
     "observation_hash",
     "observation_payload",
+    "observation_text",
     "observe",
     "store_observation",
 ]
@@ -112,13 +113,19 @@ def observation_hash(payload: dict[str, Any]) -> str:
     return content_hash(*(_render(payload[key]) for key in OBSERVATION_FIELDS))
 
 
-def minhash_text(payload: dict[str, Any]) -> str:
+def observation_text(payload: dict[str, Any]) -> str:
     """
-    The text a near-duplicate signature is computed over: title plus body.
+    The words every reader of an observation sees: title plus body.
 
-    ``normalized_content`` is preferred over ``description`` because it is the
-    HTML-stripped full text; ``description`` is the fallback for feeds that
-    carry only a summary.
+    One definition, two readers: the near-duplicate signature written at
+    insert and Tier 1 routing (backlog task 028), so that a match found by one
+    is a match the other can see. The adjudicator receives the same title and
+    body as two labelled fields of the same payload
+    (:class:`~src.evidence.adjudicator.ObservationView`) rather than this
+    joined string. ``normalized_content`` is preferred over ``description``
+    because it is the HTML-stripped full text; ``description`` is the fallback
+    for feeds that carry only a summary. Renamed on 2026-09-22 when it gained
+    its second reader.
     """
     body = payload.get("normalized_content") or payload.get("description") or ""
     return f"{payload.get('title') or ''} {body}".strip()
@@ -140,7 +147,7 @@ def observe(source_url: str, item: RawItem) -> ObservationRecord:
     return ObservationRecord(
         content_hash=observation_hash(payload),
         payload=payload,
-        minhash=signature(minhash_text(payload)),
+        minhash=signature(observation_text(payload)),
         published_date=item.published_date,
     )
 

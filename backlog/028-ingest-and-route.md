@@ -1,6 +1,6 @@
 # Ingest every configured source through the adapter path, then route observations to watches with compiled deterministic predicates.
 REPO: InsightWeaver
-STATUS: QUEUED            # QUEUED | IN_PROGRESS | PARKED | DONE | FAILED
+STATUS: DONE              # QUEUED | IN_PROGRESS | PARKED | DONE | FAILED
 SIZE: medium
 PLAN: docs/PLAN.md (section 4; section 5, task 028; supersedes backlog/015 as rescoped)
 ACCEPTANCE: `make check` passes, plus: `insightweaver ingest` builds an adapter for **every** feed in `config/feeds/` (RSS through `RSSAdapter`, others through `ADAPTER_FACTORIES`), runs them with bounded concurrency, stores through the one adapter store path, and prints per source fetched / inserted / unreachable / went-silent, with the `SOURCE ALERT` lines the runner already produces; a `routes` table links `(observation, watch)` with the index of the first trigger clause that fired, unique per pair, so routing twice produces one link; every clause compiles through `entity_matcher.term_pattern` with its shouted-term case rule and word boundaries, `entities` compiling exactly as `terms` do, `sources` matching the source name case-insensitively, every populated field in a clause required and any clause sufficient; `insightweaver route --dry-run` reports per watch how many observations in the window would route and reports the **unrouted count grouped by near-duplicate cluster and by source**, writing nothing; **no LLM call anywhere in this tier**, proved by a test that removes `src.llm` from `sys.modules` and blocks its import while driving the full routing path; and a regression test plants twenty whole-word trigger matches and one hundred substring look-alikes in a thousand synthetic observations against five watches and asserts exactly twenty route -- a test whose docstring records that it was verified to fail with `LEFT_BOUNDARY` and `RIGHT_BOUNDARY` stripped.
@@ -27,5 +27,33 @@ A watch's `triggers` is a list of clauses. A clause may populate `terms`, `entit
 Within a clause, **every** populated field must match; within a field, **any** value matches. Any
 clause matching routes the observation. The clause index stored is the first that matched. The text
 matched is the observation payload's title followed by its `normalized_content`, or its
-`description` when there is no content -- the same text `ObservationView.text` exposes to the
-adjudicator, so Tier 1 and Tier 2 read the same words.
+`description` when there is no content -- the same title and body `ObservationView` exposes to the
+adjudicator as two fields, so Tier 1 and Tier 2 read the same words.
+
+## What the adversarial review found, and what was done
+
+Four independent reviewers read the uncommitted change against this file. Fixed before commit:
+
+- **`--rebuild` handed every unrouted observation in the corpus to the pairwise MinHash grouper**,
+  which its own docstring sizes for a day of ingestion (measured: 4,000 signatures take 33s and
+  the cost quadruples per doubling). The unrouted report now describes the window only, rebuild
+  or not, and above `CLUSTER_LIMIT` (2,000) it skips clustering and says so; the per-source counts
+  and the total are always complete.
+- **The compiler stringified non-string clause entries**, so a JSON `null` in a hand-written row
+  became the term `None`. It now refuses them.
+- **The route command read the local calendar for liveness and UTC for the window**; one clock
+  now, and the CLI tests freeze it, since the stub watches expire in December.
+- **Three tests asserted less than their names claimed**: the clause-index test could not fail
+  for a router that hard-codes 0 (now a two-clause watch whose second clause fires); the
+  concurrency test accepted sequential execution (now `== 3`); the regression gate counted rows
+  (now compares the routed hashes to the planted items by identity).
+- The acceptance's "grouped by source" was only half met: per-source unrouted counts added.
+- Went-silent and `SOURCE ALERT` rendering, and the `include_rss=True` request, gained CLI tests.
+- Stale or false prose in five docstrings and one comment (the "forty feeds" claim: there are 78).
+
+Deferred, recorded here rather than fixed: `src/database/models.py` is 423 lines against the
+300-line rule and should be split when the next model lands; `_window` inner-joins to the source
+row, so an orphaned observation (possible only by hand-deleting a feed row, since SQLite is not
+enforcing the foreign key) would vanish from the window rather than fail; a `watches.triggers`
+cell that is not valid JSON fails in SQLAlchemy's deserialiser with a traceback rather than a
+`ClickException` (still fail-fast).
