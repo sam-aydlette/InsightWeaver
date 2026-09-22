@@ -183,10 +183,9 @@ class TestRefusals:
 
 class TestRegisteredInTheApp:
     def test_replay_is_a_top_level_command(self):
-        from src.cli.app import COMMAND_DISPATCH, cli
+        from src.cli.app import cli
 
-        assert COMMAND_DISPATCH["replay"] is replay_command
-        assert "replay" in cli.commands
+        assert cli.commands["replay"] is replay_command
 
     def test_commit_is_a_flag_that_defaults_to_off(self):
         flag = next(p for p in replay_command.params if p.name == "do_commit")

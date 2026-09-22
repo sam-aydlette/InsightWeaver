@@ -20,6 +20,9 @@ Lookups are lazy. Importing this module touches no keychain; only
 :func:`read` does, and the first thing that calls it is the constructor of a
 model client. The test suite therefore never needs a keychain, and CI -- which
 has none -- runs the same tests as a laptop by installing an in-memory backend.
+
+Moved here from ``src/estate/credentials.py`` on 2026-09-22 (backlog task 027),
+when the ``estate`` console script folded into ``insightweaver`` as one command.
 """
 
 from __future__ import annotations
@@ -40,9 +43,9 @@ __all__ = [
 ]
 
 # The username under which each credential is stored. The short name on the
-# left is what the operator types (``estate auth set anthropic``); the value on
-# the right is the keychain entry, and it never changes once something is
-# stored under it.
+# left is what the operator types (``insightweaver auth set anthropic``); the
+# value on the right is the keychain entry, and it never changes once something
+# is stored under it.
 ANTHROPIC = "anthropic_api_key"
 KNOWN: dict[str, str] = {"anthropic": ANTHROPIC}
 
@@ -55,7 +58,7 @@ class MissingCredential(RuntimeError):
         short = next((k for k, v in KNOWN.items() if v == username), username)
         super().__init__(
             f"no credential '{username}' in the keychain under service "
-            f"'{settings.keyring_service}'. Set it once with: estate auth set {short}"
+            f"'{settings.keyring_service}'. Set it once with: insightweaver auth set {short}"
         )
 
 

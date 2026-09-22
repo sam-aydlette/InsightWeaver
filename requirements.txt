@@ -4,12 +4,6 @@
 #
 #    pip-compile --output-file=requirements.txt pyproject.toml
 #
-aiohappyeyeballs==2.6.1
-    # via aiohttp
-aiohttp==3.13.2
-    # via insightweaver (pyproject.toml)
-aiosignal==1.4.0
-    # via aiohttp
 annotated-types==0.7.0
     # via pydantic
 anthropic==1.7.0
@@ -19,19 +13,14 @@ anyio==4.12.0
     #   anthropic
     #   httpx
     #   httpx2
-attrs==25.4.0
-    # via aiohttp
 beautifulsoup4==4.12.3
     # via insightweaver (pyproject.toml)
 certifi==2025.11.12
     # via
     #   httpcore
     #   httpx
-    #   requests
 cffi==2.1.1
     # via cryptography
-charset-normalizer==3.4.4
-    # via requests
 click==8.3.1
     # via insightweaver (pyproject.toml)
 cryptography==50.0.1
@@ -40,10 +29,6 @@ docstring-parser==0.18.0
     # via anthropic
 feedparser==6.0.11
     # via insightweaver (pyproject.toml)
-frozenlist==1.8.0
-    # via
-    #   aiohttp
-    #   aiosignal
 greenlet==3.3.0
     # via sqlalchemy
 h11==0.16.0
@@ -63,8 +48,6 @@ idna==3.11
     #   anyio
     #   httpx
     #   httpx2
-    #   requests
-    #   yarl
 jaraco-classes==3.4.0
     # via keyring
 jaraco-context==6.1.2
@@ -79,24 +62,10 @@ jiter==0.12.0
     # via anthropic
 keyring==25.7.0
     # via insightweaver (pyproject.toml)
-lxml==6.0.2
-    # via insightweaver (pyproject.toml)
-markdown-it-py==4.0.0
-    # via rich
-mdurl==0.1.2
-    # via markdown-it-py
 more-itertools==11.1.0
     # via
     #   jaraco-classes
     #   jaraco-functools
-multidict==6.7.0
-    # via
-    #   aiohttp
-    #   yarl
-propcache==0.4.1
-    # via
-    #   aiohttp
-    #   yarl
 pycparser==3.0
     # via cffi
 pydantic==2.12.5
@@ -108,17 +77,11 @@ pydantic-core==2.41.5
     # via pydantic
 pydantic-settings==2.12.0
     # via insightweaver (pyproject.toml)
-pygments==2.19.2
-    # via rich
 python-dotenv==1.0.1
     # via
     #   insightweaver (pyproject.toml)
     #   pydantic-settings
 pyyaml==6.0.2
-    # via insightweaver (pyproject.toml)
-requests==2.32.5
-    # via insightweaver (pyproject.toml)
-rich==14.2.0
     # via insightweaver (pyproject.toml)
 secretstorage==3.5.0
     # via keyring
@@ -145,7 +108,3 @@ typing-inspection==0.4.2
     # via
     #   pydantic
     #   pydantic-settings
-urllib3==2.6.2
-    # via requests
-yarl==1.22.0
-    # via aiohttp

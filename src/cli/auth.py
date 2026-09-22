@@ -1,28 +1,18 @@
 """
-The ``estate`` command.
+The auth command: credentials in the OS keychain.
 
-A thin caller over ``src/estate/``. It has no interactive mode, no banner and no
-sleep: every subcommand is meant to be run from a shell or a script and to be
-idempotent, so a repeated run is harmless.
-
-Phase 0 (backlog task 026, 2026-09-22) ships ``estate auth`` only. ``brief``,
-``observe``, ``query``, ``validate``, ``decide`` and ``status`` are Phase 1,
-one task each -- see ``docs/ESTATE_PLAN.md`` section 5.
+Moved from the removed `estate` script on 2026-09-22 (backlog task 027): one
+console script.
 """
 
 from __future__ import annotations
 
 import click
 
-from . import credentials
+from ..config import credentials
 
 
-@click.group(name="estate")
-def cli() -> None:
-    """The estate: what the principal owns, owes, is committed to, and watches."""
-
-
-@cli.group(name="auth")
+@click.group(name="auth")
 def auth() -> None:
     """Credentials in the OS keychain. A stored value is never printed."""
 
@@ -63,7 +53,3 @@ def clear_credential(name: str) -> None:
     except credentials.MissingCredential as exc:
         raise click.ClickException(str(exc))
     click.echo(f"removed '{name}'")
-
-
-if __name__ == "__main__":
-    cli()

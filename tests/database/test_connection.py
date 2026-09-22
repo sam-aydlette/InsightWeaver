@@ -3,7 +3,7 @@ Tests for database connection functions
 """
 
 import pytest
-from sqlalchemy import create_engine, text
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 
@@ -92,57 +92,3 @@ class TestGetDb:
         # Note: Session.is_active may still be True after close(),
         # but the session should be unusable
         assert session_ref is not None
-
-
-class TestCreateTables:
-    """Tests for create_tables function"""
-
-    def test_create_tables_creates_all_tables(self, tmp_path, mocker):
-        """create_tables should create all defined tables"""
-        # Create a fresh engine
-        db_path = tmp_path / "fresh.db"
-        engine = create_engine(f"sqlite:///{db_path}")
-
-        # Mock the engine
-        mocker.patch("src.database.connection.engine", engine)
-
-        from src.database.connection import create_tables
-
-        create_tables()
-
-        # Verify tables were created
-        from sqlalchemy import inspect
-
-        inspector = inspect(engine)
-        table_names = inspector.get_table_names()
-
-        # Asserted as a set rather than a subset: backlog task 012 deleted
-        # nineteen models, and a subset check would pass again the moment one of
-        # them was reintroduced by accident. `watches` was added deliberately by
-        # task 013 (2026-08-31); `observations` and `evidence` by task 014 the
-        # same day. Every addition here should be a task that says so.
-        assert set(table_names) == {
-            "rss_feeds",
-            "articles",
-            "watches",
-            "observations",
-            "evidence",
-        }
-
-    def test_create_tables_is_idempotent(self, tmp_path, mocker):
-        """create_tables should be safe to call multiple times"""
-        db_path = tmp_path / "idempotent.db"
-        engine = create_engine(f"sqlite:///{db_path}")
-        mocker.patch("src.database.connection.engine", engine)
-
-        from src.database.connection import create_tables
-
-        # Call twice - should not raise
-        create_tables()
-        create_tables()
-
-        # Tables should still exist
-        from sqlalchemy import inspect
-
-        inspector = inspect(engine)
-        assert "rss_feeds" in inspector.get_table_names()

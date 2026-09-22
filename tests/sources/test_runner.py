@@ -18,7 +18,6 @@ from src.sources.runner import (
     IngestResult,
     build_configured_adapters,
     non_rss_adapter_names,
-    non_rss_source_urls,
     run_adapter,
     run_adapters,
     run_configured_adapters,
@@ -203,13 +202,6 @@ class TestConfiguredAdapters:
 
     def test_the_shipped_config_declares_the_federal_register_adapter(self):
         assert non_rss_adapter_names() == {"federal_register"}
-
-    def test_non_rss_urls_are_kept_away_from_the_rss_fetcher(self):
-        urls = non_rss_source_urls()
-
-        assert "https://www.federalregister.gov/api/v1/documents.json" in urls
-        # The Federal Register RSS feed is still RSS and must not be excluded.
-        assert "https://www.federalregister.gov/documents/feeds/public-inspection.xml" not in urls
 
     def test_every_declared_adapter_has_a_factory(self):
         assert non_rss_adapter_names() <= set(ADAPTER_FACTORIES)

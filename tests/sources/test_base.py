@@ -81,7 +81,7 @@ class TestContentHash:
         assert content_hash("Title", "Body") == content_hash("Title", "Body")
 
     def test_hash_ignores_punctuation_case_and_whitespace(self):
-        """Matches ArticleDeduplicator._normalize_text, so the two agree."""
+        """The normalization every stored hash was computed with; it must not drift."""
         assert content_hash("The  Rule.") == content_hash("the rule")
 
     def test_different_content_hashes_differently(self):

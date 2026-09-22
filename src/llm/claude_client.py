@@ -2,7 +2,7 @@
 Minimal Claude API client: the one place a model request is constructed.
 
 Moved here from ``src/context/`` by backlog task 012 for Tier 2 adjudication.
-Rewritten 2026-09-22 by task 026 (Phase 0 of ``docs/ESTATE_PLAN.md``) with
+Rewritten 2026-09-22 by task 026 (Phase 0 of ``docs/PLAN.md``) with
 three changes and two outages kept:
 
 **Changes.**
@@ -11,9 +11,9 @@ three changes and two outages kept:
    the usage the API reports is audited after. There is no argument that turns
    this off. The repository had no token accounting at all before this; the
    cost claims in the monitoring plan were unfalsifiable.
-2. **The key comes from the OS keychain** (:mod:`src.estate.credentials`), read
+2. **The key comes from the OS keychain** (:mod:`src.config.credentials`), read
    when the client is constructed, never at import. A missing key is
-   :class:`~src.estate.credentials.MissingCredential`, raised where the request
+   :class:`~src.config.credentials.MissingCredential`, raised where the request
    would have been built, with the command that fixes it.
 3. **The model is chosen by role, not at the call site.** ``role="triage"``
    reads ``settings.llm_triage_model``; ``role="synthesis"`` reads
@@ -40,8 +40,8 @@ from typing import Any
 
 from anthropic import AsyncAnthropic
 
+from ..config import credentials
 from ..config.settings import settings
-from ..estate import credentials
 from . import audit
 
 logger = logging.getLogger(__name__)

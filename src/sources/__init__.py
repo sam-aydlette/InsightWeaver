@@ -4,9 +4,10 @@ Source adapters: ingestion generalized beyond RSS.
 Added 2026-08-26 for backlog task 005. The seam is deliberately narrow --
 an adapter turns *some upstream* into :class:`~src.sources.base.RawItem`
 values that carry exactly the field set ``RSSFetcher.normalize_article()``
-already produces. Everything downstream of the ``articles`` table
-(deduplication, filtering, clustering, frames, questions, predictions,
-synthesis) is untouched and has no idea an adapter exists.
+already produces. Everything downstream of the store path (routing,
+adjudication, the brief) reads observations and has no idea an adapter
+exists. The briefing-era consumers this sentence used to list were deleted
+on 2026-08-31 (task 012) and 2026-09-22 (task 027).
 
 Amended 2026-08-31 (backlog task 014): the same store path now also writes an
 immutable, content-addressed :class:`~src.database.models.Observation` for every

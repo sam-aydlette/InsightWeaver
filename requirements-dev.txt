@@ -4,16 +4,6 @@
 #
 #    pip-compile --extra=dev --output-file=requirements-dev.txt pyproject.toml
 #
-aiohappyeyeballs==2.6.1
-    # via aiohttp
-aiohttp==3.13.2
-    # via
-    #   aioresponses
-    #   insightweaver (pyproject.toml)
-aioresponses==0.7.8
-    # via insightweaver (pyproject.toml)
-aiosignal==1.4.0
-    # via aiohttp
 annotated-types==0.7.0
     # via pydantic
 anthropic==1.7.0
@@ -23,8 +13,6 @@ anyio==4.12.0
     #   anthropic
     #   httpx
     #   httpx2
-attrs==25.4.0
-    # via aiohttp
 beautifulsoup4==4.14.3
     # via insightweaver (pyproject.toml)
 build==1.3.0
@@ -58,10 +46,6 @@ feedparser==6.0.12
     # via insightweaver (pyproject.toml)
 filelock==3.20.1
     # via virtualenv
-frozenlist==1.8.0
-    # via
-    #   aiohttp
-    #   aiosignal
 greenlet==3.3.0
     # via sqlalchemy
 h11==0.16.0
@@ -84,7 +68,6 @@ idna==3.11
     #   httpx
     #   httpx2
     #   requests
-    #   yarl
 iniconfig==2.3.0
     # via pytest
 jaraco-classes==3.4.0
@@ -103,20 +86,10 @@ keyring==25.7.0
     # via insightweaver (pyproject.toml)
 librt==0.7.5
     # via mypy
-lxml==6.0.2
-    # via insightweaver (pyproject.toml)
-markdown-it-py==4.0.0
-    # via rich
-mdurl==0.1.2
-    # via markdown-it-py
 more-itertools==11.1.0
     # via
     #   jaraco-classes
     #   jaraco-functools
-multidict==6.7.0
-    # via
-    #   aiohttp
-    #   yarl
 mypy==1.19.1
     # via insightweaver (pyproject.toml)
 mypy-extensions==1.1.0
@@ -125,7 +98,6 @@ nodeenv==1.10.0
     # via pre-commit
 packaging==25.0
     # via
-    #   aioresponses
     #   build
     #   pytest
 pathspec==0.12.1
@@ -140,10 +112,6 @@ pluggy==1.6.0
     #   pytest-cov
 pre-commit==4.5.1
     # via insightweaver (pyproject.toml)
-propcache==0.4.1
-    # via
-    #   aiohttp
-    #   yarl
 pycparser==3.0
     # via cffi
 pydantic==2.12.5
@@ -156,9 +124,7 @@ pydantic-core==2.41.5
 pydantic-settings==2.12.0
     # via insightweaver (pyproject.toml)
 pygments==2.19.2
-    # via
-    #   pytest
-    #   rich
+    # via pytest
 pyproject-hooks==1.2.0
     # via
     #   build
@@ -185,11 +151,7 @@ pyyaml==6.0.3
     #   insightweaver (pyproject.toml)
     #   pre-commit
 requests==2.32.5
-    # via
-    #   detect-secrets
-    #   insightweaver (pyproject.toml)
-rich==14.2.0
-    # via insightweaver (pyproject.toml)
+    # via detect-secrets
 ruff==0.14.10
     # via insightweaver (pyproject.toml)
 secretstorage==3.5.0
@@ -227,8 +189,6 @@ virtualenv==20.35.4
     # via pre-commit
 wheel==0.45.1
     # via pip-tools
-yarl==1.22.0
-    # via aiohttp
 
 # The following packages are considered to be unsafe in a requirements file:
 # pip

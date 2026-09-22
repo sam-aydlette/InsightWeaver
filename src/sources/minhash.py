@@ -9,9 +9,10 @@ adjudicated three times and counts as three pieces of evidence for a Watch.
 That is the failure this module exists to prevent.
 
 **Why MinHash and not the existing similarity code.**
-``src/processors/deduplicator.py`` compares articles pairwise with a word-set
-Jaccard computed from scratch on every comparison, inside a time window, at
-query time. It is not wrong, but nothing about it is storable: there is no
+``src/processors/deduplicator.py`` (deleted 2026-09-22, backlog task 027; superseded
+by the module below) compared articles pairwise with a word-set Jaccard computed
+from scratch on every comparison, inside a time window, at query time. It was not
+wrong, but nothing about it was storable: it left no
 per-article artefact you can keep and compare later, so the grouping cannot be
 recomputed identically after the fact. A MinHash signature *is* that artefact.
 It is a fixed-width function of the text alone, written once beside the

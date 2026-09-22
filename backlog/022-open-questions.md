@@ -37,7 +37,7 @@ the cost comparison remains unverified, which is recorded rather than resolved.
 ## ANSWERED 2026-09-22 (the estate plan)
 
 The operator's brief of 2026-09-22 re-expresses this plan with the estate half added; the
-decisions and the fifteen questions it raised are recorded in `docs/ESTATE_PLAN.md`, section 7.
+decisions and the fifteen questions it raised are recorded in `docs/PLAN.md`, section 7.
 The ones that bear on tasks in this directory:
 
 - **Laptop, not cloud.** Tasks 019, 020 and 023 are superseded; 018 is rewritten for a laptop.

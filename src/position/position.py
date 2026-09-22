@@ -19,8 +19,8 @@ outside any checkout.
 two pages has drifted into describing interests rather than stakes. A hard limit
 would enforce a proxy: a three-page Position full of genuine deadlines is better
 than a one-page Position of vague interests. So the check names the drift and
-lets the human judge, the same way ``coverage_probes`` reports INCONCLUSIVE
-rather than dropping a probe. Everything that is *structurally* checkable --
+lets the human judge, rather than silently rejecting the file. Everything that
+is *structurally* checkable --
 a decision with no deadline, a duplicate key, a date that is not a date -- is a
 hard rejection, because those are not judgement calls.
 

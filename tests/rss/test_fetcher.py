@@ -8,12 +8,7 @@ import pytest
 from sqlalchemy.orm import sessionmaker
 
 from src.database.models import Article, Observation, RSSFeed
-from src.rss.fetcher import (
-    LEGACY_PATH_MESSAGE,
-    LegacyWritePathClosed,
-    RSSFetcher,
-    create_test_feed,
-)
+from src.rss.fetcher import LEGACY_PATH_MESSAGE, LegacyWritePathClosed, RSSFetcher
 
 
 class TestRSSFetcherInit:
@@ -386,40 +381,3 @@ class TestClose:
             await fetcher.close()
 
             mock_close.assert_called_once()
-
-
-class TestCreateTestFeed:
-    """Tests for create_test_feed helper"""
-
-    def test_create_test_feed_new(self):
-        """Should create new feed if not exists"""
-        mock_db = MagicMock()
-        mock_db.query.return_value.filter.return_value.first.return_value = None
-
-        create_test_feed(mock_db)
-
-        assert mock_db.add.called
-        assert mock_db.commit.called
-
-    def test_create_test_feed_existing(self):
-        """Should return existing feed"""
-        mock_db = MagicMock()
-        existing_feed = MagicMock()
-        existing_feed.name = "Existing Feed"
-        mock_db.query.return_value.filter.return_value.first.return_value = existing_feed
-
-        result = create_test_feed(mock_db)
-
-        assert result == existing_feed
-        assert not mock_db.add.called
-
-    def test_create_test_feed_custom_values(self):
-        """Should accept custom name and URL"""
-        mock_db = MagicMock()
-        mock_db.query.return_value.filter.return_value.first.return_value = None
-
-        create_test_feed(mock_db, name="Custom Feed", url="https://custom.com/feed.rss")
-
-        call_args = mock_db.add.call_args[0][0]
-        assert call_args.name == "Custom Feed"
-        assert call_args.url == "https://custom.com/feed.rss"

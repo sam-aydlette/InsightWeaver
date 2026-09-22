@@ -12,8 +12,8 @@ from types import SimpleNamespace
 
 import pytest
 
+from src.config import credentials
 from src.config.settings import settings
-from src.estate import credentials
 from src.llm.claude_client import ROLES, ClaudeClient, ModelResponse
 
 # Not a credential: the SDK is stubbed and nothing here reaches a network.

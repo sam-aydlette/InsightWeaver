@@ -4,8 +4,8 @@ Credentials: keychain only, lazy, and never defaulted.
 
 import pytest
 
+from src.config import credentials
 from src.config.settings import settings
-from src.estate import credentials
 
 
 class TestRead:
@@ -16,7 +16,7 @@ class TestRead:
     def test_a_missing_value_raises_naming_the_fix(self, memory_keyring):
         with pytest.raises(credentials.MissingCredential) as excinfo:
             credentials.read(credentials.ANTHROPIC)
-        assert "estate auth set anthropic" in str(excinfo.value)
+        assert "insightweaver auth set anthropic" in str(excinfo.value)
 
     def test_an_empty_stored_value_is_missing_not_empty(self, memory_keyring):
         memory_keyring.store[(settings.keyring_service, credentials.ANTHROPIC)] = ""

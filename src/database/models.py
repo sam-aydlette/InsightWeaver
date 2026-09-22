@@ -8,8 +8,8 @@ Everything else was deleted by backlog task 012 along with the briefing product
 that owned it -- syntheses, context snapshots, provenance, topic clusters,
 narrative frames, questions, predictions, decisions and beats. The tables are
 dropped by ``src.database.migrations.drop_briefing_tables``; the models are
-removed here so that ``create_tables()`` cannot quietly recreate a concept the
-rewrite removed.
+removed here so that ``Base.metadata.create_all()`` cannot quietly recreate a
+concept the rewrite removed.
 
 ``watches`` is the first table of the rewrite, added 2026-08-31 by backlog task
 013. Its CHECK constraints are not decoration -- see the class docstring.

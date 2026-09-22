@@ -248,17 +248,6 @@ def non_rss_adapter_names(feeds_dir: Path | str | None = None) -> set[str]:
     return {feed.adapter for feed in _configured_feeds(feeds_dir) if feed.adapter != "rss"}
 
 
-def non_rss_source_urls(feeds_dir: Path | str | None = None) -> set[str]:
-    """
-    URLs in ``config/feeds/`` that are not RSS.
-
-    ``src/rss/parallel_fetcher.py`` uses this to leave them alone: handing a
-    JSON API endpoint to feedparser would produce a parse failure every run and
-    eventually auto-deactivate the source.
-    """
-    return {feed.url for feed in _configured_feeds(feeds_dir) if feed.adapter != "rss"}
-
-
 def _configured_feeds(feeds_dir: Path | str | None = None) -> Iterator:
     """Every configured feed, read from an absolute path by default."""
     directory = Path(feeds_dir) if feeds_dir is not None else DEFAULT_FEEDS_DIR

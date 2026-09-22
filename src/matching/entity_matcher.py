@@ -57,8 +57,9 @@ RIGHT_BOUNDARY = f"(?!{_WORD_CHAR})"
 # Any run of whitespace, including a line wrap, between the words of a term.
 _WHITESPACE = r"\s+"
 
-# Kept public since backlog task 010: coverage probes match their terms by the
-# same rules as coverage entities, and a second boundary definition would be a
+# Public on purpose: the routing compiler (backlog task 028) matches trigger
+# terms by these rules, and its regression test strips the anchors to prove the
+# test would notice their absence. A second boundary definition would be a
 # second thing to get wrong.
 
 
@@ -74,21 +75,18 @@ def is_shouted(term: str) -> bool:
     return bool(letters) and all(char.isupper() for char in letters)
 
 
-def term_pattern(term: str, right_boundary: bool = True) -> str:
+def term_pattern(term: str) -> str:
     """
-    Regex source for one surface form.
+    Regex source for one surface form, anchored at both word boundaries.
 
     Runs of whitespace in the term match any run of whitespace in the text, so
     a name broken across a line wrap in the source still matches.
 
-    ``right_boundary=False`` anchors only the left-hand side, which turns the
-    term into a stem: it must still begin a word, but the word may continue.
-    Coverage probes use it for ``reinstat*``; coverage entities never do,
-    because an entity's surface forms are whole names.
+    The stem form (``reinstat*``, left-anchored only) left with the coverage
+    probes on 2026-09-22 (backlog task 027); a trigger term is a whole name.
     """
     body = _WHITESPACE.join(re.escape(token) for token in term.split())
-    tail = RIGHT_BOUNDARY if right_boundary else ""
-    return f"{LEFT_BOUNDARY}(?:{body}){tail}"
+    return f"{LEFT_BOUNDARY}(?:{body}){RIGHT_BOUNDARY}"
 
 
 @dataclass(frozen=True)

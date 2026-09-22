@@ -12,10 +12,10 @@
 config/position.yaml
 config/watches.yaml
 
-# Estate (docs/ESTATE_PLAN.md, backlog task 026, 2026-09-22).
-# A real estate directory at the repo root would hold the principal's nodes; it
-# belongs in the private repo beside Position. The audit log holds every model
-# payload that left the machine. Exports are the operator's data.
+# Backlog task 026, 2026-09-22 (docs/PLAN.md). A real estate/ directory at the
+# repo root would hold the operator's private files; they belong in the private
+# repo beside Position. The audit log holds every model payload that left the
+# machine. Exports are the operator's data.
 /estate/
 data/llm-audit/
 data/exports/
@@ -23,11 +23,6 @@ data/exports/
 client_secret*.json
 token*.json
 .secrets.baseline.tmp
-
-# User profile and personal configuration (contains personal information)
-config/user_profile.json
-config/context_modules/core/decision_context.json
-config/api_sources.json
 
 # Claude Code local settings
 .claude/settings.local.json
@@ -41,12 +36,7 @@ docs/philosophical_docs/
 *.db-wal
 *.db-shm
 
-# Forecast artifacts (forecast subsystem itself goes away in Stage 8)
-/reports/forecasts/*.html
-/reports/forecasts/*.json
-
 # Logs
-src/logs/*.log
 *.log
 
 # Python

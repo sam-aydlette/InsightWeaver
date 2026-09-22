@@ -24,7 +24,7 @@ Three event kinds share an ``id``:
 The log is not a cache and not a replay input. Evidence replay reads
 ``observations``; this file is for the operator's eyes.
 
-Added 2026-09-22 for backlog task 026 (Phase 0 of ``docs/ESTATE_PLAN.md``).
+Added 2026-09-22 for backlog task 026 (Phase 0 of ``docs/PLAN.md``).
 """
 
 from __future__ import annotations
