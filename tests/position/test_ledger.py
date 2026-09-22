@@ -232,7 +232,8 @@ def test_only_sync_and_the_two_commands_write_belief_or_resolution():
         re.compile(r"(?<!class )\bWatchBelief\("),
         re.compile(r"\brecord_belief\("),
         re.compile(r"\bresolve_watch\("),
-        re.compile(r"\.resolved_at\s*=|\.outcome\s*=|\.resolution_note\s*=|\.retired_at\s*="),
+        # Assignment only: ``x.outcome == "..."`` is a comparison, not a write.
+        re.compile(r"\.(resolved_at|outcome|resolution_note|retired_at)\s*=(?!=)"),
         re.compile(r"\.update\([^)]*(resolved_at|outcome|resolution_note|retired_at)"),
     ]
     allowed = {

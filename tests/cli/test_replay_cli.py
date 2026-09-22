@@ -215,3 +215,24 @@ class TestAnUnroutedCorpusIsRefused:
         assert result.exit_code != 0
         assert "nothing is routed" in result.output
         assert test_session.query(Evidence).count() == 2
+
+
+class TestABoundedReplayCannotBeCommitted:
+    def test_limit_with_commit_is_refused_before_anything_runs(
+        self, cli_runner, test_session, corpus
+    ):
+        """
+        commit makes the stored rows equal the replay. A bounded replay produced
+        rows for part of the corpus, so committing it would delete the rest.
+        """
+        test_session.commit()
+
+        with _patch_db(test_session):
+            result = cli_runner.invoke(
+                replay_command,
+                ["--prompt-version", "v1", "--adjudicator", V1, "--limit", "1", "--commit"],
+            )
+
+        assert result.exit_code != 0
+        assert "--commit with --limit is refused" in result.output
+        assert test_session.query(Evidence).count() == 2

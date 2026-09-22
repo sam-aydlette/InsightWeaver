@@ -26,11 +26,15 @@ retries (a 429 or a 5xx answered by an identical resend) are below this rule
 and are noted in ``src/llm/claude_client.py``.
 
 **What is not a failure of the model.** A missing keychain entry, or any
-other error constructing the client, is raised before any pair is asked; a
+other error constructing the client, is raised before any pair is asked. A
 request the API rejects outright (a 400 for a malformed schema, a 401, a 404
-for a retired model) is raised from the pair it hit. Both are the operator's
-problem, and recording either as a verdict would leave every pending pair
-permanently "failed" without a single answer having been given.
+for a retired model) and an API that is unavailable (a connection error, a
+timeout, a 429, a 5xx) are raised from the pair they hit, with that pair left
+pending. None of these is an answer about the pair, and recording any of them
+as a verdict would burn the pending backlog into permanent "failed" rows
+without a single answer having been given -- an outage would do it to every
+pair at once. Only an answered call can fail a pair: a refusal, a reply cut
+off at ``max_tokens``, an invalid reply, or a request the API found too large.
 
 **Why the schema uses sentinels.** The task file wrote ``direction`` and
 ``satisfies_clause`` as nullable. The API's structured-output grammar takes a
@@ -141,12 +145,20 @@ SCHEMA: dict[str, Any] = api_schema(AdjudicationVerdict)
 
 
 def _fingerprint() -> str:
+    """
+    The version's identity: what is sent (prompt, effort, caps, the schema the
+    API sees) and what is accepted back (the model's own schema, bounds
+    included, which pydantic enforces on receipt). The model id is not part of
+    it -- the audit log records the model per call, and a version names the
+    judge's instructions, not the engine that ran them.
+    """
     material = json.dumps(
         {
             "system": SYSTEM_PROMPT,
             "user": USER_TEMPLATE,
             "effort": EFFORT,
             "schema": SCHEMA,
+            "accepts": AdjudicationVerdict.model_json_schema(),
             "text_cap": TEXT_CAP,
             "max_tokens": MAX_TOKENS,
         },
@@ -217,13 +229,18 @@ class ClaudeAdjudicator:
                 system, user, effort=EFFORT, max_tokens=MAX_TOKENS, output_schema=SCHEMA
             )
         except ModelCallFailed as exc:
-            if exc.misconfigured:
-                # The request was rejected, not answered: a bad schema, a bad
-                # key, a retired model. Recording that per pair would mark every
-                # pending pair failed with no verdict ever given. Abort instead.
+            if exc.outcome != "answered":
+                # Rejected (a bad schema, a bad key, a retired model) or
+                # unavailable (an outage, a rate limit, a timeout): neither is
+                # an answer about this pair. Recording it per pair would mark
+                # every pending pair failed with no verdict ever given, so the
+                # run stops here with the pair left pending.
                 raise
+            message = str(exc)
+            if exc.stop_reason == "max_tokens":
+                message = f"reply cut off at max_tokens={MAX_TOKENS} (no text block): {message}"
             return Judgement(
-                watch_id, None, str(exc), exc.audit_id, exc.input_tokens, exc.output_tokens
+                watch_id, None, message, exc.audit_id, exc.input_tokens, exc.output_tokens
             )
         cost = (response.audit_id, response.input_tokens, response.output_tokens)
         if response.stop_reason == "max_tokens":

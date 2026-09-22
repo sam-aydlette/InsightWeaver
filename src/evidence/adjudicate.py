@@ -5,7 +5,10 @@ Reads ``routes`` joined to ``observations`` and the watches, minus the pairs
 this prompt version has already answered -- a row in ``adjudications``, or an
 ``evidence`` row committed by ``replay`` for the same version. Writes one
 ``adjudications`` row per pair asked, whatever the answer, and an ``evidence``
-row when the answer was evidence. Run twice, the second run asks nothing.
+row when the answer was evidence. Run twice, the second run asks nothing. A
+``replay --commit`` records evidence only, so a pair a replay judged not to be
+evidence has no row and is asked once more here; that is the one gap between
+the two paths, and it costs one call per such pair.
 
 **Which pairs.** Every routed pair on an open watch. Expiry is Tier 1's gate:
 ``route`` links only watches live on the day it runs, so a routed pair is one

@@ -10,6 +10,8 @@ returns, and what it refuses. Synchronous since backlog task 029 (2026-09-22).
 import json
 from types import SimpleNamespace
 
+import anthropic
+import httpx2
 import pytest
 
 from src.config import credentials
@@ -18,6 +20,7 @@ from src.llm.claude_client import ROLES, ClaudeClient, ModelCallFailed, ModelRes
 
 # Not a credential: the SDK is stubbed and nothing here reaches a network.
 FAKE_KEY = "sk-test"  # pragma: allowlist secret
+_REQUEST = httpx2.Request("POST", "https://api.example/v1/messages")
 
 
 @pytest.fixture
@@ -157,31 +160,64 @@ class TestSend:
         assert excinfo.value.audit_id
         assert (excinfo.value.input_tokens, excinfo.value.output_tokens) == (11, 7)
         assert excinfo.value.stop_reason == "refusal"
+        assert excinfo.value.outcome == "answered"
 
     def test_an_api_error_is_a_typed_failure_carrying_its_audit_id(self, client):
-        _stub_create(client, error=ConnectionError("no route"))
+        _stub_create(client, error=anthropic.APITimeoutError(request=_REQUEST))
 
-        with pytest.raises(ModelCallFailed, match="ConnectionError: no route") as excinfo:
+        with pytest.raises(ModelCallFailed, match="APITimeoutError") as excinfo:
             client.analyze("sys", "hello")
 
         assert excinfo.value.audit_id
         assert (excinfo.value.input_tokens, excinfo.value.output_tokens) == (0, 0)
-        assert excinfo.value.misconfigured is False
+        assert excinfo.value.outcome == "unavailable"
 
-    def test_a_rejected_request_is_marked_as_a_misconfiguration(self, client):
-        import anthropic
-        import httpx2
-
-        request = httpx2.Request("POST", "https://api.example/v1/messages")
-        rejected = anthropic.BadRequestError(
-            "invalid schema", response=httpx2.Response(400, request=request), body=None
-        )
-        _stub_create(client, error=rejected)
+    @pytest.mark.parametrize(
+        "status, outcome",
+        [
+            (400, "rejected"),
+            (401, "rejected"),
+            (403, "rejected"),
+            (404, "rejected"),
+            (413, "answered"),
+            (429, "unavailable"),
+            (500, "unavailable"),
+            (529, "unavailable"),
+        ],
+    )
+    def test_api_status_errors_are_classified_by_what_they_mean(self, client, status, outcome):
+        """400-404 is the operator's request; 413 is this pair; the rest is the API's day."""
+        response = httpx2.Response(status, request=_REQUEST)
+        error = client.client._make_status_error("boom", body=None, response=response)  # noqa: SLF001
+        _stub_create(client, error=error)
 
         with pytest.raises(ModelCallFailed) as excinfo:
             client.analyze("sys", "hello")
 
-        assert excinfo.value.misconfigured is True
+        assert excinfo.value.outcome == outcome
+        assert excinfo.value.misconfigured is (outcome == "rejected")
+
+    def test_a_connection_error_is_unavailable_not_a_verdict(self, client):
+        _stub_create(client, error=anthropic.APIConnectionError(request=_REQUEST))
+
+        with pytest.raises(ModelCallFailed) as excinfo:
+            client.analyze("sys", "hello")
+
+        assert excinfo.value.outcome == "unavailable"
+
+    def test_an_exception_that_is_not_an_api_error_is_audited_and_re_raised(
+        self, client, audit_dir
+    ):
+        """A TypeError from a kwarg the SDK no longer accepts is a bug, not a verdict."""
+        _stub_create(client, error=TypeError("create() got an unexpected keyword argument"))
+
+        with pytest.raises(TypeError):
+            client.analyze("sys", "hello")
+
+        request, error = _audit_events(audit_dir)
+        assert request["event"] == "request"
+        assert error["event"] == "error"
+        assert "TypeError" in error["error"]
 
 
 class TestAudit:
@@ -202,7 +238,9 @@ class TestAudit:
         assert response["model"] == "served-model"
 
     def test_a_failed_send_leaves_the_request_and_an_error_line(self, client, audit_dir):
-        _stub_create(client, error=ConnectionError("no route"))
+        _stub_create(
+            client, error=anthropic.APIConnectionError(message="no route", request=_REQUEST)
+        )
 
         with pytest.raises(ModelCallFailed):
             client.analyze("sys", "hello")

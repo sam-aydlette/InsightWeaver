@@ -33,7 +33,7 @@ from src.llm.claude_client import ModelCallFailed, ModelResponse
 # changes; then PROMPT_VERSION must change too, or two different judges share
 # one name in every evidence row. The value was computed on 2026-09-22.
 PINNED_FINGERPRINT = (
-    "403f818d93aeaec77c27c654b14865114962914daae0530d224d98220a5a7a81"  # pragma: allowlist secret
+    "07ca3d984c03f131802542bb77eeefe902f2b8db8c34e20d46405b6ba93a9674"  # pragma: allowlist secret
 )
 
 
@@ -269,6 +269,7 @@ class TestJudge:
         refusal = ModelCallFailed(
             "Model declined the request (category: x)",
             audit_id="audit-r",
+            outcome="answered",
             input_tokens=400,
             output_tokens=2,
             stop_reason="refusal",
@@ -285,11 +286,45 @@ class TestJudge:
 
     def test_a_rejected_request_aborts_rather_than_becoming_a_verdict(self):
         """A 400 or 401 is the operator's problem; no pair may be marked failed by it."""
-        rejected = ModelCallFailed("BadRequestError: schema", audit_id="a", misconfigured=True)
+        rejected = ModelCallFailed("BadRequestError: schema", audit_id="a", outcome="rejected")
         client = FakeClient(rejected, _verdict())
 
         with pytest.raises(ModelCallFailed, match="schema"):
             ClaudeAdjudicator(client).judge(_view(), _watch())
+
+    def test_an_unavailable_api_aborts_rather_than_burning_the_pair(self):
+        """An outage is not an answer; the pair stays pending for a later run."""
+        outage = ModelCallFailed("APIConnectionError", audit_id="a", outcome="unavailable")
+
+        with pytest.raises(ModelCallFailed, match="APIConnectionError"):
+            ClaudeAdjudicator(FakeClient(outage, _verdict())).judge(_view(), _watch())
+
+    def test_a_reply_cut_off_during_thinking_names_max_tokens(self):
+        cut = ModelCallFailed(
+            "No text block in response; got blocks: ['thinking']",
+            audit_id="a",
+            outcome="answered",
+            input_tokens=9,
+            output_tokens=16000,
+            stop_reason="max_tokens",
+        )
+        judgement = ClaudeAdjudicator(FakeClient(cut)).judge(_view(), _watch())
+
+        assert judgement.outcome == "failed"
+        assert (judgement.error or "").startswith(f"reply cut off at max_tokens={MAX_TOKENS}")
+
+    def test_the_fingerprint_moves_when_what_pydantic_accepts_changes(self, monkeypatch):
+        """Bounds are stripped from the schema the API sees but change what is accepted back."""
+        from src.evidence import claude_adjudicator as module
+
+        original = module.AdjudicationVerdict.model_json_schema
+        monkeypatch.setattr(
+            module.AdjudicationVerdict,
+            "model_json_schema",
+            classmethod(lambda cls, **kw: {**original(**kw), "properties": {"changed": True}}),
+        )
+
+        assert module._fingerprint() != PROMPT_FINGERPRINT  # noqa: SLF001
 
     def test_an_unexpected_exception_is_not_swallowed_into_a_verdict(self):
         """Only the typed model failure is recorded; a bug propagates."""

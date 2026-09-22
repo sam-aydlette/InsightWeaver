@@ -178,6 +178,7 @@ class TestRun:
         refusal = ModelCallFailed(
             "Model declined the request (category: x)",
             audit_id="audit-refused",
+            outcome="answered",
             input_tokens=500,
             output_tokens=3,
             stop_reason="refusal",
@@ -192,7 +193,9 @@ class TestRun:
         assert result.input_tokens == 600
 
     def test_a_failed_pair_is_not_asked_again_on_the_next_run(self, corpus):
-        client = FakeClient(ModelCallFailed("boom", audit_id="a"), _verdict(), _verdict())
+        client = FakeClient(
+            ModelCallFailed("boom", audit_id="a", outcome="answered"), _verdict(), _verdict()
+        )
         run(corpus, ClaudeAdjudicator(client))
 
         second = run(corpus, ClaudeAdjudicator(client))
@@ -211,8 +214,20 @@ class TestRun:
         assert corpus.query(Evidence).count() == 1
         assert len(pending_pairs(corpus, PROMPT_VERSION)) == 1
 
+    def test_an_outage_stops_the_run_with_the_pair_left_pending(self, corpus):
+        outage = ModelCallFailed("APIConnectionError: down", audit_id="a", outcome="unavailable")
+        client = FakeClient(_verdict(), outage)
+
+        with pytest.raises(ModelCallFailed, match="down"):
+            run(corpus, ClaudeAdjudicator(client))
+        corpus.rollback()
+
+        assert corpus.query(Adjudication).count() == 1
+        assert corpus.query(Adjudication).filter(Adjudication.outcome == "failed").count() == 0
+        assert len(pending_pairs(corpus, PROMPT_VERSION)) == 1
+
     def test_a_rejected_request_stops_the_run_with_earlier_answers_kept(self, corpus):
-        rejected = ModelCallFailed("BadRequestError: bad schema", audit_id="a", misconfigured=True)
+        rejected = ModelCallFailed("BadRequestError: bad schema", audit_id="a", outcome="rejected")
         client = FakeClient(_verdict(), rejected)
 
         with pytest.raises(ModelCallFailed, match="bad schema"):

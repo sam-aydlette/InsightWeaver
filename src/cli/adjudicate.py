@@ -16,6 +16,7 @@ Added 2026-09-22 for backlog task 029.
 """
 
 import click
+from keyring.errors import KeyringError
 
 from ..config.credentials import MissingCredential
 from ..database.connection import get_db
@@ -62,11 +63,22 @@ def adjudicate_command(dry_run_flag: bool, limit: int | None) -> None:
             result = run(session, adjudicator, limit=limit)
     except MissingCredential as exc:
         raise click.ClickException(str(exc))
-    except ModelCallFailed as exc:
-        # Only a misconfiguration reaches here; call failures are recorded per pair.
+    except KeyringError as exc:
         raise click.ClickException(
-            f"the API rejected the request, so the run stopped with nothing recorded for the "
-            f"pair it hit and later pairs: {exc}"
+            f"the OS keychain could not be read ({type(exc).__name__}: {exc}); the key is "
+            f"stored there by 'insightweaver auth set anthropic'"
+        )
+    except ModelCallFailed as exc:
+        # Only a rejected or unavailable call reaches here; an answered failure
+        # is recorded per pair.
+        what = (
+            "the API rejected the request"
+            if exc.outcome == "rejected"
+            else "the API was unavailable"
+        )
+        raise click.ClickException(
+            f"{what}, so the run stopped with nothing recorded for the pair it hit and later "
+            f"pairs; earlier answers are kept: {exc}"
         )
 
     click.echo(header("ADJUDICATE"))

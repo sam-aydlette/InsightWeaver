@@ -84,3 +84,26 @@ constructs a client" matches the literal token and is a guard against habit, not
 `src/database/models.py` is 480 lines and is split in task 030. Live acceptance of the derived
 schema is unverified from this machine: the first real run is the test, and if the API rejects the
 schema the run stops at the first pair with the API's message and nothing recorded.
+
+## Verification follow-ups (2026-09-22, after the review above)
+
+A second pass tried to refute the review's fixes and found that "misconfigured" was too narrow a
+classification: an outage (a connection error, a timeout, a 429, a 5xx) was neither rejected nor
+answered, so the loop recorded it per pair and one bad hour would have burned every pending pair
+into a permanent "failed" row. Fixed:
+
+- `ModelCallFailed.outcome` is one of `answered`, `rejected`, `unavailable`. The judge records
+  only an answered failure; the other two abort the run with the pair left pending. Only the
+  SDK's own `APIError` family is classified; any other exception is audited and re-raised as the
+  bug it is. `adjudicate` names which of the two stopped it; a keychain backend error is a
+  message, not a traceback.
+- A reply cut off at `max_tokens` with no text block (thinking consumed the budget) is recorded
+  as such, not as "no text block".
+- `replay --commit --limit` is refused: commit makes the stored rows equal the replay, and a
+  bounded replay would delete every row outside its bound.
+- The prompt fingerprint now includes the pydantic model's own schema, so a change to a bound
+  that is stripped from the API schema but enforced on receipt moves the version. The pinned
+  value in the test changed accordingly; no evidence had been recorded under the old one.
+- `adjudicate.py` states the one gap between the two paths: a replay judged not-evidence has no
+  row and is asked once more by `adjudicate`.
+

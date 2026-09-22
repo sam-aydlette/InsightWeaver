@@ -26,6 +26,7 @@ Added 2026-08-31 for backlog task 014.
 """
 
 import click
+from keyring.errors import KeyringError
 
 from ..config.credentials import MissingCredential
 from ..database.connection import get_db
@@ -42,6 +43,7 @@ from ..evidence import (
     stored_evidence,
 )
 from ..evidence.claude_adjudicator import AdjudicationFailed
+from ..llm.claude_client import ModelCallFailed
 from ..position.ledger import open_clause
 from .colors import accent, header, muted, warning
 
@@ -105,6 +107,12 @@ def _adjudicator_for(prompt_version: str, path: str | None):
 def replay_command(prompt_version, against, adjudicator_path, limit, do_commit):
     """Rebuild Evidence from Observations and print the diff. Writes only with --commit."""
     baseline_version = against or prompt_version
+    if do_commit and limit is not None:
+        raise click.ClickException(
+            "--commit with --limit is refused: commit makes the stored rows equal the replay, "
+            "and a bounded replay produced rows for only part of the corpus, so every stored "
+            "row outside the bound would be deleted. Replay the whole corpus to commit."
+        )
     adjudicator = _adjudicator_for(prompt_version, adjudicator_path)
 
     with get_db() as session:
@@ -131,7 +139,7 @@ def replay_command(prompt_version, against, adjudicator_path, limit, do_commit):
 
         try:
             replayed = rebuild(session, adjudicator, limit=limit)
-        except (MissingCredential, AdjudicationFailed) as exc:
+        except (MissingCredential, AdjudicationFailed, KeyringError, ModelCallFailed) as exc:
             raise click.ClickException(str(exc))
         baseline = stored_evidence(session, baseline_version)
         result = diff(replayed, baseline)

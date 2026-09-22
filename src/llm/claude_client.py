@@ -3,7 +3,8 @@ Minimal Claude API client: the one place a model request is constructed.
 
 Moved here from ``src/context/`` by backlog task 012 for Tier 2 adjudication.
 Rewritten 2026-09-22 by task 026 (Phase 0 of ``docs/PLAN.md``) with three
-changes and two outages kept, and made synchronous by task 029 the same day.
+changes and two outages kept, made synchronous by task 029 the same day, and
+given a failure classification by 029's verification follow-up.
 
 **Changes.**
 
@@ -22,9 +23,20 @@ changes and two outages kept, and made synchronous by task 029 the same day.
    structured-output schema goes beside it as ``output_config.format`` -- a
    request parameter, not a parsing convention.
 
+**Failures are classified, because the caller's right response differs.**
+:class:`ModelCallFailed.outcome` is one of three words. ``answered``: the API
+answered and the answer is unusable (a refusal, a reply cut off at
+``max_tokens``, no text block) or it rejected this one request as too large;
+that is a fact about the pair and a caller may record it. ``rejected``: the
+API rejected the request itself (400, 401, 403, 404) -- a bad schema, a bad
+key, a retired model -- which is the operator's problem. ``unavailable``: a
+connection error, a timeout, a 429, a 5xx or an overload; asking again later
+is the right response. Only the SDK's own ``APIError`` family is classified;
+any other exception is audited and re-raised untouched, because a ``TypeError``
+from a kwarg the SDK no longer accepts is a bug, not a verdict.
+
 **Synchronous** (task 029): the only caller is the adjudication loop inside a
-click command, one pair at a time. The async client was a leftover from the
-deleted pipeline and forced an event loop into every caller for nothing.
+click command, one pair at a time.
 
 **Outages kept**, because a rewrite from a blank file reintroduces them: see
 :data:`_response_text` (the ``ThinkingBlock`` shape change and the refusal
@@ -36,14 +48,16 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 
 from anthropic import (
     Anthropic,
+    APIError,
     AuthenticationError,
     BadRequestError,
     NotFoundError,
     PermissionDeniedError,
+    RequestTooLargeError,
 )
 
 from ..config import credentials
@@ -63,18 +77,18 @@ ROLES: dict[str, str] = {
     "synthesis": "llm_synthesis_model",
 }
 
+Outcome = Literal["answered", "rejected", "unavailable"]
+
+# The API errors that mean the request, not the answer, is wrong.
+_REQUEST_ERRORS = (BadRequestError, AuthenticationError, PermissionDeniedError, NotFoundError)
+
 
 class ModelCallFailed(RuntimeError):
     """
-    An audited call that yielded no usable text: an API error, a refusal, or a
-    reply with no text block. Carries the audit id the request was logged
-    under and the usage the API reported (zeros when it never answered), so a
-    caller recording the failure can cite the log entry and the cost.
-
-    ``misconfigured`` is True when the API rejected the request itself -- a
-    400 (malformed request or schema), 401, 403 or 404 (retired model). That
-    is the operator's problem, not the model's answer, and a caller that
-    records failures per pair must abort on it rather than record it.
+    An audited call that yielded no usable text. See the module docstring for
+    the three outcomes. Carries the audit id the request was logged under and
+    the usage the API reported (zeros when it never answered), so a caller
+    recording the failure can cite the log entry and the cost.
 
     Added 2026-09-22 (backlog task 029).
     """
@@ -84,21 +98,29 @@ class ModelCallFailed(RuntimeError):
         message: str,
         *,
         audit_id: str,
+        outcome: Outcome,
         input_tokens: int = 0,
         output_tokens: int = 0,
         stop_reason: str | None = None,
-        misconfigured: bool = False,
     ) -> None:
         super().__init__(message)
         self.audit_id = audit_id
+        self.outcome: Outcome = outcome
         self.input_tokens = input_tokens
         self.output_tokens = output_tokens
         self.stop_reason = stop_reason
-        self.misconfigured = misconfigured
+
+    @property
+    def misconfigured(self) -> bool:
+        return self.outcome == "rejected"
 
 
-# The API errors that mean the request, not the answer, is wrong.
-_REQUEST_ERRORS = (BadRequestError, AuthenticationError, PermissionDeniedError, NotFoundError)
+def _classify(exc: APIError) -> Outcome:
+    if isinstance(exc, _REQUEST_ERRORS):
+        return "rejected"
+    if isinstance(exc, RequestTooLargeError):
+        return "answered"  # this one request is too large; that is a fact about the pair
+    return "unavailable"
 
 
 @dataclass(frozen=True)
@@ -235,14 +257,17 @@ class ClaudeClient:
 
         try:
             response = self.client.messages.create(**request)
-        except Exception as exc:
+        except APIError as exc:
             audit.record_error(audit_id, exc)
             logger.error(f"Claude API error: {exc}")
             raise ModelCallFailed(
-                f"{type(exc).__name__}: {exc}",
-                audit_id=audit_id,
-                misconfigured=isinstance(exc, _REQUEST_ERRORS),
+                f"{type(exc).__name__}: {exc}", audit_id=audit_id, outcome=_classify(exc)
             ) from exc
+        except Exception as exc:
+            # Not an API error: a bug, a version mismatch, an interrupt's cousin.
+            # Audited so the log shows the request left, then re-raised as-is.
+            audit.record_error(audit_id, exc)
+            raise
 
         usage = _usage(response)
         stop_reason = getattr(response, "stop_reason", None)
@@ -258,6 +283,7 @@ class ClaudeClient:
             raise ModelCallFailed(
                 str(exc),
                 audit_id=audit_id,
+                outcome="answered",
                 input_tokens=usage["input_tokens"],
                 output_tokens=usage["output_tokens"],
                 stop_reason=stop_reason,
