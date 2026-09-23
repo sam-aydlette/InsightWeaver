@@ -3,8 +3,10 @@ InsightWeaver CLI application.
 
 Backlog task 012 deleted the briefing product, and with it every command that
 generated, rendered, or reasoned over a brief: brief, frames, diet, questions,
-predictions, forecast, decisions, beat, stake and scope. What is left is the
-source layer, which the rewrite keeps.
+predictions, forecast, decisions, beat, stake and scope. What was left was the
+source layer, which the rewrite kept. ``brief`` came back on 2026-09-22 (task
+031) as a different thing: a derived view over the monitor's tables with no
+model call in it.
 
 The REPL (an ASCII-art banner, a 2.5-second sleep, and a prefix dispatcher over
 a raw input loop) was removed on 2026-09-22 (backlog task 027): a scripted,
@@ -14,18 +16,20 @@ exits.
 
 The command table grows one task at a time as the decision monitor lands
 (``docs/PLAN.md`` section 4): ``ingest`` and ``route`` on 2026-09-22 (backlog
-task 028), ``adjudicate`` the same day (task 029). Nothing here should grow a
-command back by habit.
+task 028), ``adjudicate`` the same day (task 029), ``brief`` and ``run`` the
+same day (task 031). Nothing here should grow a command back by habit.
 """
 
 import click
 
 from .adjudicate import adjudicate_command
 from .auth import auth
+from .brief import brief_command
 from .ingest import ingest_command
 from .output import set_debug_mode
 from .replay import replay_command
 from .route import route_command
+from .run import run_command
 from .sources import sources_command
 from .watch import watch_command
 
@@ -38,9 +42,9 @@ def cli(ctx, debug):
     """
     InsightWeaver - monitoring against pre-registered watches.
 
-    Ingest sources, route observations to pre-registered watches, and ask
-    the model whether each routed pair is evidence. The briefing product was
-    removed in backlog task 012; the brief is the next task in docs/PLAN.md.
+    Ingest sources, route observations to pre-registered watches, ask the
+    model whether each routed pair is evidence, and render the brief: what
+    moved, what is due, what is watched, what went quiet.
     """
     set_debug_mode(debug)
     ctx.ensure_object(dict)
@@ -59,6 +63,8 @@ cli.add_command(watch_command, name="watch")
 cli.add_command(route_command, name="route")
 cli.add_command(adjudicate_command, name="adjudicate")
 cli.add_command(replay_command, name="replay")
+cli.add_command(brief_command, name="brief")
+cli.add_command(run_command, name="run")
 
 
 if __name__ == "__main__":

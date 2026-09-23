@@ -72,6 +72,18 @@ class RSSAdapter:
 
         entries = getattr(feed_data, "entries", None) or []
         feed_info = getattr(feed_data, "feed", None) or {}
+        if not getattr(feed_data, "version", ""):
+            # feedparser leaves ``version`` empty when the document is not a
+            # feed of any kind: a 200 carrying a landing page, a challenge
+            # page, JSON. That is not "a quiet day"; recorded as a success it
+            # would clear the source's error and list it in the brief as a
+            # feed that ran and returned nothing. Raise instead. A feed with
+            # parse warnings (``bozo``) but a recognised version is still a
+            # feed (2026-09-23, backlog task 031 review).
+            problem = getattr(feed_data, "bozo_exception", None)
+            raise SourceUnavailable(
+                self.name, "response is not a feed" + (f": {problem}" if problem else "")
+            )
 
         items: list[RawItem] = []
         skipped = 0

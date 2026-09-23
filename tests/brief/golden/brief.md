@@ -1,0 +1,37 @@
+# Brief as of 2026-08-24 06:00
+window: since 2026-08-17 06:00
+position: reviewed 2026-08-01 (23 days ago)
+sources:
+- Agency Newsroom: fetched 2026-08-24 06:00; 0 in window
+- Broken Feed: LAST ATTEMPT FAILED 2026-08-24 06:00: HTTP error: connection refused; 0 in window
+- Compliance Weekly: fetched 2026-08-24 06:00; 2 in window
+- Federal Register - Documents API: fetched 2026-08-24 06:00; 6 in window
+
+## MOVED
+- nist-site-rules-loosen: NIST relaxes the conduct rules at its sites before the visit is scheduled.
+  - supports 0.80  2026-08-21  Federal Register - Documents API: Traffic and Conduct on the Grounds of Certain National Institute of Standards and Technology Sites  [sha256:841e04c37028, claude-v1] (+1 near-duplicate)
+    - also supports 0.80  2026-08-21  Compliance Weekly: Traffic and Conduct on the Grounds of Certain National Institute of Standards and Technology Sites  [sha256:8f54b09130d9, claude-v1]
+- opm-benefit-forms-change: OPM reopens comment on the retirement benefit application forms.
+  - supports 0.55  2026-08-20  Federal Register - Documents API: Submission for Review: 3206-0156, Application for Death Benefits Under the Civil Service Retirement System, (SF 2800); Documentation in Support of Application for Death Benefits When Deceased was an Employee at the Time of Death, (SF 2800A) and Applying for Death Benefits Under CSRS Pamphlet, (SF 2800-1)  [sha256:c2fcbdff3a66, claude-v1]
+
+## DUE
+- decision schedule-site-visit: Schedule the NIST site visit before or after the conduct rule changes (2026-09-10, 17 days)
+  - stake: Two travel days and the assessor's calendar, against a visit under rules that change mid-stay.
+- watch nist-site-rules-loosen: NIST relaxes the conduct rules at its sites before the visit is scheduled. (expires 2026-09-15, 22 days)
+
+## WATCHING
+- dfars-cyber-reporting: belief 0.20 (file, 2026-08-24); serves renew-authorization; expires in 160 days; evidence in window 0, last never
+  - DFARS adds a cyber incident reporting collection before the renewal.
+- nist-site-rules-loosen: belief 0.30 (file, 2026-08-24); serves schedule-site-visit; expires in 22 days; evidence in window 2, last 2026-08-24
+  - NIST relaxes the conduct rules at its sites before the visit is scheduled.
+- opm-benefit-forms-change: belief 0.50 (file, 2026-08-24); serves renew-authorization; expires in 219 days; evidence in window 1, last 2026-08-24
+  - OPM reopens comment on the retirement benefit application forms.
+
+## QUIET
+watches with nothing routed inside their staleness window: 1
+- dfars-cyber-reporting: never routed (alert after 7 days)
+sources that ran in the window and returned nothing: 1
+- Agency Newsroom (never produced)
+routed pairs no adjudication has answered: 0
+failed adjudications in the window: 1
+- sha256:ebf02a3e9ea4 / opm-benefit-forms-change [claude-v1]: Model declined the request (category: scripted)

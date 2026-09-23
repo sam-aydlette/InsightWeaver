@@ -128,7 +128,7 @@ folded in: credentials move to `src/config/credentials.py`, `auth` to `src/cli/a
 | `route [--dry-run] [--rebuild]` | compile triggers, link candidates, report the unrouted clusters | `routes` | no | no |
 | `adjudicate [--dry-run] [--limit]` | one structured call per routed pair without a verdict for this prompt version | `adjudications`, `evidence`, audit log | no | yes |
 | `replay` | as today, over routed pairs | `evidence` with `--commit` | no | depends |
-| `brief [--since] [--as-of] [--format] [--output]` | the document | `briefs` | no | no |
+| `brief [--since] [--as-of] [--format] [--output] [--dry-run]` | the document | `briefs` (not with `--dry-run`) | no | no |
 | `run` | ingest, route, adjudicate, brief, in that order | all of the above | yes | yes |
 
 Modules, each under 300 lines:
@@ -143,8 +143,9 @@ Modules, each under 300 lines:
 - `src/evidence/claude_adjudicator.py`: the one `ClaudeAdjudicator`, prompt version `claude-v1`,
   structured output validated against a pydantic verdict, failures recorded not retried.
 - `src/evidence/adjudicate.py`: select pairs, call, write the ledger and evidence, total tokens.
-- `src/brief/`: `select.py` (the four sections as data), `render.py` (plain text and markdown, no
-  timestamps beyond `as_of` and the data's own dates, deterministic to the byte).
+- `src/brief/`: `sections.py` (the data types), `select.py` (the sections as data), `render.py`
+  (plain text and markdown, no timestamps beyond `as_of` and the data's own dates, deterministic
+  to the byte).
 - `src/cli/{ingest,route,adjudicate,brief,run,auth}.py`: thin.
 
 The brief, in fixed order, each item citing observation hashes:

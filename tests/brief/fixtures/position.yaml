@@ -1,0 +1,13 @@
+# The Position for the brief's end-to-end test. Fictional; the shape of
+# config/position.example.yaml. Frozen "today" in the test is 2026-08-24.
+version: 1
+reviewed: 2026-08-01
+decisions:
+  - key: schedule-site-visit
+    name: Schedule the NIST site visit before or after the conduct rule changes
+    deadline: 2026-09-10
+    stake: Two travel days and the assessor's calendar, against a visit under rules that change mid-stay.
+  - key: renew-authorization
+    name: Renew the authorization or let it lapse
+    deadline: 2027-03-31
+    stake: Two engineer-quarters against 40% of federal revenue.

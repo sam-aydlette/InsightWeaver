@@ -16,7 +16,8 @@ holds. Re-running it after a later task creates only what is new.
 derived and rebuildable from observations and watches; ``adjudications``
 (task 029) and ``watch_beliefs`` (task 030) are ledgers of what the model was
 asked and what the operator believed, and nothing rebuilds them, which the
-help text says. Task 030 also added four lifecycle columns to ``watches``;
+help text says. ``briefs`` (task 031) records each brief rendered; dropping it
+only resets the next brief's default window to seven days. Task 030 also added four lifecycle columns to ``watches``;
 ``add_watch_columns`` adds whichever an existing table lacks, one ALTER each,
 and the way down drops them.
 
@@ -33,17 +34,18 @@ from sqlalchemy import inspect, text
 from sqlalchemy.engine import Engine
 
 from src.database.connection import engine
-from src.database.models import Adjudication, Route, WatchBelief
+from src.database.models import Adjudication, BriefRun, Route, WatchBelief
 
 __all__ = ["TABLES", "WATCH_COLUMNS", "downgrade", "upgrade"]
 
 # Creation order. Reversed on the way down.
-TABLES = ("routes", "adjudications", "watch_beliefs")
+TABLES = ("routes", "adjudications", "watch_beliefs", "briefs")
 
 _MODELS: dict[str, Any] = {
     "routes": Route,
     "adjudications": Adjudication,
     "watch_beliefs": WatchBelief,
+    "briefs": BriefRun,
 }
 
 # Columns task 030 added to `watches`, with the DDL that adds each to an

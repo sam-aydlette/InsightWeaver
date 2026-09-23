@@ -193,8 +193,9 @@ class TestSchemaBoundaries:
         ``watches`` joined the set on 2026-08-31 (backlog task 013);
         ``observations`` and ``evidence`` on 2026-08-31 (backlog task 014);
         ``routes`` on 2026-09-22 (backlog task 028); ``adjudications`` the same
-        day (task 029); ``watch_beliefs`` the same day (task 030). Every
-        addition to this set should be a task that says so.
+        day (task 029); ``watch_beliefs`` the same day (task 030); ``briefs``
+        the same day (task 031). Every addition to this set should be a task
+        that says so.
         """
         from src.database.models import Base
 
@@ -207,4 +208,5 @@ class TestSchemaBoundaries:
             "routes",
             "adjudications",
             "watch_beliefs",
+            "briefs",
         }

@@ -1,0 +1,36 @@
+# Three watches for the brief's end-to-end test, chosen so that the recorded
+# Federal Register week (tests/sources/fixtures/federal_register_week.json)
+# routes to two of them and to none of the third.
+version: 1
+watches:
+  - id: nist-site-rules-loosen
+    claim: NIST relaxes the conduct rules at its sites before the visit is scheduled.
+    belief: 0.3
+    so_what:
+      decision: schedule-site-visit
+      because: A looser regime changes what the visit has to cover and who can attend.
+    triggers:
+      - terms: ["National Institute of Standards and Technology", "NIST"]
+    expires: 2026-09-15
+    staleness_alert_days: 14
+  - id: opm-benefit-forms-change
+    claim: OPM reopens comment on the retirement benefit application forms.
+    belief: 0.5
+    so_what:
+      decision: renew-authorization
+      because: A changed form set moves the renewal's paperwork estimate.
+    triggers:
+      - terms: ["Application for Death Benefits"]
+      - terms: ["Court-Ordered Benefits"]
+    expires: 2027-03-31
+    staleness_alert_days: 30
+  - id: dfars-cyber-reporting
+    claim: DFARS adds a cyber incident reporting collection before the renewal.
+    belief: 0.2
+    so_what:
+      decision: renew-authorization
+      because: A new collection is a new control family to evidence.
+    triggers:
+      - terms: ["cyber incident reporting"]
+    expires: 2027-01-31
+    staleness_alert_days: 7

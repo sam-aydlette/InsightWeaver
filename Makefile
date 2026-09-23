@@ -73,6 +73,11 @@ test:
 coverage:
 	$(PYTEST) tests/ --cov=src --cov-report=term-missing -v
 
+# Rewrite tests/brief/golden/ from the current renderer. Read the diff before
+# committing it: a golden that changed is the test reporting a change.
+golden:
+	INSIGHTWEAVER_UPDATE_GOLDEN=1 $(PYTEST) tests/brief/test_end_to_end.py -q
+
 lint:
 	$(RUFF) check src/ tests/
 	$(RUFF) format --check src/ tests/

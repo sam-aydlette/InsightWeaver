@@ -116,10 +116,26 @@ def store_items(db: Session, source: RSSFeed, items: Iterable[RawItem]) -> tuple
     if observations:
         logger.info(f"{source.name}: stored {observations} new observation(s)")
 
-    source.last_fetched = utcnow()  # type: ignore[assignment]
-    source.last_error = None  # type: ignore[assignment]
-    source.error_count = 0  # type: ignore[assignment]
+    record_attempt(source, error=None)
     return inserted, duplicates
+
+
+def record_attempt(source: RSSFeed, *, error: str | None) -> None:
+    """
+    Stamp the source row with the outcome of the fetch that just ran.
+
+    ``last_fetched`` is the time of the last *attempt*, success or failure;
+    ``last_error`` is that attempt's error, or None when it succeeded, with or
+    without items. The row does not keep the time of the last success once a
+    failure has overwritten it, and the brief's header says so by labelling
+    the stamp "last attempt failed" when ``last_error`` is set. One function
+    for the three writers (items stored, nothing returned, failure) so they
+    cannot drift (2026-09-23, backlog task 031).
+    """
+    # Column[...] vs value: the models use the pre-2.0 Column() style.
+    source.last_fetched = utcnow()  # type: ignore[assignment]
+    source.last_error = error  # type: ignore[assignment]
+    source.error_count = 0 if error is None else int(source.error_count or 0) + 1  # type: ignore[assignment]
 
 
 def source_article_count(db: Session, source: RSSFeed) -> int:

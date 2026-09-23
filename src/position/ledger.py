@@ -129,13 +129,15 @@ def record_belief(
     return row
 
 
-def current_beliefs(db: Session) -> dict[str, CurrentBelief]:
+def current_beliefs(db: Session, *, as_of: datetime | None = None) -> dict[str, CurrentBelief]:
     """
-    The latest ledger row per watch.
+    The latest ledger row per watch, or the latest at or before ``as_of``.
 
     A watch with no ledger row -- one stored before the ledger existed, or a
     row inserted by hand -- reads as its registration belief, labelled
     ``file`` and dated by its ``created_at``, which is what that value is.
+    ``as_of`` is for the brief, which is a pure function of the moment it is
+    rendered as of (2026-09-23, backlog task 031 review).
     """
     registered: dict[str, float] = {}
     out: dict[str, CurrentBelief] = {}
@@ -152,7 +154,10 @@ def current_beliefs(db: Session) -> dict[str, CurrentBelief]:
             None,
             float(w.belief),
         )
-    rows = db.query(WatchBelief).order_by(WatchBelief.observed_at, WatchBelief.id).all()
+    query = db.query(WatchBelief)
+    if as_of is not None:
+        query = query.filter(WatchBelief.observed_at <= as_of)
+    rows = query.order_by(WatchBelief.observed_at, WatchBelief.id).all()
     for row in rows:
         watch_id = str(row.watch_id)
         if watch_id not in registered:

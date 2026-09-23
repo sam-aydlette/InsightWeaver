@@ -59,10 +59,13 @@ asked twice and where a failed call is recorded rather than retried.
 append-only and written only from the watch file at sync and by the operator;
 the same task gave ``watches`` its lifecycle columns (retired, resolved) so a
 watch is never deleted once history hangs off it.
+
+``briefs`` records each brief rendered, added 2026-09-22 by backlog task 031;
+the next brief's default window starts where the last one before today ended.
 """
 
 from .base import Base, LedgerIsAppendOnly, ObservationIsImmutable
-from .monitor import Adjudication, Route
+from .monitor import Adjudication, BriefRun, Route
 from .observations import Evidence, Observation
 from .sources import Article, RSSFeed
 from .watches import Watch, WatchBelief
@@ -71,6 +74,7 @@ __all__ = [
     "Adjudication",
     "Article",
     "Base",
+    "BriefRun",
     "Evidence",
     "LedgerIsAppendOnly",
     "Observation",

@@ -134,6 +134,31 @@ class TestUnreachable:
             assert row.last_error == "HTTP 503"
             assert row.error_count == 1
 
+    async def test_an_empty_fetch_is_recorded_as_a_fetch(self, db_factory):
+        """
+        Zero items from a reachable source is a fact about the window, and the
+        brief prints it as such; it needs the fetch stamp to do so, and an
+        earlier error is over once the source answers (2026-09-22, task 031).
+        """
+
+        def row():
+            with db_factory() as db:
+                r = db.query(RSSFeed).filter(RSSFeed.url == FakeAdapter.source_url).one()
+                return r.last_fetched, r.last_error, r.error_count
+
+        await run_adapter(FakeAdapter([]), SINCE, db_factory=db_factory)
+        stamped, error, count = row()
+        assert stamped is not None, "an empty fetch must stamp the row itself"
+        assert (error, count) == (None, 0)
+
+        await run_adapter(
+            FakeAdapter(SourceUnavailable("Fake Source", "HTTP 503")), SINCE, db_factory=db_factory
+        )
+        assert row()[1:] == ("HTTP 503", 1)
+
+        await run_adapter(FakeAdapter([]), SINCE, db_factory=db_factory)
+        assert row()[1:] == (None, 0), "an answer, even an empty one, ends the error"
+
     async def test_an_unexpected_adapter_bug_is_still_an_outage(self, db_factory):
         result = await run_adapter(
             FakeAdapter(ValueError("adapter bug")), SINCE, db_factory=db_factory

@@ -73,11 +73,13 @@ class TestSubcommandRegistration:
 
     @pytest.mark.parametrize(
         "gone",
-        ["brief", "frames", "diet", "questions", "predictions", "forecast", "decisions", "beat"],
+        ["frames", "diet", "questions", "predictions", "forecast", "decisions", "beat"],
     )
     def test_deleted_commands_are_not_registered(self, cli_runner, gone):
         """
-        The briefing commands are gone from --help and from dispatch.
+        The briefing commands are gone from --help and from dispatch. ``brief``
+        left this list on 2026-09-22 (backlog task 031) when it came back as a
+        derived view over the monitor's tables, with no model call in it.
 
         Pinned rather than assumed: the editable install resolves a missing
         ``src.*`` module against the developer's other checkout, so a dangling

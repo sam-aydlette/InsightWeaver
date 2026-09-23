@@ -40,7 +40,7 @@ from ..utils import utcnow
 from .base import SourceAdapter, SourceUnavailable
 from .federal_register import FederalRegisterAdapter, FederalRegisterConfigError
 from .rss_adapter import RSSAdapter
-from .store import ensure_source, source_article_count, store_items
+from .store import ensure_source, record_attempt, source_article_count, store_items
 
 logger = logging.getLogger(__name__)
 
@@ -150,17 +150,21 @@ async def run_adapter(
     except SourceUnavailable as exc:
         result.error = exc.reason
         logger.error(f"SOURCE UNREACHABLE: {adapter.name} - {exc.reason}")
-        _record_error(db_factory, source_id, exc.reason)
+        _record_outcome(db_factory, source_id, exc.reason)
         return result
     except Exception as exc:  # noqa: BLE001 - an adapter bug is still an outage
         result.error = f"unexpected {type(exc).__name__}: {exc}"
         logger.error(f"SOURCE FAILED: {adapter.name} - {result.error}")
-        _record_error(db_factory, source_id, result.error)
+        _record_outcome(db_factory, source_id, result.error)
         return result
 
     result.fetched = len(items)
 
     if not items:
+        # The source ran and answered. Record that, or the brief cannot tell
+        # a source that returned nothing from one that never ran; QUIET names
+        # the former by this timestamp (2026-09-22, backlog task 031).
+        _record_outcome(db_factory, source_id, None)
         if prior_articles > 0:
             result.went_silent = True
             logger.error(
@@ -189,18 +193,14 @@ async def run_adapter(
     return result
 
 
-def _record_error(db_factory: DbFactory, source_id: int, reason: str) -> None:
-    """Write the failure onto the source row so it is visible outside the log."""
+def _record_outcome(db_factory: DbFactory, source_id: int, error: str | None) -> None:
+    """Write the attempt's outcome onto the source row so it is visible outside the log."""
     from ..database.models import RSSFeed
 
     with db_factory() as db:
         row = db.query(RSSFeed).filter(RSSFeed.id == source_id).first()
-        if row is None:
-            return
-        # Column[...] vs value, as in src/sources/store.py.
-        row.last_fetched = utcnow()  # type: ignore[assignment]
-        row.last_error = reason  # type: ignore[assignment]
-        row.error_count = int(row.error_count or 0) + 1  # type: ignore[assignment]
+        if row is not None:
+            record_attempt(row, error=error)
 
 
 async def run_adapters(

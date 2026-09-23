@@ -23,7 +23,7 @@ def blank_engine(tmp_path):
 
 class TestUpgrade:
     def test_creates_routes_and_returns_its_name(self, blank_engine):
-        assert mig.upgrade(blank_engine) == ["routes", "adjudications", "watch_beliefs"]
+        assert mig.upgrade(blank_engine) == ["routes", "adjudications", "watch_beliefs", "briefs"]
         assert inspect(blank_engine).has_table("routes")
 
     def test_is_idempotent(self, blank_engine):
@@ -58,6 +58,7 @@ class TestUpgrade:
             "routes",
             "adjudications",
             "watch_beliefs",
+            "briefs",
         }
 
 
@@ -72,6 +73,7 @@ class TestDowngrade:
     def test_drops_with_confirm(self, blank_engine):
         mig.upgrade(blank_engine)
         assert mig.downgrade(blank_engine, confirmed=True) == [
+            "briefs",
             "watch_beliefs",
             "adjudications",
             "routes",
@@ -174,7 +176,7 @@ class TestWatchColumns:
 
         dropped = mig.downgrade(blank_engine, confirmed=True)
 
-        assert dropped == ["watch_beliefs", "adjudications", "routes"]
+        assert dropped == ["briefs", "watch_beliefs", "adjudications", "routes"]
         columns = {c["name"] for c in inspect(blank_engine).get_columns("watches")}
         assert columns.isdisjoint(mig.WATCH_COLUMNS)
         assert inspect(blank_engine).has_table("watches")

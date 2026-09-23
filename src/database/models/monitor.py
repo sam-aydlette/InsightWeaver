@@ -110,3 +110,30 @@ class Adjudication(Base):
         Index("idx_adjudications_version", "prompt_version"),
         Index("idx_adjudications_watch", "watch_id"),
     )
+
+
+class BriefRun(Base):
+    """
+    One row per brief rendered, so the next brief knows where the last left off.
+
+    ``brief`` defaults its window to the ``as_of`` of the most recent row
+    delivered before the start of the day it is rendered on, which is what
+    makes a second run the same morning reproduce the first instead of
+    reporting "nothing since ten minutes ago". ``rendered_sha`` is the hash of
+    the bytes printed, kept so a reader can check that a saved brief is the one
+    this row records. ``--dry-run`` renders without writing here.
+
+    Added 2026-09-22 for backlog task 031.
+    """
+
+    __tablename__ = "briefs"
+
+    id = Column(Integer, primary_key=True)
+    as_of = Column(DateTime, nullable=False)
+    since = Column(DateTime, nullable=False)
+    moved = Column(Integer, nullable=False)
+    quiet = Column(Integer, nullable=False)
+    rendered_sha = Column(String(80), nullable=False)
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+
+    __table_args__ = (Index("idx_briefs_as_of", "as_of"),)
