@@ -15,125 +15,115 @@ Review tests to ensure they describe behaviors, not implementations.
 ### Good Test Characteristics
 
 1. **Describes behavior, not methods**
-   - Test name: `test_citation_map_overrides_claude_response` (behavior)
-   - Not: `test_build_synthesis_task_with_citations_returns_tuple` (implementation)
+   - Test name: `test_a_second_run_asks_nothing` (behavior: idempotency)
+   - Not: `test_pending_pairs_calls_query_filter` (implementation)
 
-2. **Decoupled from implementation details**
-   - Test the contract, not the internals
-   - If refactoring breaks tests but not behavior, tests are too coupled
+2. **Can actually fail**
+   - A test earns its place only if a plausible bug turns it red.
+   - `tests/routing/test_regression.py` plants exactly 20 whole-word matches
+     among 1000 observations and 100 look-alikes, then asserts on the
+     identity of the routed set, not just a count -- a routing predicate
+     that is too loose bills real model calls, so the test is pinned with a
+     number and was verified to fail (61 routed) when the word-boundary
+     anchors were emptied out.
+   - `tests/brief/test_select.py` inserts rows out of the order the brief
+     must print them (`test_clusters_and_citations_are_ordered_by_date_before_hash`
+     even gives the earlier observation the *larger* hash in both pairs), so
+     a missing or wrong `ORDER BY` fails the test instead of passing by
+     accident.
 
-3. **Follows Arrange-Act-Assert structure**
-   ```python
-   # Arrange: Set up preconditions
-   articles = [{"id": 1, "title": "Test"}]
+3. **No tautologies**
+   - Don't assert that a mock returned what you told it to return.
+   - Assert on what the code under test *did* with that input: what it
+     wrote, what it computed, what it left alone.
+   - `tests/position/test_ledger.py::test_only_sync_and_the_two_commands_write_belief_or_resolution`
+     is the extreme version of this: instead of trusting that every call
+     site remembers to go through `record_belief`/`resolve_watch`, it scans
+     every file under `src/` for the patterns that would write to the
+     ledger and asserts the only matches are the three allowed writers, by
+     name.
 
-   # Act: Execute the behavior
-   result = await synthesizer.synthesize()
-
-   # Assert: Verify outcomes
-   assert result["status"] == "success"
-   ```
-
-4. **Tests at boundaries, not internals**
-   - Public API boundaries
-   - Integration points (database, external APIs)
-   - Error boundaries
-
-5. **Meaningful assertions**
-   - Assert on outcomes users care about
-   - Not: `assert mock.called` (verifies plumbing)
-   - Yes: `assert result["citation_map"]["1"]["title"] == "Expected Title"` (verifies value)
+4. **Mocks only at the boundary**
+   - Mock the external boundary (the model API, the network), never an
+     internal method of the unit under test.
+   - `tests/evidence/test_adjudicate.py`'s `FakeClient` stands in for the
+     Claude API client itself -- the one seam that would otherwise cost
+     money and require a key -- and returns scripted `ModelResponse` or
+     raises a scripted `ModelCallFailed`. Everything downstream (routing,
+     the adjudicator, the ledger writes) is the real code.
+   - `tests/sources/test_runner.py`'s `FakeAdapter` plays the same role for
+     a source: it returns a scripted list of items, an empty list, or
+     raises `SourceUnavailable`, and the runner, the silence watchdog and
+     the database writes are all real.
+   - `tests/brief/test_end_to_end.py` goes one boundary further: it patches
+     `get_db` to yield one shared test session and patches the HTTP layer
+     under each adapter, then runs the real CLI commands (`watch sync`,
+     `ingest`, `route`, `adjudicate`, `brief`) end to end and compares the
+     rendered bytes against a committed golden file.
 
 ## Red Flags
 
-- Test names that mirror method names exactly
-- Assertions that only check mock call counts
-- Tests that break when implementation changes but behavior doesn't
-- Heavy use of `mock.assert_called_with()` on internal methods
-- Tests that require knowing private method signatures
-- Excessive mocking of the unit under test
-
-## InsightWeaver-Specific Patterns
-
-### Async Tests
-```python
-@pytest.mark.asyncio
-async def test_synthesis_produces_valid_output(self, mock_curator, mock_client):
-    # Arrange
-    mock_curator.curate.return_value = {"articles": sample_articles}
-    mock_client.analyze.return_value = valid_response_json
-
-    # Act
-    result = await synthesizer.synthesize_with_trust_verification()
-
-    # Assert on behavior
-    assert result["status"] == "success"
-    assert "citation_map" in result["synthesis_data"]["metadata"]
-```
-
-### Mocking External Services
-Mock at the boundary (Claude API, database), not internal methods:
-```python
-# Good: Mock the external boundary
-mock_client.analyze_with_context = AsyncMock(return_value=response)
-
-# Bad: Mock internal helper methods
-mock_synthesizer._parse_synthesis_response = MagicMock()
-```
-
-### Testing Error Handling
-Test that errors produce correct outcomes, not that specific exceptions flow:
-```python
-# Good: Behavior when API fails
-async def test_synthesis_handles_api_failure_gracefully():
-    mock_client.analyze.side_effect = Exception("API Error")
-    result = await synthesizer.synthesize()
-    assert result["status"] == "error"  # Behavior
-
-# Bad: Testing exception plumbing
-async def test_api_exception_propagates():
-    mock_client.analyze.side_effect = APIError()
-    with pytest.raises(APIError):  # Implementation detail
-        await synthesizer.synthesize()
-```
+- Test names that mirror method or function names exactly
+- Assertions that only check a mock's call count (`mock.assert_called_once()`
+  with nothing about what it produced)
+- Tests that would still pass if the feature were deleted
+- A test that asserts a value it just told a stub to return
+- Mocking an internal function of the module under test rather than the
+  true external boundary (an LLM client, the network, the database engine)
+- A clock read from the wall in a test that asserts on dates or ordering
+  (see `frozen_clock` in `tests/brief/test_end_to_end.py`, which replaces
+  the `datetime` class `src.utils.utcnow` reads)
 
 ## Review Checklist
 
-When reviewing tests, ask:
+When reviewing a test, ask:
 
-- [ ] Does the test name describe a behavior or outcome?
-- [ ] Would this test break if I refactored without changing behavior?
-- [ ] Am I testing what users/callers care about?
-- [ ] Are assertions on outcomes rather than call patterns?
-- [ ] Is mocking limited to true external boundaries?
-- [ ] Can I understand what the code does just from reading tests?
+- [ ] Does the test name describe a behavior or outcome, not a method call?
+- [ ] Is there a concrete bug that would turn this test red? (If you can't
+      name one, the test may be a tautology.)
+- [ ] Are assertions on outcomes -- what got written, computed, or
+      rendered -- rather than on call patterns?
+- [ ] Is mocking limited to a true external boundary (model client,
+      network, wall clock), with everything else real?
+- [ ] Would this test survive a refactor that kept behavior the same but
+      changed internals (renamed a private function, changed a return
+      type)?
+- [ ] If the test is about ordering or a threshold, is it exercised with
+      data that would expose a wrong sort or an off-by-one (both sides of
+      the boundary, not just one)?
 
 ## Questions to Ask
 
-1. "If I renamed a private method, would this test break?"
-2. "Does this test tell me what the feature does?"
-3. "Am I testing the contract or the implementation?"
-4. "Would a user of this code care about what I'm asserting?"
+1. "If I renamed a private function, would this test break?"
+2. "What real defect would this test catch?"
+3. "Am I testing the contract (what the caller observes) or the internals?"
+4. "Is every mock here standing in for the network, the model, or the
+   clock -- or did I mock something inside the unit under test?"
 
 ## Example Transformation
 
-**Before (implementation-coupled):**
+**Before (tautological, mock-verification only):**
 ```python
-def test_build_synthesis_task_with_citations_returns_tuple():
-    result = synthesizer._build_synthesis_task_with_citations(articles, 2)
-    assert isinstance(result, tuple)
-    assert len(result) == 2
+def test_run_calls_the_client():
+    client = FakeClient(_verdict())
+    run(corpus, ClaudeAdjudicator(client))
+    assert client.calls == 1
 ```
 
-**After (behavior-focused):**
+**After (behavior-focused, from `tests/evidence/test_adjudicate.py`):**
 ```python
-def test_synthesis_includes_citation_map_matching_input_articles():
-    """Citation map in output should reference the exact articles provided"""
-    articles = [{"id": 1, "title": "Article One", "source": "Source A"}]
+def test_every_pair_gets_a_ledger_row_and_evidence_gets_an_evidence_row(self, corpus):
+    client = FakeClient(_verdict(), _verdict(is_evidence=False, direction="none"))
 
-    result = await synthesizer.synthesize_with_trust_verification()
+    result = run(corpus, ClaudeAdjudicator(client))
 
-    citation_map = result["synthesis_data"]["metadata"]["citation_map"]
-    assert citation_map["1"]["title"] == "Article One"
-    assert citation_map["1"]["source"] == "Source A"
+    assert (result.asked, result.evidence, result.none, result.failed) == (2, 1, 1, 0)
+    ledger = corpus.query(Adjudication).order_by(Adjudication.watch_id).all()
+    assert [(a.watch_id, a.outcome, a.audit_id) for a in ledger] == [
+        ("conmon-scope-expands", "evidence", "audit-1"),
+        ("hiring-market-tightens", "none", "audit-2"),
+    ]
 ```
+
+See `examples.md` for the full good/bad contrast pairs drawn from the
+current suite.

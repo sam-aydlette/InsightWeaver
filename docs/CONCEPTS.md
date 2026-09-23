@@ -1,295 +1,217 @@
 # InsightWeaver Concepts
 
-A one-page reference for the entities the tool persists, how they relate, and when each one gets created. Read this once and the CLI commands will make sense.
-
----
-
-## The core idea: a commitment graph
-
-InsightWeaver is built around a small graph of **commitments** — things the system or the user has bound itself to track. Each daily brief is a diff against this graph, not a standalone artifact. The unit of value is the running record, not the morning report.
-
-The graph has five primary entity types. Everything in the CLI is either creating one of these, updating one, or reading the graph back out.
-
-A sixth concept, the **Beat**, is not a commitment but a *scope* over them: it says which sources a run reads and which slice of the graph that run accumulates into. See "Beats" below.
-
----
-
-## Questions
-
-A **Question** is an unresolved epistemic thread the coverage is implicitly tracking. Most situations end with one — "Will the Fed cut rates in June?" — and that question persists across daily runs until it resolves.
-
-A Question has one of three origins. Most are **emergent**: the graph notices what coverage leaves unresolved. A beat can also **declare** one up front — see "Standing questions" below. Since 2026-08-27 the operator can declare one directly with `questions add "..." --cadence 90d`. All three are the same kind of row, and everything downstream (predictions, decision evidence, appearance counts) treats them identically.
-
-**Cadence.** A question the operator declared carries a `cadence` — a review interval such as `7d`, `90d`, `1y`. **A cadence is not a deadline.** It says how often the question is worth re-examining; a Prediction's `due_by` says when a specific claim resolves. A question reviewed quarterly can hold a claim resolving in three weeks, and that nesting is the point: a CISA directive deadline is a 30-day loop and whether CMMC Phase 2 slips is a multi-year one, and forcing both onto one rhythm checks the fast one too late and buries the slow one in noise.
-
-`forecast --due` surfaces a question when *its own* interval has elapsed since `last_reviewed_at` (or `first_asked_at`, if never reviewed), and **stamps it whether or not anything moved** — a quiet question that reappears every day trains the operator to skim. A cadence is itself falsifiable: a question always quiet at its interval was set too fast, one that moved twice before its next review was set too slow.
-
-Cadence is nullable, and null means "not on a review schedule". Emergent questions have none — the interval is the operator's read on how fast a subject moves, so nothing infers it from coverage volume.
-
-**When created.** Each situation's `unresolved_questions.primary` (and optional secondaries) is matched against the open question graph by a Haiku call. If today's question is the same underlying question as one already open, today's situation gets bound to that existing Question. Otherwise a new Question is created.
-
-**When resolved.** Manually, via `insightweaver questions resolve <id> --note "..."`. The tool never auto-resolves; deciding a thread has closed is editorial.
-
-**Reappearance.** When a previously resolved Question's text appears again in fresh coverage, a *new* Question is created with `previous_question_id` pointing at the resolved one. Resolution is never silently undone.
-
-**CLI.** `questions add "..." --cadence 90d | list [--beat NAME] | show <id> | resolve <id> --note ...`. `questions list` shows each question's cadence and time until next review.
-
-**In the brief.** Returning questions surface their identity inline: `Q47 (run 4, asked 2026-03-12)` for repeat appearances, `Q47 (new)` for first ones.
-
----
-
-## Predictions
-
-A **Prediction** is a falsifiable claim about the future. Every prediction carries an `author`: `model` or `operator`.
-
-**Model predictions.** Each `what_to_watch` entry in a situation's output becomes a Prediction keyed to that situation's primary Question, created during synthesis after questions are resolved. Before each new synthesis, a check pass grades the open ledger against today's coverage: triggered, contradicted, expired (no signal after 90 days), or still open.
-
-**Operator predictions.** Staked by hand: `predict <question-id> "..." --by YYYY-MM-DD --confidence 0.7`. Both flags are **required and rejected at entry** — nothing is stored without them. That is not fussiness. Of the first 33 model predictions, 25 were phrased "X would signal Y" (an interpretation rule, which cannot be wrong) and only 3 carried a date; 19 expired unjudged. A claim with no resolution date can never come due, so it can never be graded, and a confidence with a default is a non-commitment in a different costume.
-
-**When an operator prediction resolves.** Manually: `resolve <id> --outcome yes|no --note "..."`. `resolved_at` is recorded **separately from `due_by`** — resolving three months late is itself calibration data. A resolved prediction is not editable, and resolving one twice is refused.
-
-**Auto-resolution from coverage is deliberately absent.** A tool that grades its operator's calls using the same corpus that produced them is measuring agreement with itself. The friction of resolving by hand is the instrument, not an obstacle to it.
-
-**The author split.** `predictions track-record` reports the operator's plain hit rate — how often the claim, as written, came true — and reports model predictions under a separate heading. The two are never mixed: a track record blending them measures nothing. The model's stay in the ledger as *prompts*, suggestions about what is worth holding an opinion on.
-
-**CLI.** `predictions open | triggered | contradicted | track-record`, each taking `--beat NAME`; plus the write side, `predict` and `resolve`.
-
-**In the brief.** A transparency line at the top of each brief reports the check results: "Prediction check: 8 open observables graded — 1 triggered, 0 contradicted, 7 still open."
-
----
-
-## Decisions, Factors, and Evidence
-
-These three together form the **decision journal** — the user-side input that turns daily news into accumulating per-decision context.
-
-A **Decision** is a standing decision the user is carrying (e.g., "housing market timing"). A **DecisionFactor** is a specific variable inside that decision the user is tracking (e.g., "interest rates"). Each factor has a free-text `what_would_update_me` clause — this is the user's stated rule for what evidence would change their read, and it's what makes routing tractable.
-
-**DecisionEvidence** records that a specific situation contained evidence bearing on a specific factor, in a specific direction (`supports`, `complicates`, `neutral`), with an `epistemic_status` label.
-
-**When created.** Decisions and Factors are added by the user via CLI. Evidence is created automatically: after each synthesis's Pass 2, a Haiku router matches situations against open factors and writes Evidence rows for genuine connections.
-
-**Why it matters.** Real decisions accumulate over weeks of evidence, not a single brief. The decision journal is what turns the tool from a daily artifact into a working memory.
-
-**CLI.** `decisions list | show <id> | add | resolve <id> --note ... | factor add <decision-id> --name ... --update-when ...`
-
-**In the brief.** A "Your decisions" section shows which factors moved today and which direction.
-
----
-
-## Frames
-
-A **NarrativeFrame** is a coherent way of organizing a story: what it emphasizes, what it backgrounds, and what it takes for granted. Frames are structural features of coverage, not opinions.
-
-The frame layer has several related entities:
-
-- **TopicCluster.** A topical area (e.g., "fed policy"). Frames live inside clusters.
-- **NarrativeFrame.** A discovered or validated frame for a cluster. Has `validated: bool` — discovered frames start unvalidated until the user approves them via `frames edit`.
-- **ArticleFrame.** Maps an article to the frame it most exhibits, with a confidence in `[0, 1]`. Populated by a Haiku classifier on each run.
-- **FrameGap.** A frame consistently absent from coverage. A feed-curation signal — if a known frame stops appearing, the gap is recorded.
-
-**Why it matters.** Once `article_frames` is populated, you can ask structural questions about your information diet: which frames does each feed carry, which frames does only one feed supply (single point of exposure), which frames have been absent for weeks. That's what `diet` shows.
-
-**CLI.** `frames list | show <topic> | edit <id> | gaps`, and `diet feeds | gaps | overlap`.
-
----
-
-## Meta-fractures
-
-A **meta-fracture** is a single underlying frame conflict that surfaces across multiple topically distinct situations on the same day. Computed in Pass 3 (cross-cluster reconciliation) and not persisted as its own table — lives in the synthesis JSON.
-
-Most days have none. When one appears, it's structural insight: the same disagreement is shaping coverage in places you wouldn't have connected.
-
-**In the brief.** A META-FRACTURES section appears when results exist.
-
----
-
-## Beats
-
-A **Beat** is a *subject* the tool runs briefs for, as opposed to the *person* the user profile models. `config/user_profile.json` describes a location, a profession, a voting context and a set of civic interests; `config/beats/<name>.json` describes a topic and the sources that cover it. The two coexist. The person path is unchanged and `insightweaver brief` with no `--beat` behaves exactly as it always has.
-
-**Shape.** A beat file is small on purpose:
-
-```json
-{
-  "name": "us-public-sector-compliance",
-  "description": "...",
-  "sources": [
-    { "adapter": "rss", "feed_tags": ["regulatory", "federal_policy"], "geo_tags": ["usa"] }
-  ],
-  "coverage": {},
-  "standing_questions": [],
-  "channels": ["terminal"]
-}
-```
-
-**Source selection reuses the feed `applicability` tags**, it does not invent a parallel selector. `feed_tags` is matched against a feed's `domain_tags` and `specialty_tags`; the optional `geo_tags` and `scope` narrow against the families of the same name. Within a family the match is ANY, across families it is ALL, and multiple `sources` entries union. A beat is deliberately *not* validated by `src/utils/profile_loader.py` — that validator enforces a person-shaped schema, and a beat is a different shape.
-
-**Neither `coverage` nor `standing_questions` is reserved any more.** `coverage` declares the institutions the beat tracks — see "Institutional activity" below. `standing_questions` declares the agenda it reports against — see "Standing questions" below.
-
-**Run recording.** `beats` holds one row per subject; `beat_runs` holds one row per brief run, carrying the `analysis_run_id`, the `synthesis_id`, the article count and the number of feeds the beat resolved to. A run is attributed in the same transaction that stores its synthesis, so a stored synthesis is either attributed or does not exist.
-
-**CLI.** `brief --beat NAME`. `--beat` and `--from-run` are mutually exclusive: a stored run replays exactly as recorded.
-
-**Expect a beat to be thin.** RSS is the only adapter today, and specialist domains publish little of it. The shipped `us-public-sector-compliance` beat resolves to eight feeds. That thinness is a finding about the source layer, not a defect in the beat.
-
-### Scoping decision: the graph is scoped by derivation, not by a `beat_id` column
-
-Questions, Predictions and their join rows carry **no `beat_id` column**. A row's beat is derived from `beat_runs`: a synthesis belongs to a beat when a `beat_runs` row says so; a Question belongs to a beat when it appeared in one of that beat's syntheses; a Prediction inherits the beat of the Question it keys off. Two scopes exist — a beat's scope, and the **default scope**, which is everything no beat run ever touched.
-
-This is scoping, not collision-acceptance. The question matcher only ever binds within one scope, the prediction check only grades and expires within one scope, and — the load-bearing part — **appearance counts are counted within a scope**, so `Q47 (run 4, asked 2026-03-12)` means "the fourth time *this subject* raised it".
-
-Why derivation rather than a column:
-
-- **A Question's beat is not an independent fact.** It is discovered from coverage, and the only thing that knows which subject surfaced it is the run. A `beat_id` column would be a second, denormalized copy of something `beat_runs` already determines, and the two could disagree.
-- **The same question can legitimately belong to two scopes.** A CISA directive can be both a compliance question and a personal-news question. A column forces a duplicate Question row and severs the link between them; derivation keeps one Question with an independent appearance count in each scope.
-- **It is additive.** No existing table is altered, so an unmigrated database keeps working for every non-beat command, and the migration cannot lose data. On a database with no `beat_runs` rows — every database that predates this feature — the default scope is the whole graph and every scope filter is an identity filter. That is what makes the no-beat path provably unchanged rather than merely believed to be.
-
-What stays **global**, deliberately:
-
-- **Decisions, DecisionFactors and DecisionEvidence.** A standing decision belongs to the user, not to a subject; the point of routing beat coverage into it is that a compliance development can move the user's career-timing factor. Scoping the decision journal per beat would break exactly the connection it exists to make.
-- **TopicClusters and NarrativeFrames.** A frame is a structural property of coverage, not of a subject. The same "national-security framing" appears in both the compliance beat and the general brief, and it is the same frame. Splitting the glossary per beat would fragment the frame vocabulary and weaken the `diet` signals, which depend on comparing feeds across the whole corpus.
-- **Article content filtering.** Stage 3 still filters articles against the person profile's `excluded_topics` before a beat brief selects from what remains. A beat scopes which *sources* are read, not who the brief is for.
-
-### Standing questions: the agenda a beat declares
-
-A brief is a delta against a standing intelligence agenda, not a summary of events. Emergent Questions give half of that: the graph notices what coverage leaves unresolved. `standing_questions` gives the other half — the human writes down what the beat is watching, and the beat carries it **whether or not any given run's coverage mentions it**.
-
-```json
-"standing_questions": [
-  "Does CMMC Phase 2 slip past its statutory date?",
-  "Which CSPs move to FedRAMP authorized, and at which impact level?"
-]
-```
-
-A list of strings, in the human's own agenda order. Duplicates are refused rather than deduplicated: two identical declarations mean the author lost track of the agenda, and collapsing them would hide that.
-
-**Seeding.** On the beat's first run each declaration becomes a real `Question` row, joined to the beat through `beat_standing_questions`. Seeding is idempotent by normalized text, and it happens at beat registration — before any coverage is read — because a declared question exists because a human declared it, not because an article mentioned it. If the beat is already raising that exact question emergently, the existing Question is *adopted* rather than duplicated, so its accumulated history survives the declaration.
-
-**Nothing is auto-retired.** Removing a question from the config stops it being declared; it does not close the Question. Closing one is editorial, and it stays a manual `questions resolve`.
-
-**Why a join table and not a `beat_id` column.** The derivation rule above places a Question by the runs it appeared in. A declared question can exist before — and without ever — appearing in a synthesis, so `beat_runs` alone cannot place it, and it would fall into the default scope and collide with the person brief's ledger. `beat_standing_questions` is a beat table in the same sense `beat_runs` is: the graph tables still carry no `beat_id`, and a beat's scope is still derived from a join.
-
-**A tighter binding threshold than emergent questions get.** Seeded questions enter the same matcher, so a run's coverage can bind to one. But a declared question is written before any coverage exists and is typically broad, and broad text is exactly what a similarity matcher over-matches. Binding one to unrelated coverage is worse than missing a real match, because a standing question that falsely reads "moved" destroys the only thing the agenda is for. So for declared questions the Haiku matcher's answer is treated as a *proposal*: it stands only if the proposed text also shares at least 60% of the shorter question's subject vocabulary (`STANDING_BINDING_MIN_OVERLAP`). A refused bind is not a failure — the proposed question becomes a new emergent Question and the standing question is reported unmoved, which is the honest answer when the coverage was about something else. Emergent matching is unchanged.
-
-**In the brief.** Every run reports movement against every declared question, in a `STANDING AGENDA` section ahead of the situations:
+The entity-by-entity reference for the decision monitor. Rewritten 2026-09-23 (backlog task
+033) from the code as it stands; the earlier commitment graph of questions, predictions and
+frames was deleted on 2026-08-31 and is described only in git history and
+`docs/RECONCILIATION.md`.
+
+## The shape of the thing
+
+Decisions are the root. A watch is a claim that would change one decision, written before any
+document arrives. Observations are what sources published. Routing links observations to
+watches by rule. Adjudication asks a model whether a linked pair is evidence. Beliefs and
+grades are the operator's. The brief is a view over all of it, as of a moment.
 
 ```
-  [MOVED] Does CMMC Phase 2 slip past its statutory date?
-    Q1 (declared 2026-08-26, run 2)
-    Moved in: Situation 1: DoD signals CMMC Phase 2 timeline pressure[3]
-    Watching for: A DFARS class deviation naming CMMC Phase 2 -- published before the statutory date
-
-  [NO MOVEMENT] Which CSPs move to FedRAMP authorized, and at which impact level?
-    Q2 (declared 2026-08-26, never moved)
-    No coverage this run bore on this question, and none ever has.
+Position (decisions)            hand-authored, private
+   |
+Watch (claim, triggers)         hand-authored, private; the join key
+   |
+Observation <-- Route --> Watch     deterministic, no model
+   |
+Adjudication --> Evidence           one model call per routed pair
+   |
+Belief ledger, Resolution           operator only
+   |
+Brief                               derived view, deterministic to the byte
 ```
 
-The second entry is the point. **"No movement on CMMC Phase 2 this week" is itself information**, so a standing question with no coverage this run is reported as unmoved rather than filtered out as an empty section. That is the single failure mode this feature exists to prevent, and no layer — builder, stored payload, or renderer — is allowed to drop a quiet entry.
+## Position and Decision
 
-The agenda is computed when the synthesis is stored, not when it is rendered, and lands in `synthesis_data.metadata.standing_agenda`. So `--from-run` replays the same agenda the live run reported, and no renderer needs database access.
+`position.yaml`, at `POSITION_PATH`, outside this repository. It holds `version`, `reviewed`
+(the date the operator last sat down with the file) and `decisions`. A decision has:
 
-Standing questions need their own additive migration:
+- `key`: a slug, referenced by watches;
+- `name`: one sentence the operator could act on;
+- `deadline`: a date. The loader refuses a decision without one, because a decision with no
+  date is an interest, and interests are not what the system is for;
+- `stake`: what is worse if the decision goes wrong. Missing, the loader warns.
 
-```bash
-python -m src.database.migrations.add_standing_questions   # or: insightweaver brief setup
-```
+The loader (`src/position/position.py`) refuses structural problems, all of them at once, and
+warns rather than refuses on drift: a file past two pages, a deadline already passed, a
+decision with no stake. The brief carries a banner when `reviewed` is more than 90 days old, or
+absent, or when the file could not be read at all.
 
-### Reading the graph back out: `questions`, `predictions`, `forecast`
+## Watch
 
-Scoping the write path is only half the boundary. `brief` writes the graph; `questions`, `predictions` and `forecast` read it back out, and an unscoped read would surface a beat's ledger as though it were the user's own. That is the same silent-wrong-answer failure the scoping exists to prevent, so these commands answer the same way `brief` does:
+`watches.yaml`, at `WATCHES_PATH`, beside the Position. A watch is one pre-registered claim
+serving one decision. Every field is required and none defaults (`src/position/_validate.py`):
 
-**No `--beat` means your own ledger, `--beat NAME` means that subject's.** One flag, the same meaning everywhere.
+- `id`: a slug; the name every brief line carries;
+- `claim`: the thing that is or is not true, phrased so that afterwards the operator could say
+  which;
+- `belief`: the operator's probability at registration, 0.0 to 1.0. This is the prior; the
+  ledger below holds every later value;
+- `so_what.decision`: a key from the Position. A watch naming no decision, or an unknown one,
+  is refused (invariant 2);
+- `so_what.because`: what changes for that decision if the claim resolves. Printed back in the
+  adjudication prompt as the operator wrote it, never paraphrased;
+- `triggers`: a list of clauses, below;
+- `expires`: when the question stops mattering. Routing ignores an expired watch, and the brief
+  lists an expired, unresolved watch under DUE. The loader refuses a file that holds a watch
+  whose `expires` has passed, so the next `watch sync` fails until the operator grades the
+  watch (`watch resolve`) and then moves its date or removes it; removing it retires it, and a
+  retired watch leaves DUE;
+- `staleness_alert_days`: after how many days with nothing routed the silence is itself
+  reported. A whole number of days or a cadence string such as `2w`.
 
-| Command | Scoped? |
-| --- | --- |
-| `questions list` | yes |
-| `predictions open` / `triggered` / `contradicted` | yes |
-| `predictions track-record` | yes |
-| `forecast` | yes |
-| `questions show <id>` | no -- id-addressed, discloses its ledger |
-| `questions resolve <id> --note ...` | no -- id-addressed, reports its ledger |
+**Triggers.** A clause is a mapping over `terms`, `entities` and `sources`. Within a clause
+every populated field must match; within a field any listed value will do; across clauses any
+one firing routes the observation, and the first that fires is recorded. `terms` and
+`entities` compile to word-boundary patterns (`CISA` is not inside `precisa`), and an all-caps
+term matches case-sensitively (`BOD` matches, `body` does not). `sources` is a case-insensitive
+exact match on a configured source's name. A trigger written as prose is refused by the loader
+and again by the compiler (`src/routing/compile.py`), because a trigger that cannot be compiled
+never fires, and the deleted prediction ledger held 33 free-text triggers that were never
+graded for exactly that reason.
 
-`track-record` is the case that matters most. A calibration figure is only meaningful within one ledger: folding a compliance beat's resolved observables into the user's personal hit rate would corrupt the single number the tool exists to be honest about. `forecast` is a derived view over the predictions ledger, so it inherits the ledger's scoping rather than defining its own.
+**Sync.** `insightweaver watch sync` is the only path from the file to the `watches` table. A
+watch that leaves the file is retired (`retired_at`), never deleted, because ledger rows and
+evidence hang off it; a watch that returns is restored. There is no `watch add` (invariant 6).
 
-**The two exceptions are deliberate, and they are not "left global by omission".** `questions show 47` and `questions resolve 47` name one specific row. Refusing to find it because it belongs to another ledger would be obstructive, and silently scoping the lookup would make a valid id look nonexistent — addressing a row by id is an explicit act, not a browse. So both operate on the whole graph, and both **disclose** the ledger the row belongs to: `show` prints a `Ledger:` line, and `resolve` names the beat in its confirmation. The appearance history inside `show` is likewise unscoped, because it is the full history of the row the user asked about. Scoping is thereby always either applied or stated, never assumed.
+## Source and Observation
 
-**`--beat` on the read side resolves against the `beats` table, not `config/beats/`.** A ledger you have already accumulated stays readable after its config file is edited or deleted; reading is about what ran, not about what is currently configured to run. An unrecognised name is an error naming the beats that have runs, rather than an empty result that would read as "you have nothing here".
+A source is a row in `rss_feeds`: a configured feed from `config/feeds/`, or an adapter such
+as the Federal Register documents API. Every adapter (`src/sources/`) emits the same
+normalized item and stores it through one path, `src/sources/store.py`. An adapter that
+cannot reach or cannot understand its upstream raises `SourceUnavailable`; it never returns an
+empty list. Each attempt stamps the source row with its time and its error, if any, which is
+what the brief's header prints.
 
-On a database with no `beat_runs` rows these commands behave exactly as they always have, for the same reason the brief does: the default scope is the whole graph.
+An observation (`observations`) is one thing a source published:
 
----
+- keyed by `content_hash`, a SHA-256 over the normalized payload, which includes the item's URL
+  and the source's URL, so re-fetching an unchanged document is a no-op while the same text from
+  two sources is two rows: who said it is part of what was observed, and grouping the pair back
+  together is the MinHash signature's job;
+- immutable: an ORM update raises `ObservationIsImmutable`, and a database trigger refuses an
+  `UPDATE` issued any other way (invariant 3);
+- signed: a MinHash over five-word shingles is written beside the payload, and
+  `NEAR_DUPLICATE_THRESHOLD` (default 0.7) decides when two observations are one story. The
+  brief groups a watch's evidence by these clusters, so twelve outlets carrying one wire story
+  are one item with twelve citations.
 
-## Institutional activity
+`published_date` is the source's date when it gave one; `observed_at` is when the row was
+written. Ordering in the brief is by published date, then observed date, then hash, so it is
+total.
 
-A beat's `coverage` block names the **institutions** it tracks: organizations, programs, and types of document. Each run counts how many of its items mention each one, and the brief reports the entities whose count **departed from their trailing average**.
+## Route
 
-```json
-"coverage": {
-  "orgs":           [{ "name": "CISA", "aliases": ["Cybersecurity and Infrastructure Security Agency"] }],
-  "programs":       ["FedRAMP 20x", "CMMC"],
-  "document_types": [{ "name": "Binding Operational Directive", "aliases": ["BOD"] }]
-}
-```
+Tier 1. `insightweaver route` compiles every live watch's triggers, evaluates them over the
+observations in the window, and writes one `routes` row per (observation, watch) that
+matched, with the clause index that fired and when it was routed. The table is derived and
+rebuildable (`route --rebuild` discards the live watches' links and routes the whole corpus
+again; the new rows carry the rebuild's time, so QUIET's silence clock restarts for every watch
+that matches anything). No model is involved; the routing regression test plants exact matches and near-miss substrings
+and asserts which route.
 
-An entry is either a bare canonical name or `{"name": ..., "aliases": [...]}`. The three block names are the whole vocabulary: `kind` is `org`, `program` or `document_type`.
+Everything that does not route is reported, grouped by near-duplicate cluster and by source,
+because a trigger that misses is the operator's to fix and the report is where they see it.
 
-**There is no person kind, and that is the design, not an omission.** The loader rejects a `coverage.people` key — and any other unrecognised block — with an error rather than ignoring it, so the boundary is enforced by the schema and cannot be reintroduced by convention. `beat_entities` has no person kind and there is no persons table, so no per-individual record exists to profile with. A named individual may appear inside a rendered situation where the source document names a signatory; that is an attribute of a document and expires with it, whereas a person row would accumulate across runs into a file on someone.
+## Adjudication and Evidence
 
-The reasoning is on the merits as well as the ethics. Personnel rotate and offices persist: tracking `FedRAMP PMO` survives a staffing change, while tracking a name goes silently dark on reassignment and the absence reads as inactivity — a wrong answer that looks like a real one. The interesting signal was never a person; it is whether an office moved.
+Tier 2, and the only model call in the system (invariant 4). `insightweaver adjudicate` takes
+every routed pair on an open watch that the current prompt version has not answered and asks
+the model one structured question: does this item bear on this claim, in which direction, how
+strongly, satisfying which clause, and why. The question is `src/evidence/prompt.py`; the
+answer is validated against a pydantic schema (`src/evidence/claude_adjudicator.py`).
 
-**The signal is the delta, never the count.** A flat tally is noise: the entities a beat declares are the ones that appear most days, so "FedRAMP PMO: 6" reproduces a standing fact every morning. What the brief says is `FedRAMP PMO appeared in 6 items this run, against a trailing average of 1`. The baseline is the last five recorded runs, and a move must clear both one whole item and half the baseline before it is reported as movement. **Expect this to look useless on day one** — there is no baseline until several runs have accumulated, and it must not be tuned against a single run.
+- An **adjudication** (`adjudications`) is one call about one pair, whatever it answered:
+  `evidence`, `none`, or `failed`, with the audit id, the token counts the API reported, and
+  the rationale. A pair is asked once per prompt version, with one gap: `replay --commit`
+  writes evidence and no adjudication row, so a pair a replay judged not to be evidence is asked
+  once more by `adjudicate`. A failed call is recorded, not retried; retrying until an answer
+  looks right would make the replay below meaningless.
+- **Evidence** (`evidence`) is the subset that bore on the claim: `direction` (`supports` or
+  `contradicts`; there is no neutral row), `magnitude` (a strength of bearing, not a
+  probability), and the `prompt_version` that produced it, per row.
+- An API outage or a rejected request is neither an answer nor a verdict: the run stops with
+  the pair left pending, and the brief counts pending pairs under QUIET.
 
-**Matching is deterministic word-boundary alias matching. No model is involved.** A count a model produced is not reproducible from the same articles tomorrow, and an unreproducible baseline cannot support a delta. Acronyms collide badly — `CISA` sits inside "precisa", `OMB` inside "bombing" and "combat", `BOD` inside "body" — so every term is anchored between non-alphanumeric positions, and a term written entirely in capitals matches case-sensitively, because an acronym is only itself when it is shouted. Hyphens and slashes are boundaries, so "CISA-issued" counts. A mention is counted per *item*, not per occurrence: an article naming CISA nine times is one item.
+**Prompt versions and replay.** The version written on every row is a hand-maintained label
+(`claude-v1`). The prompt, its effort level, its caps and the schema are hashed into a
+fingerprint that a test pins to that label, so a change to any of them fails the suite until
+the label is bumped; a version cannot drift under the rows that carry it. `insightweaver replay
+--prompt-version V` rebuilds evidence for a version over the routed pairs and diffs it against
+what is stored, writing nothing; `--commit` replaces that version's rows and is the only path
+that deletes evidence. The test suite's adjudicators are keyword stubs that live in the test
+tree on purpose, so the replay machinery is exercised without a key.
 
-**What appears and what does not.** An entity with no mentions and no history does not appear — declaring it was a hypothesis about where news comes from, and one that has never paid out is a note about the config, not a line in the brief. An entity that **has** been active and is now quiet does appear: silence is information, and dropping it is the same class of bug as a standing question vanishing on a quiet day. `entity_mentions` records a row per entity per run including the zeroes, because a baseline that averaged only the busy days would always read as normal.
+**The audit log.** `src/llm/audit.py` writes every request, in full, to `data/llm-audit/`
+before it is sent, and the usage and stop reason of every response after. There is no way to
+send a request without writing it. The log is for the operator's eyes; it is not a cache.
 
-**It is not a leaderboard.** Entries are ordered by kind then name, never by count, and the section states that a count is an observation rather than a measure of significance. Consistent with "no entity stores a truth value": activity is not importance, and the tool does not infer intent, motive or significance from it.
+## Belief ledger and Resolution
 
-**Schema.** `beat_entities` holds one row per declared institution per beat, carrying `kind`, the canonical `name` and the configured `aliases`. `entity_mentions` holds one row per entity per run, carrying `item_count`, `items_scanned` and the `beat_run_id` and `synthesis_id` of the run — written in the same transaction as the synthesis, so a stored run is either fully recorded or does not exist. An entity dropped from the config keeps its rows; deleting them would silently rewrite the record of what was observed.
+`watch_beliefs` is append-only, enforced by database triggers and ORM guards. The first row
+for a watch is the file's `belief`, labelled `file`, written at sync. `insightweaver watch
+believe ID P --note` appends a row labelled `principal`; it refuses a retired watch (put it back
+in the file and sync first). The file stays authoritative: whenever a sync finds the file's
+belief different from the current belief, including after the operator moved it, it appends a
+`file` row with a note naming the value it replaced. That is a recorded change, never a silent
+overwrite, and it means the number in the file should be kept in step with the ledger or the
+next sync moves the belief back (decided in backlog task 030). No code path in the tool moves a
+belief on its own; a belief update rule is deferred until there are resolved watches to
+calibrate one against.
 
-**Migration.** `python -m src.database.migrations.add_beat_entities`. Purely additive; a database without it keeps working and the activity section is simply absent.
+`insightweaver watch resolve ID --outcome yes|no --note` grades the claim, once, and sets
+`resolved_at` on the watch. A resolved watch takes no further belief and leaves routing. A
+retired watch may still be graded, because the operator may learn the answer after removing
+the claim from the file.
 
----
+## Brief
 
-## Sources
+`insightweaver brief` is a pure function of the database, `--since` and `--as-of`
+(`src/brief/select.py` selects, `src/brief/render.py` prints). No clock is read in the render
+path, no iteration is unordered, and the golden test renders twice and compares bytes. Five
+parts, in fixed order:
 
-Each RSSFeed carries derived **calibration signals**, computed on demand from ArticleFrame and FrameGap data. No new schema for this — purely a view:
+1. **Header**: as of, the window, the Position's reviewed date with days since and the banner,
+   and one line per source with its last attempt (labelled as a failure when it was one) and
+   its count in the window.
+2. **MOVED**: every watch that gained evidence in the window, live or not, with each cluster of
+   near-duplicate observations as one item citing hash, source, date, title, direction,
+   magnitude and prompt version.
+3. **DUE**: decisions with a deadline inside the next 30 days or already past; open watches
+   expiring inside that horizon or already expired and unresolved.
+4. **WATCHING**: every live watch with its belief as of the moment, its source and date, the
+   decision it serves, days to expiry, evidence in the window and the date of the last
+   evidence.
+5. **QUIET**: watches with nothing routed inside their staleness window, sources that ran and
+   returned nothing, routed pairs no adjudication has answered, failed adjudications. Printed
+   with zeros; that is when the section carries information (invariant 5).
 
-- **Frame uniqueness:** fraction of this feed's tagged articles whose frame is carried by no other feed. High score = single point of exposure.
-- **Gap-filling:** fraction of recorded gap labels this feed's articles cover. High score = this source brings perspectives the rest of your corpus lacks.
+A row in `briefs` records each render. The next brief's default window opens at the last brief
+delivered before the start of today, so a second run the same morning reproduces the first
+instead of reporting "nothing since ten minutes ago". `--dry-run` renders without recording.
 
-**CLI.** `sources list | show <name>`
+## Invariants
 
----
+1. Nothing sends.
+2. Every watch names a decision.
+3. Observations are immutable; evidence is derived.
+4. One stochastic component.
+5. Silence is distinguishable from breakage.
+6. The system never authors watches.
 
-## How a daily brief flows through the graph
+Each has a test that would fail if a change broke it; the tests are the specification.
 
-With `--beat`, step 0 is registering the beat, seeding the standing questions it declares, and resolving its sources; every graph read and write below is then confined to that beat's scope, and step 8 also writes the `beat_runs` row. Without `--beat` the run operates in the default scope, which on a database with no beat runs is the whole graph.
+## What is not modeled
 
-0. **Coverage pass** (beats with a `coverage` block only) — the run's items are matched against the beat's declared institutions and read against their trailing averages. Deterministic, no model call.
-1. **Prediction check** — open Predictions are graded against today's coverage. Resolutions written to the ledger.
-2. **Pass 1** — articles clustered into topic groups.
-3. **Pass 2** — each cluster gets a situation analysis (with frame-aware prompting if known frames exist) and its articles get tagged into ArticleFrame.
-4. **Pass 3** — cross-cluster reconciliation looks for meta-fractures.
-5. **Question matching** — situation `unresolved_questions` matched against the open Question graph; new Questions created or existing ones bound. With `--beat`, this is also where the beat's declared standing questions can be bound, on the tighter threshold, and where the standing-agenda review is computed — including every declared question that did *not* move.
-6. **Prediction creation** — situation `what_to_watch` observables become new open Predictions keyed to the matched Questions.
-7. **Decision routing** — situations matched against open DecisionFactors; Evidence rows written for genuine connections.
-8. **Render** — the brief renders, surfacing question identity, the prediction-check summary, the decision routing, the standing agenda and the institutional activity (both for a beat), and any meta-fractures.
-
-After this loop runs, the graph has accumulated:
-- new Questions or returning ones marked with appearance counts
-- new open Predictions plus today's resolutions to the ledger
-- new ArticleFrame rows
-- DecisionEvidence linking today's situations to your standing decisions
-
-That accumulation is the point. The brief is the diff view onto it.
-
----
-
-## What's not modeled
-
-A few things deliberately don't exist as entities:
-
-- **Unknown unknowns.** The Rumsfeld bucket is excluded by design. The tool does not fabricate observables it cannot ground.
-- **Claim survival.** Computing per-source claim survival would require structured claim extraction we have not built. The `sources` command omits this signal honestly rather than computing a fake one.
-- **Truth.** No entity stores a truth value. Predictions are graded for whether they *resolved*, not whether they were *right*. Frames have no "correct" status. The tool surfaces structure, not verdicts.
+- **Unknown unknowns.** The tool does not fabricate observables it cannot ground. A claim with
+  no trigger words is a claim that will never route, and the loader says so.
+- **Truth.** No entity stores a truth value. A resolution records that the operator graded the
+  claim, not that the tool judged it; evidence records bearing, not correctness.
+- **Frames.** The earlier product modeled the frame each source exhibits. The monitor does
+  not, and README.md says so under the third principle.
+- **Automatic belief.** Every belief row was written by a person.

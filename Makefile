@@ -44,6 +44,7 @@ help:
 	@echo "  make check           Run all checks (lint + typecheck + test)"
 	@echo ""
 	@echo "Database:"
+	@echo "  make db-init           Create every table a fresh database lacks (additive, safe)"
 	@echo "  make db-add-watches    Create the watches table (additive, safe)"
 	@echo "  make db-add-observations  Create observations and evidence (additive, safe)"
 	@echo "  make db-add-monitor    Create the decision monitor tables (additive, safe)"
@@ -120,6 +121,12 @@ clean:
 clean-all: clean
 	rm -rf venv/
 	rm -rf .venv/
+
+# A fresh database: every table the models declare, creating what is absent
+# and touching nothing that exists. The additive targets below add columns to
+# older tables and are harmless after this. (2026-09-23, backlog task 033.)
+db-init:
+	$(PYTHON) -m src.database.migrations.create_schema
 
 # Additive: creates the watches table if it is absent and prints that it did
 # nothing if it is not. No --confirm, because nothing here can lose data; the

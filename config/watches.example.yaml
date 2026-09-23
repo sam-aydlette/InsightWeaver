@@ -54,7 +54,7 @@ watches:
     triggers:
       - entities: [FedRAMP PMO, GSA]
         terms: [continuous monitoring, ConMon, significant change]
-      - sources: [Federal Register]
+      - sources: [Federal Register - Documents API]
         terms: [FedRAMP]
     expires: 2027-03-31
     staleness_alert_days: 30

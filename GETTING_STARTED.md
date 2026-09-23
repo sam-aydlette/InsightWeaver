@@ -1,217 +1,150 @@
-# Getting Started with InsightWeaver
+# Getting Started
 
-> **Superseded 2026-08-31 (backlog task 012).** The briefing product this
-> document describes -- `brief`, beats, questions, predictions, frames,
-> synthesis and rendering -- has been **deleted**. Roughly 8,900 lines of source
-> and most of the test suite went with it, in a single commit, because the
-> operator's call was that git history is the rollback path and dead code in the
-> tree reads as current. `insightweaver` now exposes one command, `sources`.
->
-> What survives is ingestion: `src/sources/`, `src/rss/`, `src/processors/`, the
-> feed config, and five modules ported for tiers not yet built
-> (`src/matching/entity_matcher.py`, `src/matching/coverage_probe.py`,
-> `src/llm/claude_client.py`, `src/utils/cadence.py`,
-> `src/processors/deduplicator.py`).
->
-> **Everything below this banner describes the deleted product and has not been
-> rewritten.** Rewriting it needs the new pipeline to exist first, which task 012
-> explicitly puts out of scope. Read it as history until it is replaced.
+From a clean checkout to a first brief. Rewritten 2026-09-23 (backlog task 033).
 
----
+## What you need
 
-This guide walks you through downloading, installing, and running InsightWeaver on your computer.
+- Python 3.11 or newer.
+- An Anthropic API key, for the one model call the tool makes (`adjudicate`). Everything else,
+  including the whole test suite, runs without one.
+- A place outside this checkout for two private files, described in step 3.
 
----
+## 1. Install
 
-## What You Need
-
-1. **A computer** (Windows, Mac, or Linux)
-2. **Python 3.11 or newer** -- [Download Python](https://www.python.org/downloads/)
-3. **An Anthropic API key** -- [Get one here](https://console.anthropic.com/) (requires account; ~$0.20-0.40 per brief)
-
----
-
-## Step 1: Download InsightWeaver
-
-**Option A: Download ZIP** (easiest)
-1. Click the green "Code" button on this page
-2. Click "Download ZIP"
-3. Extract the ZIP file to a folder (e.g., your Documents folder)
-
-**Option B: Using Git** (if you have it installed)
-```
-git clone https://github.com/YOUR_USERNAME/InsightWeaver.git
+```bash
+git clone https://github.com/sam-aydlette/InsightWeaver.git
+cd InsightWeaver
+python -m venv .venv
+source .venv/bin/activate
+make install-dev
 ```
 
----
+`make install-dev` installs the pinned dependencies, the package in editable mode so that
+`insightweaver` is on your path, and the pre-commit hooks. Check it worked:
 
-## Step 2: Open a Terminal
-
-**Windows:**
-1. Press `Windows + R`, type `cmd`, press Enter
-2. `cd Documents\InsightWeaver`
-
-**Mac:**
-1. Open Spotlight (`Cmd + Space`), type `Terminal`, press Enter
-2. `cd ~/Documents/InsightWeaver`
-
-**Linux:**
-1. Open your terminal application
-2. `cd ~/Documents/InsightWeaver`
-
----
-
-## Step 3: Install InsightWeaver
-
-```
-python -m venv venv
+```bash
+insightweaver --help
+make check
 ```
 
-Activate the virtual environment:
+`make check` runs the linter, the type checker and the test suite. It needs no key and no
+network.
 
-- Windows: `venv\Scripts\activate`
-- Mac/Linux: `source venv/bin/activate`
+## 2. Store the key
 
-Install:
-
-```
-pip install -e .
+```bash
+insightweaver auth set anthropic
 ```
 
----
+You are prompted for the key, hidden, and it is written to the OS keychain. It is never read
+from `.env` and never printed; `insightweaver auth status` says whether it is set.
 
-## Step 4: Add Your API Key
+## 3. Write your Position and watches
 
-```
-cp .env.example .env       # Mac/Linux
-copy .env.example .env     # Windows
-```
+The tool's whole input is two hand-authored YAML files: the decisions you are carrying, with
+deadlines, and the claims you want watched, with the words a document would contain if it
+bore on them. They name real decisions and real deadlines, so they belong in a private
+repository of your own, not in this one. Tell the tool where they are:
 
-Open `.env` in any text editor. Replace `your_key_here` with your actual API key. Save.
-
----
-
-## Step 5: Set Up Your Profile
-
-Copy the example profile to its expected location:
-
-```
-cp config/user_profile.example.json config/user_profile.json
+```bash
+cp .env.example .env
+# edit POSITION_PATH and WATCHES_PATH in .env, or leave the defaults:
+#   ~/.config/insightweaver/position.yaml
+#   ~/.config/insightweaver/watches.yaml
 ```
 
-Open `config/user_profile.json` and edit it for your situation -- location, profession, civic interests, etc. The profile is what makes the brief location-aware and personally relevant.
+Two ways to write them:
 
----
+- **Interview.** In Claude Code, run the `/onboard` skill. It asks for each decision and each
+  watch, field by field, writes the two files from your answers, and ends by syncing them. It
+  transcribes; it does not suggest decisions, beliefs or claims.
+- **By hand.** Copy `config/position.example.yaml` and `config/watches.example.yaml` to the
+  private paths and edit them. The comments in both files explain every field, and the loader
+  refuses a file with a missing or malformed field, all problems at once, so a mistake is a
+  message rather than a silent default. One thing it cannot check: a `sources` trigger names a
+  source by its exact registered name (the `name` in `config/feeds/`, or `Federal Register -
+  Documents API`), and a misspelling is a clause that never fires. `insightweaver sources list`
+  shows the names once a first `ingest` has run.
 
-## Step 6: Generate Your First Briefing
+Then create the database and load the watches:
 
-```
-insightweaver brief
-```
-
-This takes 2-5 minutes. The brief renders directly to your terminal. To archive a copy as markdown:
-
-```
-insightweaver brief --save brief.md
-```
-
----
-
-## Daily Use
-
-The minimum rhythm is one command:
-
-```
-insightweaver brief
+```bash
+make db-init
+insightweaver watch sync
+insightweaver watch list
 ```
 
-Each morning. That's it. The brief renders to your terminal with everything you need: situation analyses, narrative-layer mapping, branching paths, information gaps, returning question identity (`Q47 (run 4, asked 2026-03-12)`), and a transparency line reporting which of yesterday's flagged observables resolved.
+## 4. The first morning
 
-You don't need to touch anything else.
-
----
-
-## Optional: tracking threads across time
-
-InsightWeaver maintains a persistent commitment graph behind the brief -- Questions, Predictions, Decisions, Frames. These accumulate automatically whether or not you ever query them, but the CLI exposes them when you want to look.
-
-**See [docs/CONCEPTS.md](docs/CONCEPTS.md)** for a one-page reference on what each entity is and when it gets created.
-
-Commands available when you want depth:
-
-```
-insightweaver questions list           # threads the coverage is still tracking
-insightweaver questions show 47        # full history of question Q47
-insightweaver predictions track-record # the tool's own calibration record
-insightweaver decisions list           # standing decisions
-insightweaver decisions show 1         # factors and routed evidence for D1
-insightweaver diet feeds               # which frames each feed carries
-insightweaver diet gaps                # frames consistently absent (curation signal)
-insightweaver sources list             # per-source structural calibration
-insightweaver frames list              # the narrative frame glossary
-insightweaver forecast                 # open observables + resolved record
+```bash
+insightweaver run
 ```
 
-If you want to register decisions so they accumulate evidence over time:
+This runs four commands in order and stops at the first that fails:
 
-```
-insightweaver decisions add --name "housing market timing" --type housing
-insightweaver decisions factor add 1 --name "interest rates" \
-  --update-when "Fed signals a cut or hold at the next meeting"
-```
+1. `ingest` reads every configured source and stores what is new. Each source is reported as
+   fetched, inserted, unreachable, or went silent.
+2. `route` links each new observation to the watches whose triggers it matches, and reports
+   what routed nowhere, grouped by story and by source, so you can see what your triggers miss.
+3. `adjudicate` asks the model, once per routed pair, whether the item bears on the claim.
+   Every request is written to `data/llm-audit/` before it is sent.
+4. `brief` prints the brief.
 
-Then each subsequent brief will route relevant situation evidence into that decision automatically.
+Read the brief top to bottom. The header says whether every source ran; MOVED is what gained
+evidence; DUE is what has a date on it; WATCHING is every live claim and your current belief;
+QUIET is where silence might be breakage. A brief whose QUIET section is all zeros and whose
+sources all fetched is a quiet week. A brief with a source marked `LAST ATTEMPT FAILED` or a
+watch marked `never routed` is telling you where to look.
 
-Run `insightweaver --help` or type `help` in interactive mode for the full command list.
+To see what would be sent before spending anything:
 
----
-
-## Filtering the brief
-
-The brief accepts topic and scope filters:
-
-```
-insightweaver brief --hours 48          # look back 48 hours
-insightweaver brief -cs -n              # national cybersecurity only
-insightweaver brief --hours 48 -l       # 48-hour local news
+```bash
+insightweaver adjudicate --dry-run
 ```
 
-Topic flags: `--cybersecurity` (`-cs`), `--ai` (`-ai`). Scope flags: `--local` (`-l`), `--state` (`-s`), `--national` (`-n`), `--global` (`-g`). Combine with AND logic.
+## Daily use
 
----
+```bash
+insightweaver run                              # the morning
+insightweaver watch believe my-watch 0.6 --note "the notice narrows the scope"
+insightweaver watch resolve my-watch --outcome yes --note "final rule published 2026-10-02"
+insightweaver brief --format md --output ~/briefs/today.md
+```
+
+Beliefs are yours to move and are appended, never edited. A watch is graded once. When a
+decision closes or a claim stops mattering, edit the private files and run `watch sync`; a
+watch removed from the file is retired, not deleted, so its history stays.
+
+The default window of a brief opens at the last brief before today, so running `brief` twice
+in a morning reports the same window and the same items; only the as-of stamp in the first
+line moves. With `--as-of` fixed, the bytes are identical, and the suite asserts it.
 
 ## Troubleshooting
 
-**"command not found" or "not recognized"** -- the virtual environment isn't active. Run `source venv/bin/activate` (Mac/Linux) or `venv\Scripts\activate` (Windows). You should see `(venv)` at the start of your prompt.
-
-**"No module named..."** -- reinstall: `pip install -e .`
-
-**API key errors** -- check that `.env` exists and contains your key with no extra spaces around the `=`. Verify the key at [console.anthropic.com](https://console.anthropic.com/).
-
-**Brief is empty or errors out** -- check internet connection and API credit balance. Add `--debug` for verbose logs: `insightweaver brief --debug`.
-
----
-
-## Configuration
-
-**Your profile** is `config/user_profile.json`. Edit directly to change your location, professional domain, or topic interests. Most users edit this once a year, when major life circumstances change.
-
-**Your RSS feeds** are configured in `config/feeds/`. Each JSON file lists feed URLs by category. Add or remove sources to shape your information diet -- the `diet gaps` command will tell you what perspectives are missing.
-
----
+- **`insightweaver: command not found`**: the virtual environment is not active. Run
+  `source .venv/bin/activate`.
+- **`no credential 'anthropic_api_key' in the keychain`**: run `insightweaver auth set anthropic`.
+- **`No Position at ...` or `No watch set at ...`**: `POSITION_PATH` or `WATCHES_PATH` does not
+  point at a file. Check `.env`.
+- **`no such table`**: run `make db-init`.
+- **`unable to open database file`**: the database path is relative to the directory you run
+  from. Run commands from the checkout, or set `DATABASE_URL` in `.env` to an absolute path
+  (`sqlite:////home/you/insightweaver/data/insightweaver.db`).
+- **A source reports UNREACHABLE every morning**: `insightweaver sources show NAME` prints its
+  URL and last error. Old feeds in `config/feeds/` do go dark; remove the entry and `ingest`
+  stops asking it. Its row stays in the database, so the header keeps printing its last attempt
+  and `sources list` keeps listing it; there is no command to remove a source yet.
+- **The run stopped at `adjudicate` with "the API was unavailable"**: nothing was recorded for
+  the pair it stopped on; run `insightweaver adjudicate` again later and it resumes.
 
 ## Privacy
 
-- All data is stored locally in `data/insightweaver.db`
-- News articles come from public RSS feeds you configure
-- Synthesis runs through the Anthropic API (no third-party sharing)
-- Delete `data/` to wipe all accumulated state
-
----
-
-## Requirements
-
-- **Python:** 3.11 or newer
-- **Disk:** ~100MB for database
-- **Internet:** for RSS fetch and API calls
-- **API budget:** ~$0.20-0.40 per brief
+- The database is `data/insightweaver.db`, relative to the directory you run from, and the audit
+  log is `data/llm-audit/` under the checkout. Keep both out of cloud-synced folders;
+  `DATABASE_URL` and `LLM_AUDIT_DIR` in `.env` move them.
+- The only network calls are fetching your configured sources and the model API. Nothing
+  listens, nothing sends mail, nothing writes to any external service.
+- The audit log holds every request that left the machine, in full, and each response's usage
+  and stop reason. It is yours to read and to delete.
+- Delete `data/` to wipe all accumulated state. Your Position and watches are elsewhere and are
+  untouched.

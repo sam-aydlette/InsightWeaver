@@ -60,9 +60,9 @@ dev = [
 insightweaver = "src.cli.app:cli"
 
 [project.urls]
-Homepage = "https://github.com/yourusername/insightweaver"
-Repository = "https://github.com/yourusername/insightweaver"
-Issues = "https://github.com/yourusername/insightweaver/issues"
+Homepage = "https://github.com/sam-aydlette/InsightWeaver"
+Repository = "https://github.com/sam-aydlette/InsightWeaver"
+Issues = "https://github.com/sam-aydlette/InsightWeaver/issues"
 
 [tool.setuptools.packages.find]
 where = ["."]

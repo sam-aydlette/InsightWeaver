@@ -1,389 +1,200 @@
 # Contributing to InsightWeaver
 
-Thank you for your interest in contributing to InsightWeaver! This guide will help you get started.
+## Development setup
 
-## Table of Contents
+Requires Python 3.11 or higher.
 
-- [Development Setup](#development-setup)
-- [Project Structure](#project-structure)
-- [Development Workflow](#development-workflow)
-- [Code Standards](#code-standards)
-- [Testing](#testing)
-- [Documentation](#documentation)
-- [Pull Request Process](#pull-request-process)
-
-## Development Setup
-
-### Prerequisites
-
-- Python 3.11 or higher
-- pip and virtualenv
-- Git
-
-### Initial Setup
-
-1. **Clone the repository**
+1. Create a virtual environment and activate it:
    ```bash
-   git clone https://github.com/yourusername/insightweaver.git
-   cd insightweaver
+   python -m venv .venv
+   source .venv/bin/activate
    ```
 
-2. **Create and activate a virtual environment**
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
-
-3. **Install development dependencies**
+2. Install development dependencies:
    ```bash
    make install-dev
-   # Or manually:
-   pip install -r requirements-dev.txt
-   pip install -e .
-   pre-commit install
    ```
+   This runs `pip install -r requirements-dev.txt`, then `pip install -e .` (editable install,
+   so CLI changes are picked up immediately), then `pre-commit install` (registers the git hooks
+   in `.pre-commit-config.yaml`).
 
-   This installs the package in editable mode (`-e`) so you can test CLI changes immediately.
-
-4. **Set up environment variables**
+3. Set the Anthropic API key. It is never read from `.env` -- it lives in the OS keychain:
    ```bash
-   cp .env.example .env
-   # Edit .env with your API keys and configuration
+   insightweaver auth set anthropic
    ```
+   `insightweaver auth status` shows which known credentials are set, without printing values;
+   `insightweaver auth clear` removes one.
 
-5. **Set up database**
+4. Copy `.env.example` to `.env` and, if you keep your Position and watch set outside the
+   default location, point the two paths at them:
+   - `POSITION_PATH` (default `~/.config/insightweaver/position.yaml`)
+   - `WATCHES_PATH` (default `~/.config/insightweaver/watches.yaml`)
+
+   These are private, hand-authored files and do not live in this repository.
+
+5. Create a fresh database:
    ```bash
-   make db-migrate
+   make db-init
    ```
-
-6. **Run tests to verify setup**
-   ```bash
-   make test
-   ```
-
-## Project Structure
-
-```
-insightweaver/
-├── src/
-│   ├── cli/              # Command-line interface (one module per command group)
-│   ├── context/          # Synthesis orchestration: synthesizer, matcher,
-│   │                     # tracker, router, reconciler, frame manager
-│   ├── prompts/          # Analysis rules and per-pass prompt templates
-│   ├── processors/       # Content filter, deduplicator, normalizer
-│   ├── pipeline/         # Top-level pipeline orchestrator
-│   ├── rss/              # RSS fetching
-│   ├── database/         # SQLAlchemy models and migrations
-│   ├── config/           # Settings and feed loaders
-│   └── utils/            # Profile loader, base formatter, logging
-├── tests/                # Pytest suite, mirrors src/ layout
-├── config/               # User profile + feed JSON
-└── docs/                 # CONCEPTS.md and other reference docs
-```
-
-## Development Workflow
-
-### 1. Create a Feature Branch
-
-```bash
-git checkout -b feature/your-feature-name
-```
-
-### 2. Make Your Changes
-
-Follow the [Code Standards](#code-standards) below when writing code.
-
-### 3. Run Quality Checks
-
-Before committing, run all checks:
-
-```bash
-make check  # Runs lint + typecheck + test
-```
-
-Or run individually:
-```bash
-make lint       # Run linter
-make format     # Auto-format code
-make typecheck  # Run type checker
-make test       # Run tests
-```
-
-### 4. Commit Your Changes
-
-Pre-commit hooks will automatically run on each commit:
-
-```bash
-git add .
-git commit -m "feat: add new feature"
-```
-
-Use conventional commit messages:
-- `feat:` New feature
-- `fix:` Bug fix
-- `docs:` Documentation changes
-- `test:` Test changes
-- `refactor:` Code refactoring
-- `chore:` Maintenance tasks
-
-### 5. Push and Create Pull Request
-
-```bash
-git push origin feature/your-feature-name
-```
-
-Then create a pull request on GitHub.
-
-## Code Standards
-
-### Python Style
-
-- Follow PEP 8
-- Use type hints for function signatures
-- Maximum line length: 100 characters
-- Use ruff for linting and formatting
-
-### Code Organization
-
-- Keep functions focused and single-purpose
-- Avoid files longer than 300 lines
-- Reuse existing functionality
-- Add docstrings to all public functions and classes
-
-### Naming Conventions
-
-- **Functions/Variables**: `snake_case`
-- **Classes**: `PascalCase`
-- **Constants**: `UPPER_SNAKE_CASE`
-- **Private members**: `_leading_underscore`
-
-### Example
-
-```python
-class NarrativeSynthesizer:
-    """Generates narrative intelligence briefs using context engineering."""
-
-    async def synthesize_with_citations(
-        self,
-        hours: int = 48,
-        max_articles: int = 50,
-    ) -> dict:
-        """
-        Generate narrative synthesis with inline citations.
-
-        Args:
-            hours: Hours to look back for articles
-            max_articles: Maximum articles to include in context
-
-        Returns:
-            Synthesis results dictionary
-        """
-        # Implementation
-        pass
-```
-
-## Testing
-
-### Writing Tests
-
-- Place tests in `tests/` directory
-- Use `test_*.py` naming convention
-- Follow AAA pattern: Arrange, Act, Assert
-- Use fixtures from `conftest.py` for common setup
-- Mock external dependencies (API calls, file I/O)
-
-### Test Example
-
-```python
-import json
-import pytest
-
-from src.context.question_matcher import ProposedQuestion, QuestionMatcher
-from src.database.models import QUESTION_STATUS_OPEN, Question
-
-
-class TestQuestionMatcher:
-    """Validate LLM-output handling for the question matcher."""
-
-    @pytest.fixture
-    def matcher(self, mock_claude_client):
-        return QuestionMatcher(client=mock_claude_client)
-
-    @pytest.mark.asyncio
-    async def test_exact_normalized_match_short_circuits_llm(
-        self, matcher, test_session, mock_claude_client
-    ):
-        existing = Question(
-            text="Will the Fed cut rates?",
-            normalized_text="will the fed cut rates",
-            status=QUESTION_STATUS_OPEN,
-        )
-        test_session.add(existing)
-        test_session.commit()
-
-        proposed = [ProposedQuestion("Will the Fed cut rates?", is_primary=True)]
-        result = await matcher.resolve_questions(proposed, test_session)
-
-        assert result[0].id == existing.id
-        mock_claude_client.analyze.assert_not_called()
-```
-
-When testing components that take a `session` argument, use the `test_session` fixture from `tests/conftest.py`. When testing components that open their own `get_db()` session (like the frame manager), patch `src.context.<module>.get_db` to yield the test session -- see `tests/context/test_frame_classification.py` for an example.
-
-### Running Tests
-
-```bash
-# Run all tests
-make test
-
-# Run with coverage
-make coverage
-
-# Run specific test file
-pytest tests/context/test_synthesizer.py -v
-
-# Run specific test
-pytest tests/context/test_synthesizer.py::TestSchemaValidation::test_passes_with_executive_summary -v
-```
-
-### Coverage Requirements
-
-- Aim for 85%+ overall coverage
-- New features should have 90%+ coverage
-
-## Database Migrations
-
-InsightWeaver uses a custom migration system located in `src/database/migrations/`.
-
-### Running Migrations
-
-```bash
-# Apply migrations
-make db-migrate
-
-# Rollback migrations
-make db-migrate-down
-
-# Reset database (WARNING: deletes all data)
-make db-reset
-```
-
-### Creating Migrations
-
-Migrations are Python modules in `src/database/migrations/` with an `upgrade()` function and optionally a `downgrade()`. For new tables, follow the pattern in `add_questions.py`:
-
-```python
-"""
-Migration: Add New Tables
-Description of what this migration does.
-"""
-from src.database.connection import engine
-from src.database.models import YourModel
-
-
-def upgrade():
-    """Apply migration."""
-    YourModel.__table__.create(engine, checkfirst=True)
-    print("  your_table created")
-
-
-def downgrade():
-    """Rollback migration."""
-    YourModel.__table__.drop(engine, checkfirst=True)
-    print("  your_table dropped")
-
-
-if __name__ == "__main__":
-    import sys
-    if len(sys.argv) > 1 and sys.argv[1] == "down":
-        downgrade()
-    else:
-        upgrade()
-```
-
-For drop migrations (where there is no production rollback path), see `drop_orphan_tables.py` -- a hardcoded allowlist of table names used with `DROP TABLE IF EXISTS` via parameterized `text()`. Do not template table names from user input under any circumstances.
-
-## Documentation
-
-### Code Documentation
-
-- Add docstrings to all public functions and classes
-- Use Google-style docstrings
-- Include parameter types and return types
-- Provide usage examples for complex functions
-
-### Project Documentation
-
-- Update README.md for user-facing changes
-- Update this CONTRIBUTING.md for development workflow changes
-- Add comments for complex logic (explain "why", not "what")
-
-## Pull Request Process
-
-### Before Submitting
-
-1. **Ensure all checks pass**
+   This runs `src.database.migrations.create_schema`, which creates every table the SQLAlchemy
+   models declare that the database is missing, and touches nothing that already exists. If you
+   are working from an older checkout instead of a fresh one, the additive migrations
+   (`make db-add-watches`, `make db-add-observations`, `make db-add-monitor`) add whatever those
+   earlier stages introduced; each is safe to re-run.
+
+6. Verify the setup:
    ```bash
    make check
    ```
 
-2. **Update tests**
-   - Add tests for new features
-   - Update tests for modified behavior
-   - Ensure coverage doesn't decrease
+## Project structure
 
-3. **Update documentation**
-   - Update docstrings
-   - Update README if needed
-   - Add comments for complex logic
+```
+src/
+    brief/       render the brief (header, MOVED, DUE, WATCHING, QUIET) from the database
+    cli/         one module per command group (adjudicate, auth, brief, ingest, replay, route,
+                 run, sources, watch), wired together in app.py
+    config/      settings, OS-keychain credentials, feed matching
+    database/    SQLAlchemy models and the migrations under database/migrations/
+    evidence/    the one adjudication model call and its prompt, plus the replay harness
+    llm/         the Claude client, audit logging, JSON parsing helpers
+    matching/    entity matching used by routing
+    position/    the Position and watch-set loaders, validation, and the belief/resolution ledger
+    routing/     compiles watch triggers and routes observations to the watches they match
+    rss/         RSS fetching
+    sources/     the adapter layer -- every source (RSS, Federal Register, ...) normalizes to
+                 one observation shape and stores it through one path
 
-4. **Clean commit history**
-   - Squash fixup commits if needed
-   - Use meaningful commit messages
+tests/           mirrors src/ one-to-one, plus tests/cli/ for command-level tests
 
-### PR Guidelines
+backlog/         task files (see Workflow, below)
+config/          non-secret configuration checked into the repo
+docs/            CONCEPTS.md (entity model), PLAN.md (architecture and delivery record), and
+                 other reference docs
+```
 
-1. **Title**: Use conventional commit format
-   ```
-   feat: add claim verification timeout
-   fix: resolve race condition in parallel fetcher
-   ```
+## Workflow
 
-2. **Description**: Include
-   - Summary of changes
-   - Motivation and context
-   - Testing performed
-   - Breaking changes (if any)
+Branch from `main`. `main` is protected and takes changes only through pull requests.
 
-3. **Size**: Keep PRs focused
-   - Prefer smaller, focused PRs over large ones
-   - One feature/fix per PR
-   - Large refactors should be discussed first
+The convention is one backlog task per PR. A task lives as a file under `backlog/`, for example
+`backlog/031-brief.md`. Its first line is a `#` title stating the task in one sentence, then a
+fixed set of header fields:
 
-### Review Process
+- `REPO` -- the repository the task belongs to
+- `STATUS` -- `QUEUED`, `IN_PROGRESS`, `PARKED`, `DONE`, or `FAILED`
+- `SIZE` -- roughly how large the change is
+- `ACCEPTANCE` -- the specific, checkable conditions the task is done against; this is the
+  approved plan, not a suggestion
+- `OUT OF SCOPE` -- what the task deliberately does not touch, so a reviewer can tell scope
+  creep from the intended change
+- `LANDMINES` -- known ways the task could be gotten subtly wrong, written down in advance
+- `PLAN` -- where in `docs/PLAN.md` the task comes from, when it does
 
-1. Automated CI checks must pass
-2. At least one maintainer approval required
-3. Address review feedback promptly
-4. Squash and merge when approved
+A PR that closes a task updates that task's file (`STATUS: DONE` and any notes worth keeping)
+as part of the same change. Commits are ordinary commits with an informative message; there is
+no required commit format beyond that.
 
-## Getting Help
+## Quality gate
 
-- **Questions**: Open a GitHub Discussion
-- **Bugs**: Open a GitHub Issue
-- **Features**: Open a GitHub Issue with proposal
+```bash
+make check
+```
+runs lint, typecheck, and test, in that order, and stops if any of them fails.
 
-## Code of Conduct
+- **ruff** (`make lint`) runs `ruff check src/ tests/` and `ruff format --check src/ tests/`.
+  Rule set: pycodestyle, pyflakes, isort, flake8-bugbear, flake8-comprehensions, pyupgrade, and
+  flake8-unused-arguments/flake8-simplify (see `[tool.ruff.lint]` in `pyproject.toml`). Line
+  length is unenforced by the linter (left to the formatter); `make format` (alias `make fmt`)
+  applies fixes and formatting.
+- **mypy** (`make typecheck`) runs `mypy src/ --show-error-codes --pretty`. Several modules
+  (`src.database.models`, `src.database.connection`, `src.rss.*`, `src.matching.*`, `src.llm.*`,
+  `src.cli.*`, `src.utils.*`, `src.config.*`) carry `ignore_errors` overrides in `pyproject.toml`;
+  new code outside those modules is checked in full.
+- **pytest** (`make test`) runs `pytest tests/ -v`.
+- **detect-secrets** is not part of `make check` -- it runs as a pre-commit hook and in CI (see
+  below), scanning against `.secrets.baseline`. A false positive gets an inline
+  `pragma: allowlist secret` next to it rather than a baseline edit that hides it.
 
-- Be respectful and inclusive
-- Provide constructive feedback
-- Focus on the code, not the person
-- Help others learn and grow
+The pre-commit hooks (`.pre-commit-config.yaml`, installed by `make install-dev` or run on demand
+with `make pre-commit`) run ruff (with `--fix`) and ruff-format, the standard
+trailing-whitespace/end-of-file/check-yaml/check-json/check-toml/check-merge-conflict/
+detect-private-key/mixed-line-ending hooks, check-added-large-files (1000 kB, which a recorded
+fixture can reach), detect-secrets, and mypy. The pre-commit mypy hook is
+informational (`verbose: true`, no failure on type errors); `make typecheck` is the real gate.
 
-## License
+CI (`.github/workflows/ci.yml`) runs on push and PR to `main` and `develop`, as four jobs: `test`
+(pytest with coverage, on Python 3.11 and 3.12), `lint` (ruff check and ruff format --check),
+`typecheck` (mypy -- `continue-on-error: true`, so a type error there does not fail the build),
+and `security` (detect-secrets over every tracked file, which does fail the build on a new
+secret, plus a `safety` dependency check that only reports and never fails the build).
 
-By contributing, you agree that your contributions will be licensed under the MIT License.
+## Tests
 
----
+Each test gets its own SQLite database through `tests/conftest.py`; no test needs a real key or
+the network. `tests/evidence/stubs.py` states the rule directly in its module docstring:
 
-Thank you for contributing to InsightWeaver!
+> Nothing here makes an LLM call and nothing here needs an API key. The whole point of the
+> harness is that adjudication is pluggable and that the replay machinery can be exercised
+> without the stochastic part.
+
+Anything that would otherwise touch the OS keychain uses the `memory_keyring` fixture from
+`tests/conftest.py`, a keyring that forgets everything when the test ends.
+
+The brief has a golden end-to-end test, `tests/brief/test_end_to_end.py`, which drives recorded
+RSS and Federal Register fixtures (`tests/brief/fixtures/` and
+`tests/sources/fixtures/federal_register_week.json`) through `watch sync`, ingest, route, a stub
+adjudicator, and the brief renderer, and compares the output byte-for-byte against
+`tests/brief/golden/`. Regenerate the golden files with:
+```bash
+make golden
+```
+and read the diff before committing it -- a golden file that changed is the test reporting a
+behavior change, not noise to clear.
+
+Run a single test file directly, e.g.:
+```bash
+pytest tests/brief/test_end_to_end.py -v
+```
+
+## Database migrations
+
+The modules under `src/database/migrations/`:
+
+- `create_schema.py` -- the one bootstrap for a fresh database. Creates every table the models
+  declare that is currently absent (`Base.metadata.create_all`); adds no columns to an existing
+  table. Run with `make db-init`.
+- `add_watches_table.py` -- additive; creates the `watches` table from `Watch.__table__` so the
+  migration and the model cannot drift. Run with `make db-add-watches`.
+- `add_observations_and_evidence.py` -- additive; creates `observations` and `evidence`, and
+  does not read, rewrite, or migrate the pre-existing `articles` table. Run with
+  `make db-add-observations`.
+- `add_monitor_tables.py` -- additive; creates whichever of the decision monitor's tables
+  (`routes`, `adjudications`, `watch_beliefs`, `briefs`) are absent and adds the lifecycle
+  columns an older `watches` table lacks. Run with `make db-add-monitor`.
+- `drop_briefing_tables.py` -- destructive; drops the tables belonging to the deleted briefing
+  product. This one refuses to run without `--confirm`; `make db-drop-briefing` deliberately
+  does not pass it, so the target only shows what would be destroyed and the operator has to
+  type the real command themselves.
+
+## Documentation
+
+- `README.md` -- what the tool is and why
+- `GETTING_STARTED.md` -- first-run walkthrough
+- `docs/CONCEPTS.md` -- the entity model (Watch, Evidence, Position, etc.)
+- `docs/PLAN.md` -- the architecture and the delivery record it was built from
+- `SOURCES.md` -- every source InsightWeaver retrieves and its recorded basis for use; a source
+  with no recorded basis does not ship
+- Comments that record a decision carry the date the decision was made, so a later reader can
+  tell whether the reasoning still applies.
+
+## Pull requests
+
+A reviewer checks:
+
+- `make check` is green
+- the backlog task file is updated (`STATUS`, and notes on what changed vs. what the task
+  described)
+- no fallback or mock data is hiding a problem that should fail loudly instead
+- changed files stay under roughly 200-300 lines; a file that grew past that is a refactor
+  candidate, not an exception
