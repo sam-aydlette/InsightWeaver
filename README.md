@@ -58,7 +58,8 @@ with how this build carries it, or does not.
    `so_what` the operator wrote is printed back, not paraphrased.
 5. **Honest self-awareness about the tool's own narrative.** A brief that looks the same when
    nothing happened and when the pipeline is broken is the failure the design exists to prevent.
-   The header prints every source's last attempt and its error; QUIET prints every watch that
+   The header names every source whose last attempt failed, in full, by default; a summary
+   count covers the rest (`--verbose` lists every source). QUIET prints every watch that
    heard nothing, every source that ran and returned nothing, every routed pair no adjudication
    has answered, and every model call that failed, with zeros when there are none. Every model
    request is written to a local audit log before it is sent, and each response's usage after.
@@ -82,11 +83,8 @@ The brief, in fixed order:
 BRIEF AS OF 2026-08-24 06:00
 window: since 2026-08-17 06:00
 position: reviewed 2026-08-01 (23 days ago)
-sources:
-* Agency Newsroom: fetched 2026-08-24 06:00; 0 in window
+sources: 4 configured, 3 fetched, 1 failed, 0 never fetched (--verbose for every source)
 * Broken Feed: LAST ATTEMPT FAILED 2026-08-24 06:00: HTTP error: connection refused; 0 in window
-* Compliance Weekly: fetched 2026-08-24 06:00; 2 in window
-* Federal Register - Documents API: fetched 2026-08-24 06:00; 6 in window
 
 MOVED
 -----

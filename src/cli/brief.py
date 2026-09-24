@@ -13,7 +13,11 @@ loader found, DUE says its decisions are missing, the review banner is up, and
 the brief still renders: the watches are in the database, and the header's job
 is to say what the machinery could not do. Nothing here calls a model.
 
-Added 2026-09-22 for backlog task 031.
+The header's source list is compact by default: a source that answered is
+folded into a count, a source whose last attempt failed is always printed in
+full. ``--verbose`` prints every source individually.
+
+Added 2026-09-22 for backlog task 031; ``--verbose`` added 2026-09-24.
 """
 
 from __future__ import annotations
@@ -77,7 +81,13 @@ def _parse_as_of(raw: str) -> datetime:
     help="Write the brief here instead of printing it.",
 )
 @click.option("--dry-run", is_flag=True, default=False, help="Render without recording the brief.")
-def brief_command(since_raw, as_of_raw, fmt, output, dry_run):
+@click.option(
+    "--verbose",
+    is_flag=True,
+    default=False,
+    help="List every source in the header, not just the ones that failed.",
+)
+def brief_command(since_raw, as_of_raw, fmt, output, dry_run, verbose):
     """Render the brief: header, MOVED, DUE, WATCHING, QUIET."""
     as_of = _parse_as_of(as_of_raw) if as_of_raw else utcnow()
     window = None
@@ -99,7 +109,7 @@ def brief_command(since_raw, as_of_raw, fmt, output, dry_run):
         brief = select_brief(
             session, as_of=as_of, since=since, position=position, position_problem=problem
         )
-        text = render(brief, markdown=fmt == "md")
+        text = render(brief, markdown=fmt == "md", verbose=verbose)
 
         # Deliver first, record second: a row for a brief nobody received
         # would move the next default window past a week nobody read.

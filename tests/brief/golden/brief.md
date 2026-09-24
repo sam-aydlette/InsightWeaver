@@ -1,11 +1,8 @@
 # Brief as of 2026-08-24 06:00
 window: since 2026-08-17 06:00
 position: reviewed 2026-08-01 (23 days ago)
-sources:
-- Agency Newsroom: fetched 2026-08-24 06:00; 0 in window
+sources: 4 configured, 3 fetched, 1 failed, 0 never fetched (--verbose for every source)
 - Broken Feed: LAST ATTEMPT FAILED 2026-08-24 06:00: HTTP error: connection refused; 0 in window
-- Compliance Weekly: fetched 2026-08-24 06:00; 2 in window
-- Federal Register - Documents API: fetched 2026-08-24 06:00; 6 in window
 
 ## MOVED
 - nist-site-rules-loosen: NIST relaxes the conduct rules at its sites before the visit is scheduled.

@@ -90,3 +90,13 @@ Recorded, not changed: `src/sources/runner.py` and its test were over 300 lines 
 task and gained a few lines each; the stamp helper moved to `store.py` to keep it from growing
 further. The row cannot hold the last success once a failure overwrote it (above).
 
+## Addendum (2026-09-24): the header's default became compact
+
+After a first real run against 72 configured sources, the operator asked for the per-source
+header to be shorter by default -- 72 lines of mostly-successful status was burying the four
+sections worth reading daily. The fix keeps the LANDMINES rule intact rather than relaxing it:
+**a source whose last attempt failed is still named in full, every time, with no flag needed**;
+only a source that *answered* (whatever it returned) is folded into a summary count. `--verbose`
+restores the original always-list-everything behaviour. `src/brief/render.py`'s module
+docstring and `src/cli/brief.py`'s carry the detail; the golden files were regenerated and the
+README's embedded excerpt resynced.

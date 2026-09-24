@@ -11,6 +11,7 @@ Added 2026-09-22 for backlog task 031.
 from __future__ import annotations
 
 from datetime import date, datetime
+from typing import Any
 
 import pytest
 
@@ -34,8 +35,8 @@ AS_OF = datetime(2026, 8, 24, 6, 0)
 SINCE = datetime(2026, 8, 17, 6, 0)
 
 
-def _empty_header(**overrides) -> Header:
-    base = {
+def _empty_header(**overrides: Any) -> Header:
+    base: dict[str, Any] = {
         "as_of": AS_OF,
         "since": SINCE,
         "position_problem": None,
@@ -52,8 +53,8 @@ def _empty_brief(**header_overrides) -> Brief:
     return Brief(header=_empty_header(**header_overrides))
 
 
-def _citation(**overrides) -> Citation:
-    base = {
+def _citation(**overrides: Any) -> Citation:
+    base: dict[str, Any] = {
         "content_hash": "sha256:" + "a" * 64,
         "title": "Agency proposes new rule",
         "source": "Federal Register",
@@ -222,8 +223,8 @@ def test_header_position_problem_never_reviewed_and_banner():
     assert "REVIEW OVERDUE" not in text_off
 
 
-def test_header_sources_never_fetched_failed_attempt_success_and_none_registered():
-    sources = (
+def _three_sources():
+    return (
         SourceState(name="feed-a", last_attempt=None, last_error=None, items_in_window=0),
         SourceState(
             name="feed-b",
@@ -238,12 +239,34 @@ def test_header_sources_never_fetched_failed_attempt_success_and_none_registered
             items_in_window=1,
         ),
     )
-    text = render(_empty_brief(sources=sources), markdown=False)
+
+
+def test_verbose_header_lists_never_fetched_failed_attempt_success_and_none_registered():
+    text = render(_empty_brief(sources=_three_sources()), markdown=False, verbose=True)
     assert "* feed-a: never fetched; 0 in window" in text
     # A failed attempt is never printed as a fetch: the stamp is the attempt's.
     assert "* feed-b: LAST ATTEMPT FAILED 2026-08-23 05:00: timeout; 2 in window" in text
     assert "* feed-c: fetched 2026-08-22 04:00; 1 in window" in text
+    assert "none registered" in render(_empty_brief(sources=()), markdown=False, verbose=True)
+
+
+def test_compact_header_is_the_default_and_folds_answered_sources_into_counts():
+    """A source that answered, whatever it returned, is a count, never a line.
+    A source whose last attempt failed is always a line, every time -- that
+    is the one thing invariant 5 requires this header to never hide."""
+    text = render(_empty_brief(sources=_three_sources()), markdown=False)
+    assert "sources: 3 configured, 1 fetched, 1 failed, 1 never fetched" in text
+    assert "* feed-b: LAST ATTEMPT FAILED 2026-08-23 05:00: timeout; 2 in window" in text
+    assert "feed-a" not in text  # never-fetched: folded into the count, not named
+    assert "feed-c" not in text  # answered cleanly: folded into the count, not named
     assert "none registered" in render(_empty_brief(sources=()), markdown=False)
+
+
+def test_compact_header_with_no_failures_prints_no_source_bullets():
+    sources = (SourceState("feed-a", datetime(2026, 8, 23, 5, 0), None, 3),)
+    text = render(_empty_brief(sources=sources), markdown=False)
+    assert "sources: 1 configured, 1 fetched, 0 failed, 0 never fetched" in text
+    assert "* feed-a" not in text
 
 
 def test_due_decision_past_and_watch_expired():

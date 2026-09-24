@@ -163,6 +163,33 @@ class TestFormatAndOutput:
         assert "## QUIET" in result.output
         assert not re.search(r"^MOVED$", result.output, re.MULTILINE)
 
+    def test_verbose_lists_every_source_default_folds_answered_ones_into_a_count(
+        self, run, test_session
+    ):
+        from src.database.models import RSSFeed
+
+        test_session.add(
+            RSSFeed(
+                name="Quiet Feed",
+                url="https://example.com/feed",
+                last_fetched=datetime(2026, 9, 21, 8, 0),
+                last_error=None,
+            )
+        )
+        test_session.commit()
+        as_of = "2026-09-22T06:00:00"
+
+        compact = run(["--as-of", as_of, "--dry-run"])
+        verbose = run(["--as-of", as_of, "--dry-run", "--verbose"])
+
+        assert compact.exit_code == 0 and verbose.exit_code == 0
+        assert "sources: 1 configured, 1 fetched, 0 failed, 0 never fetched" in compact.output
+        # An answered source is folded into the count in the header, even
+        # though it is also named later in QUIET as a source that produced
+        # nothing -- a different, unrelated section doing its own job.
+        assert "* Quiet Feed: fetched" not in compact.output
+        assert "* Quiet Feed: fetched 2026-09-21 08:00; 0 in window" in verbose.output
+
     def test_output_path_writes_the_file_and_prints_wrote(self, run, tmp_path):
         as_of = "2026-09-22T06:00:00"
         out_path = tmp_path / "brief.txt"

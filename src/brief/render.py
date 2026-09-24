@@ -11,7 +11,17 @@ full hash. Every heading is printed, with a zero, when its section is empty:
 a brief that looks the same when nothing happened and when the pipeline is
 broken is the failure this design exists to prevent.
 
-Added 2026-09-22 for backlog task 031; reworked 2026-09-23 after its review.
+**The source header is compact by default** (``verbose=False``): a source
+that answered, whatever it returned, is folded into the summary counts. A
+source whose last attempt *failed* is never folded -- it is printed in full,
+every time, because that is the one line invariant 5 exists to guarantee.
+``--verbose`` on the CLI prints every source individually, as the header
+always did before 2026-09-24.
+
+Added 2026-09-22 for backlog task 031; reworked 2026-09-23 after its review;
+the compact header added 2026-09-24 at the operator's request, after a first
+real run showed a ~70-source header burying the four sections worth reading
+daily.
 """
 
 from __future__ import annotations
@@ -66,7 +76,17 @@ def _cite(c: Citation) -> str:
     )
 
 
-def _header(doc: _Doc, brief: Brief) -> None:
+def _source_line(s) -> str:
+    if s.last_attempt is None:
+        when = "never fetched"
+    elif s.last_error:
+        when = f"LAST ATTEMPT FAILED {_stamp(s.last_attempt)}: {s.last_error}"
+    else:
+        when = f"fetched {_stamp(s.last_attempt)}"
+    return f"{s.name}: {when}; {s.items_in_window} in window"
+
+
+def _header(doc: _Doc, brief: Brief, verbose: bool) -> None:
     h = brief.header
     doc.title(f"Brief as of {_stamp(h.as_of)}")
     doc.line(f"window: since {_stamp(h.since)}")
@@ -84,17 +104,23 @@ def _header(doc: _Doc, brief: Brief) -> None:
             "REVIEW OVERDUE: every item below was judged against a Position last reviewed more "
             "than 90 days ago, or never. The items still stand; the frame may not."
         )
-    doc.line("sources:")
     if not h.sources:
-        doc.bullet("none registered; nothing has been ingested")
-    for s in h.sources:
-        if s.last_attempt is None:
-            when = "never fetched"
-        elif s.last_error:
-            when = f"LAST ATTEMPT FAILED {_stamp(s.last_attempt)}: {s.last_error}"
-        else:
-            when = f"fetched {_stamp(s.last_attempt)}"
-        doc.bullet(f"{s.name}: {when}; {s.items_in_window} in window")
+        doc.line("sources: none registered; nothing has been ingested")
+        return
+    if verbose:
+        doc.line("sources:")
+        for s in h.sources:
+            doc.bullet(_source_line(s))
+        return
+    failed = [s for s in h.sources if s.last_error is not None]
+    fetched = [s for s in h.sources if s.last_attempt is not None and s.last_error is None]
+    never = [s for s in h.sources if s.last_attempt is None]
+    doc.line(
+        f"sources: {len(h.sources)} configured, {len(fetched)} fetched, {len(failed)} failed, "
+        f"{len(never)} never fetched (--verbose for every source)"
+    )
+    for s in failed:
+        doc.bullet(_source_line(s))
 
 
 def _moved(doc: _Doc, brief: Brief) -> None:
@@ -175,9 +201,16 @@ def _quiet(doc: _Doc, brief: Brief) -> None:
         doc.bullet(f"{short(f.content_hash)} / {f.watch_id} [{f.prompt_version}]: {f.error}")
 
 
-def render(brief: Brief, *, markdown: bool = False) -> str:
-    """The whole document: header first, then the four sections in fixed order."""
+def render(brief: Brief, *, markdown: bool = False, verbose: bool = False) -> str:
+    """
+    The whole document: header first, then the four sections in fixed order.
+
+    ``verbose`` controls only the header's source list (see the module
+    docstring); the other four sections never summarise, because they are
+    already the compact view over their own data.
+    """
     doc = _Doc(markdown)
-    for part in (_header, _moved, _due, _watching, _quiet):
+    _header(doc, brief, verbose)
+    for part in (_moved, _due, _watching, _quiet):
         part(doc, brief)
     return doc.text()
