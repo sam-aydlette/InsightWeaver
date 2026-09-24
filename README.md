@@ -1,11 +1,28 @@
 # InsightWeaver
 
-A decision monitor. You write down the decisions you are carrying, each with a deadline, and
-the claims that would change them. Every morning it reads your sources, links what matches a
-claim, asks a model whether each match is evidence, and prints a brief that says what moved,
-what is due, what is being watched, and what went quiet. Nothing in it authors a watch, moves a
-belief, or sends anything anywhere. It runs on your laptop, from the command line, when you
-run it.
+A compass for insight at cybernetic speed.
+
+In land navigation you don't walk with your face in the compass. You shoot an azimuth to a
+point you can actually see, drop the compass to your side, and walk to it -- counting paces,
+reading the terrain, following a handrail where the ground gives you one. You picked that
+azimuth once, at the start point, relative to where you actually stood and where you actually
+needed to go. The compass doesn't know what's out there. It only gives you a bearing, and the
+bearing only means anything once you've oriented it to your own position on the map -- there's
+no reading a compass from nowhere.
+
+Most information tools skip the orientation step. They hand you volume in the general direction
+of "everything," which isn't a bearing at all -- it's what you get when you start walking before
+you've found your position on the map. InsightWeaver asks for the start point first: the
+decisions you are actually carrying, each with a real deadline. A **watch** is the azimuth shot
+to one of them -- a specific claim, at a specific bearing, that would move you if it turned out
+true. Routing is pacing toward it. Adjudication is terrain association: does what you're
+passing actually confirm the bearing, or is it a lookalike a keyword caught without being on
+the route. And when nothing has confirmed the route in longer than expected, that's not
+silence to read as "all clear" -- it's the catching feature telling you that you may have
+drifted, and the tool says so instead of staying quiet about its own quiet.
+
+Nothing in it authors a watch, moves a belief, or sends anything anywhere. It runs on your
+laptop, from the command line, when you run it.
 
 ```
 insightweaver run
@@ -13,17 +30,15 @@ insightweaver run
 
 ## Status, stated plainly
 
-Updated 2026-09-23.
-
-- The monitor is built end to end: ingestion, deterministic routing, one structured model call
-  per candidate pair, an append-only belief ledger, hand grading, and the brief. `make check`
-  runs lint, types and the suite, and a golden-file test drives a recorded Federal Register week
-  and a recorded feed through `watch sync`, `ingest`, `route`, `adjudicate` and `brief` with a
+- The monitor runs end to end: ingestion, deterministic routing, one structured model call per
+  candidate pair, an append-only belief ledger, hand grading, and the brief. `make check` runs
+  lint, types and the suite, and a golden-file test drives a recorded Federal Register week and
+  a recorded feed through `watch sync`, `ingest`, `route`, `adjudicate` and `brief` with a
   scripted model and a frozen clock.
-- It has not yet been run for the three weeks the plan calls for (`docs/PLAN.md`, section 5).
-  Until it has, there is no claim here about what it finds. The adjudication prompt has also not
-  been through a live model call from the development machine: the structured-output schema is
-  verified against the SDK, not the API, and the first real run is the test.
+- Track record builds from your own watches resolving against your own coverage, week over
+  week (`docs/PLAN.md`, section 5, is the plan it's measured from). Read the QUIET section of
+  every brief; it's where a run tells you where it might be missing something, instead of
+  staying quiet about its own silence.
 - `articles` is the table the product this one replaced ingested into. Ingest still writes a
   row there beside each new observation, and `sources list` counts them; the rows written before
   the rewrite have no observation and nothing in the monitor reads them. The rule is in
@@ -33,13 +48,19 @@ Updated 2026-09-23.
 
 ## The idea
 
-Most news tools answer "what happened". The question worth a morning is "what changed for a
-decision I am carrying". That question has a shape: a decision with a date, a claim that would
-move it, and the words a document would contain if it bore on that claim. Written down in
-advance, the shape can be checked against every item a source publishes, by a rule, before any
-model reads anything. What survives the rule is small enough to ask a model about one pair at a
-time, with the question fixed and the answer structured. What the model answers is evidence,
-keyed to the claim, and the brief is a view over that evidence and nothing else.
+Every platform you use is already a feedback loop: it reads what moves you, adjusts what it
+shows you, and reads the result -- steering, continuously, at whatever speed its infrastructure
+allows. That's not a metaphor; it's how a recommendation system is built, and it is cybernetics
+in the original sense of the word, steering. The asymmetry is that the loop steers toward the
+platform's ends, not yours, and it moves faster than you can audit it.
+
+The individual-scale answer isn't to opt out of information -- that just hands the steering to
+someone else's loop by default. It's to build your own, deliberately, at the same speed, and
+keep it in view instead of behind an interface. A watch is the stake in the ground: a claim,
+tied to a decision you're actually carrying, that you commit to caring about before anything
+happens, so that what arrives afterward has a bearing to be measured against instead of just
+adding to the pile. Routing, one model judgment per candidate, and an append-only record of what
+you believed and when are the loop itself, running for you, on your terms, on your machine.
 
 The design follows from five principles the project has kept since it began. Each is stated
 with how this build carries it, or does not.
@@ -51,11 +72,12 @@ with how this build carries it, or does not.
    it. A belief is a number the operator wrote, with a date and a note, never one the tool
    inferred.
 3. **Frame visibility over false balance.** Not implemented in this build. The monitor has no
-   notion of a frame; the deferred synthesis pass (`docs/PLAN.md`, section 8) is where it would
-   return, and the principle is kept here so that its absence is visible.
-4. **Epistemic autonomy as the goal.** The tool never recommends. It reports that an item bears
-   on a claim and how strongly; what that means for the decision is the operator's, and the
-   `so_what` the operator wrote is printed back, not paraphrased.
+   notion of a frame; it returns, if it does, with the deferred synthesis pass (`docs/PLAN.md`,
+   section 8).
+4. **Epistemic autonomy as the goal.** There is no view from nowhere for the tool to hand you a
+   conclusion from -- it reports that an item bears on a claim and how strongly, from the bearing
+   you already staked. What that means for the decision is the operator's, and the `so_what` the
+   operator wrote is printed back, not paraphrased.
 5. **Honest self-awareness about the tool's own narrative.** A brief that looks the same when
    nothing happened and when the pipeline is broken is the failure the design exists to prevent.
    The header names every source whose last attempt failed, in full, by default; a summary
@@ -212,10 +234,10 @@ with no recorded basis does not ship.
 
 ## What is deliberately not built
 
-Recorded in `docs/PLAN.md`, section 8, each with what would bring it back: a belief update
-rule (the operator moves beliefs, because there are no resolved watches to calibrate against
-yet), a synthesis pass over the brief, sensors beyond published sources, an MCP server, and
-any integration that writes anywhere.
+Recorded in `docs/PLAN.md`, section 8, each with what would bring it back: a belief update rule
+(the operator moves beliefs; auto-updating one without resolved watches to calibrate against
+would be inferring calibration that doesn't exist), a synthesis pass over the brief, sensors
+beyond published sources, an MCP server, and any integration that writes anywhere.
 
 ## Development
 
