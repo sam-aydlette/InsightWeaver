@@ -1,12 +1,23 @@
 """
-The Claude API boundary.
+LLM access. One client, one audited send path.
 
-One client, one response parser. Ported out of the deleted ``src/context/``
-package by backlog task 012 for Tier 2 adjudication; the synthesis product that
-used to call it is gone, the call path is not.
+``parse_claude_json`` survives from the briefing product because a fenced-JSON
+reply is a property of the API, not of the product that was reading it. Note
+that it returns ``{}`` on a parse failure: that is a silent default, and Tier 2
+adjudication (backlog task 016) must not use it -- a response that fails
+validation is recorded as a failed adjudication, never coerced. Noted
+2026-09-22 (task 026).
 """
 
 from ._json import parse_claude_json
-from .claude_client import ClaudeClient
+from .audit import record_error, record_request, record_response
+from .claude_client import ClaudeClient, ModelResponse
 
-__all__ = ["ClaudeClient", "parse_claude_json"]
+__all__ = [
+    "ClaudeClient",
+    "ModelResponse",
+    "parse_claude_json",
+    "record_error",
+    "record_request",
+    "record_response",
+]

@@ -1,151 +1,193 @@
 # Test Examples from InsightWeaver
 
-## Good Examples (Behavior-Focused)
+Excerpts are trimmed to the lines the point needs; `# ...` marks lines left out.
 
-### From test_synthesizer.py
+## Good Examples (Behavior-Focused, Can Fail, Boundary-Mocked)
 
-```python
-class TestSynthesizeWithTrustVerificationCitationMap:
-    """Integration tests for citation_map handling in trust-verified synthesis"""
-
-    @pytest.mark.asyncio
-    async def test_citation_map_overrides_claude_response(self, ...):
-        """Our citation map should override any citation_map Claude returns"""
-        # Arrange: Setup with KNOWN correct data
-        test_articles = [{"id": 99, "title": "Correct Title", ...}]
-        mock_curator.return_value = {"articles": test_articles}
-
-        # Claude returns WRONG data (simulating the bug)
-        mock_client.return_value = json.dumps({
-            "metadata": {"citation_map": {"1": {"title": "WRONG Title"}}}
-        })
-
-        # Act
-        result = await synthesizer.synthesize_with_trust_verification()
-
-        # Assert: Our data wins (the behavior we care about)
-        citation_map = result["synthesis_data"]["metadata"]["citation_map"]
-        assert citation_map["1"]["title"] == "Correct Title"  # Not "WRONG Title"
-```
-
-**Why this is good:**
-- Test name describes the behavior: "citation_map_overrides_claude_response"
-- Tests a real scenario: Claude returning incorrect data
-- Asserts on the outcome users care about: correct citation titles
-- Does not assert on internal method calls
-
-### From test_trust_pipeline.py
+### From tests/evidence/test_adjudicate.py
 
 ```python
-async def test_biased_response_detected(self, trust_pipeline):
-    """Test detection of bias in response"""
-    # Arrange
-    trust_pipeline.client.analyze = AsyncMock(
-        return_value="This revolutionary technology will change everything!"
-    )
-    trust_pipeline.bias_analyzer.analyze = AsyncMock(
-        return_value=BiasAnalysis(
-            loaded_terms=[LoadedTerm("revolutionary", "dramatic", "innovative")]
-        )
-    )
+def test_a_second_run_asks_nothing(self, corpus):
+    client = FakeClient(_verdict(), _verdict())
+    run(corpus, ClaudeAdjudicator(client))
 
-    # Act
-    result = await trust_pipeline.run_full_pipeline(
-        user_query="Tell me about tech", verify_response=True
-    )
+    second = run(corpus, ClaudeAdjudicator(client))
 
-    # Assert: Bias was detected (the behavior)
-    assert result["analysis"]["bias"]["total_issues"] > 0
+    assert second.asked == 0
+    assert client.calls == 2
+    # ...
 ```
 
-**Why this is good:**
-- Tests the user-visible outcome: "bias detected"
-- Does not care HOW bias was detected internally
-- Meaningful assertion on what matters
+**Why good:** `FakeClient` replaces the one true boundary in this path --
+the Claude API -- and nothing else; routing, the adjudicator and the
+database writes are all real. The name states the behavior (never-retried),
+and the assertion checks both the observable count and the mechanism that
+would leak a retry (`client.calls == 2`, not 4).
+
+### From tests/routing/test_regression.py
+
+```python
+def test_exactly_the_planted_whole_word_matches_route(test_session):
+    # ... the two builders that plant the corpus
+    report = route(test_session, since=SINCE, today=TODAY)
+
+    # ...
+    assert report.routed == 20
+    routed_hashes = {h for (h,) in test_session.query(Route.observation_hash)}
+    assert routed_hashes == planted_hashes
+```
+
+**Why good:** pinned with a number, not "some routed" -- the file's
+docstring records that this test was verified to fail (61 routed) when the
+word-boundary anchors in `entity_matcher.py` were emptied. It checks
+identity (`routed_hashes == planted_hashes`), not just count, so a router
+that matched the wrong 20 items still fails. The look-alike corpus plants
+`PRECISA` and `COMBAT` in capitals because task 010 found a boundary test
+that passed for the wrong reason (case-sensitivity, not the anchors).
+
+### From tests/brief/test_select.py
+
+```python
+def test_clusters_and_citations_are_ordered_by_date_before_hash(self, test_session):
+    # The earlier observation has the LARGER hash in both pairs, so an
+    # order by hash alone gets both wrong.
+    later_small = _obs(test_session, "aa", source.id, "later", None, datetime(2026, 9, 16), [7]*10)
+    earlier_big = _obs(test_session, "zz", source.id, "earlier", None, datetime(2026, 9, 15), [7]*10)
+    ...
+    assert [c[0].title for c in moved.clusters] == ["earlier", "single"]
+```
+
+**Why good:** rows are inserted with hashes running opposite to the
+correct date order, so a missing or wrong `ORDER BY` fails loudly instead
+of passing by coincidence. Elsewhere in the file,
+`test_the_review_banner_turns_on_the_day_after_the_threshold` exercises
+both sides of a threshold, which is what catches an off-by-one.
+
+### From tests/brief/test_end_to_end.py
+
+```python
+class _FrozenDatetime(datetime):
+    @classmethod
+    def now(cls, tz=None):
+        return NOW.replace(tzinfo=UTC) if tz is not None else NOW
+
+@pytest.fixture
+def frozen_clock(monkeypatch):
+    monkeypatch.setattr("src.utils.datetime", _FrozenDatetime)
+    return NOW
+```
+
+**Why good:** the clock is a boundary like any other -- every column
+default and the belief ledger read `src.utils.utcnow`, so it is frozen here.
+Everything else patched is a boundary too: the HTTP layer under each adapter,
+the model client behind the adjudicator, the two private file loaders, and
+each command's `get_db`, pointed at one test session. Nothing inside the
+pipeline is mocked. The real CLI commands (`watch sync`, `ingest`, `route`, `adjudicate`,
+`brief`) then run end to end against a real session, compared byte-for-byte
+with a committed golden file -- catching regressions no single unit test
+would see.
+
+### From tests/position/test_ledger.py
+
+```python
+def test_only_sync_and_the_two_commands_write_belief_or_resolution():
+    patterns = [re.compile(r"\brecord_belief\("), re.compile(r"\bresolve_watch\("), ...]
+    allowed = {root / "position" / "ledger.py", root / "position" / "watches.py",
+               root / "cli" / "watch.py"}
+    offenders = [str(p.relative_to(root)) for p in sorted(root.rglob("*.py"))
+                 if p not in allowed and any(pat.search(p.read_text()) for pat in patterns)]
+    assert offenders == []
+```
+
+**Why good:** instead of trusting every future call site to remember "only
+the ledger writes belief", it scans the tree for anything that could
+construct a ledger row or assign a resolution column and names the
+offending file if one appears -- catching a bypass, not just documenting
+the rule.
+
+### From tests/sources/test_runner.py
+
+```python
+async def test_source_unavailable_is_an_error_not_an_empty_run(self, db_factory, caplog):
+    adapter = FakeAdapter(SourceUnavailable("Fake Source", "HTTP 503"))
+
+    result = await run_adapter(adapter, SINCE, db_factory=db_factory)
+
+    assert result.success is False
+    assert result.fetched == 0
+```
+
+**Why good:** `FakeAdapter` mocks only the source boundary (`fetch`), which
+can return items, return nothing, or raise. This test and its neighbor
+`test_zero_after_some_is_loud` distinguish two failure classes that look
+alike from outside (zero items): unreachable is loud on a first run, quiet
+is loud only once a source has history to contradict.
 
 ---
 
-## Bad Examples (Implementation-Coupled)
+## Bad Examples (Tautological, Implementation-Coupled, or Untrustworthy)
 
-### Testing Method Signatures
-
-```python
-# BAD: Tests implementation detail (return type)
-def test_build_synthesis_task_with_citations_returns_tuple():
-    result = synthesizer._build_synthesis_task_with_citations(articles, 2)
-    assert isinstance(result, tuple)
-    assert len(result) == 2
-```
-
-**Problems:**
-- Name mirrors method name exactly
-- Tests private method directly
-- Asserts on structure, not behavior
-- Would break if we changed return type but kept behavior
-
-**Better:**
-```python
-# GOOD: Test the behavior enabled by this method
-def test_synthesis_output_contains_accurate_citation_references():
-    result = await synthesizer.synthesize_with_trust_verification()
-    # Assert on what the citation_map enables
-    assert result["synthesis_data"]["metadata"]["citation_map"]
-```
-
-### Excessive Mock Verification
+### Testing a Mock's Own Return Value
 
 ```python
-# BAD: Tests plumbing, not behavior
-async def test_synthesize_calls_curator_then_client():
-    await synthesizer.synthesize()
-
-    mock_curator.curate_for_narrative_synthesis.assert_called_once()
-    mock_client.analyze_with_context.assert_called_once()
-    # What did it produce? Who knows!
+# BAD: asserts the stub returned what it was told to return
+client = FakeClient(_verdict())
+response = client.analyze("system", "user")
+assert response.text == _verdict()
 ```
 
-**Problems:**
-- Only verifies calls happened
-- Says nothing about the outcome
-- Would pass even if result is garbage
+**Problems:** no code under test runs; this is a tautology about the
+fixture, not a behavior of `run()`. No plausible bug would ever turn it
+red.
 
-**Better:**
-```python
-# GOOD: Test the outcome
-async def test_synthesize_produces_structured_brief():
-    result = await synthesizer.synthesize()
+**Better:** assert on what `run()` does with that verdict, as in
+`test_every_pair_gets_a_ledger_row_and_evidence_gets_an_evidence_row`
+above.
 
-    assert result["status"] == "success"
-    assert "synthesis_data" in result
-    assert result["synthesis_data"]["bottom_line"]
-```
-
-### Testing Exception Flow
+### Asserting Only a Count
 
 ```python
-# BAD: Tests exception propagation (implementation)
-async def test_api_error_raises_exception():
-    mock_client.analyze.side_effect = APIError("fail")
-
-    with pytest.raises(APIError):
-        await synthesizer.synthesize()
+# BAD: passes even if the wrong 20 items routed
+def test_some_items_route(test_session):
+    report = route(test_session, since=SINCE, today=TODAY)
+    assert report.routed == 20
 ```
 
-**Problems:**
-- Tests how errors flow, not what happens
-- Couples test to exception type
+**Problems:** drops the identity check, so a router that matched 20 wrong
+items (look-alikes instead of the planted whole words) still passes.
 
-**Better:**
+**Better:** compare the routed set by hash against the known-planted set.
+
+### Mocking Past the Boundary
+
 ```python
-# GOOD: Tests error handling behavior
-async def test_api_failure_returns_error_status():
-    mock_client.analyze.side_effect = Exception("API Error")
-
-    result = await synthesizer.synthesize()
-
-    assert result["status"] == "error"
-    assert "error" in result
+# BAD: mocks a method internal to the unit under test, not the true boundary
+with patch("src.sources.runner.store_items") as mock_store:
+    await run_adapter(FakeAdapter([item("a")]), SINCE, db_factory=db_factory)
+    mock_store.assert_called_once()
 ```
+
+**Problems:** `store_items` is internal to the module under test; the
+assertion verifies a call happened, not that a row exists.
+
+**Better:** mock only the adapter's `fetch` and assert on `RSSFeed`/
+`Article` rows through the real `db_factory` session, as the real tests do.
+
+### A Clock Read from the Wall
+
+```python
+# BAD: uses the real clock in a test that asserts on dates
+def test_watch_is_live_today():
+    watch = Watch(id="w", expires=date.today() + timedelta(days=1), ...)
+    assert live_clause(date.today())
+```
+
+**Problems:** nothing pins the scenario; the test's meaning drifts with
+the date it happens to run on.
+
+**Better:** pass an explicit `TODAY = date(2026, 9, 1)`, as
+`tests/position/test_ledger.py` does throughout, or freeze `src.utils`'s
+clock for a full command run as `test_end_to_end.py` does.
 
 ---
 
@@ -155,9 +197,11 @@ Ask yourself: **If I refactor the implementation without changing behavior, do t
 
 | Refactoring | Good Test | Bad Test |
 |-------------|-----------|----------|
-| Rename private method | Still passes | Breaks |
-| Change return type of internal | Still passes | Breaks |
-| Split class into two | Still passes | Breaks |
-| Change algorithm (same output) | Still passes | May break |
+| Rename a private helper | Still passes | Breaks |
+| Change an internal data structure, same output | Still passes | Breaks |
+| Split one module into two, same CLI/API behavior | Still passes | Breaks |
+| Change an algorithm, same routed/adjudicated result | Still passes | May break |
+| Introduce the exact bug the test exists to catch | Fails | Still passes |
 
-If your tests break on pure refactoring, they're testing implementation, not behavior.
+If your tests break on a pure refactor, or stay green through the bug they
+were written for, they are testing implementation, not behavior.

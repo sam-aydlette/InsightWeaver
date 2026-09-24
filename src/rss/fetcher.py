@@ -5,9 +5,6 @@ from datetime import datetime
 import feedparser
 import httpx
 from bs4 import BeautifulSoup
-from sqlalchemy.orm import Session
-
-from src.database.models import RSSFeed
 
 logger = logging.getLogger(__name__)
 
@@ -207,20 +204,3 @@ class RSSFetcher:
                     await asyncio.sleep(backoff_time)
 
         return False, None, f"Failed after {self.max_retries} attempts: {last_error}"
-
-
-def create_test_feed(
-    db: Session,
-    name: str = "NASA Breaking News",
-    url: str = "https://www.nasa.gov/rss/dyn/breaking_news.rss",
-) -> RSSFeed:
-    """Create a test RSS feed for development"""
-    existing = db.query(RSSFeed).filter(RSSFeed.url == url).first()
-    if existing:
-        return existing
-
-    feed = RSSFeed(name=name, url=url, category="news", is_active=True)
-    db.add(feed)
-    db.commit()
-    db.refresh(feed)
-    return feed

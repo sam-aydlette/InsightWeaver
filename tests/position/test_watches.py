@@ -21,7 +21,9 @@ from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
 from src.database.models import Watch as WatchRow
+from src.database.models import WatchBelief
 from src.position import TriggerClause, WatchError, load_position, load_watches, sync_watches
+from src.position.ledger import current_beliefs, record_belief, resolve_watch
 
 from .conftest import ABSENT, TODAY
 
@@ -258,21 +260,93 @@ class TestOtherRejections:
 
 
 class TestSync:
-    def test_sync_adds_updates_and_removes(self, watches_file, watch_doc, position, test_session):
+    def test_sync_adds_updates_and_retires(self, watches_file, watch_doc, position, test_session):
         first = _load(watches_file(watch_doc(id="a"), watch_doc(id="b")), position)
         summary = sync_watches(test_session, first)
         test_session.commit()
         assert sorted(summary["added"]) == ["a", "b"]
 
-        # The file is authoritative: "b" is gone and "a" moved.
+        # The file is authoritative for existence: "b" is gone and "a" changed.
         second = _load(watches_file(watch_doc(id="a", belief=0.9)), position)
         summary = sync_watches(test_session, second)
         test_session.commit()
 
-        assert summary["updated"] == ["a"]
-        assert summary["removed"] == ["b"]
-        assert test_session.query(WatchRow).count() == 1
-        assert test_session.query(WatchRow).one().belief == pytest.approx(0.9)
+        assert summary["updated"] == []  # only the belief moved, and belief is not a column edit
+        assert summary["retired"] == ["b"]
+        assert summary["belief_changed"] == ["a"]
+        # Retired, not deleted: the row and its history stay.
+        assert test_session.query(WatchRow).count() == 2
+        assert test_session.get(WatchRow, "b").retired_at is not None
+        assert test_session.query(WatchBelief).filter(WatchBelief.watch_id == "b").count() == 1
+
+    def test_an_unchanged_file_synced_again_reports_and_writes_nothing(
+        self, watches_file, watch_doc, position, test_session
+    ):
+        sync_watches(test_session, _load(watches_file(watch_doc(id="a")), position))
+        before = test_session.query(WatchBelief).count()
+
+        summary = sync_watches(test_session, _load(watches_file(watch_doc(id="a")), position))
+
+        assert not any(summary.values())
+        assert test_session.query(WatchBelief).count() == before
+
+    def test_the_registration_belief_is_a_ledger_row_and_is_never_overwritten(
+        self, watches_file, watch_doc, position, test_session
+    ):
+        sync_watches(test_session, _load(watches_file(watch_doc(id="a", belief=0.35)), position))
+        sync_watches(test_session, _load(watches_file(watch_doc(id="a", belief=0.9)), position))
+        test_session.commit()
+
+        assert test_session.get(WatchRow, "a").belief == pytest.approx(0.35)
+        rows = test_session.query(WatchBelief).order_by(WatchBelief.id).all()
+        assert [(r.belief, r.source) for r in rows] == [(0.35, "file"), (0.9, "file")]
+        assert current_beliefs(test_session)["a"].belief == pytest.approx(0.9)
+
+    def test_a_file_behind_the_operator_shows_as_a_change_not_a_silent_overwrite(
+        self, watches_file, watch_doc, position, test_session
+    ):
+        sync_watches(test_session, _load(watches_file(watch_doc(id="a", belief=0.35)), position))
+        record_belief(test_session, "a", 0.7, source="principal", note="moved it")
+
+        summary = sync_watches(
+            test_session, _load(watches_file(watch_doc(id="a", belief=0.35)), position)
+        )
+
+        assert summary["belief_changed"] == ["a"]
+        current = current_beliefs(test_session)["a"]
+        assert (current.belief, current.source) == (0.35, "file")
+        assert "from 0.7" in (current.note or "")
+
+    def test_a_retired_watch_that_returns_to_the_file_is_restored(
+        self, watches_file, watch_doc, position, test_session
+    ):
+        sync_watches(test_session, _load(watches_file(watch_doc(id="a")), position))
+        sync_watches(test_session, _load(watches_file(watch_doc(id="b")), position))
+        assert test_session.get(WatchRow, "a").retired_at is not None
+
+        summary = sync_watches(
+            test_session, _load(watches_file(watch_doc(id="a"), watch_doc(id="b")), position)
+        )
+
+        assert summary["restored"] == ["a"]
+        assert test_session.get(WatchRow, "a").retired_at is None
+
+    def test_the_file_updates_a_resolved_watch_but_never_un_resolves_it(
+        self, watches_file, watch_doc, position, test_session
+    ):
+        sync_watches(test_session, _load(watches_file(watch_doc(id="a")), position))
+        resolve_watch(test_session, "a", outcome="yes", note="it happened")
+
+        summary = sync_watches(
+            test_session,
+            _load(watches_file(watch_doc(id="a", claim="Reworded claim.", belief=0.1)), position),
+        )
+
+        row = test_session.get(WatchRow, "a")
+        assert summary["resolved"] == ["a"]
+        assert row.outcome == "yes" and row.resolved_at is not None
+        assert row.claim == "Reworded claim."
+        assert summary["belief_changed"] == []
 
 
 class TestSchemaEnforcesInvariantTwo:

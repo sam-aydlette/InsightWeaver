@@ -187,12 +187,15 @@ class TestSchemaBoundaries:
     def test_only_the_declared_tables_are_mapped(self):
         """
         Task 012 removed nineteen models. If one comes back by accident,
-        ``create_tables()`` would recreate a concept the rewrite deleted, so the
-        mapped set is pinned rather than left to review.
+        ``Base.metadata.create_all()`` would recreate a concept the rewrite
+        deleted, so the mapped set is pinned rather than left to review.
 
         ``watches`` joined the set on 2026-08-31 (backlog task 013);
-        ``observations`` and ``evidence`` on 2026-08-31 (backlog task 014).
-        Every addition to this set should be a task that says so.
+        ``observations`` and ``evidence`` on 2026-08-31 (backlog task 014);
+        ``routes`` on 2026-09-22 (backlog task 028); ``adjudications`` the same
+        day (task 029); ``watch_beliefs`` the same day (task 030); ``briefs``
+        the same day (task 031). Every addition to this set should be a task
+        that says so.
         """
         from src.database.models import Base
 
@@ -202,4 +205,8 @@ class TestSchemaBoundaries:
             "watches",
             "observations",
             "evidence",
+            "routes",
+            "adjudications",
+            "watch_beliefs",
+            "briefs",
         }

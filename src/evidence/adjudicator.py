@@ -4,8 +4,9 @@ The seam a prompt version plugs into, and the vocabulary it may return.
 Adjudication is the one stochastic tier in this system. Everything either side
 of it is deterministic and unit-testable; the tier itself can only be reviewed
 by holding its inputs fixed and looking at what a different prompt does to its
-outputs. This module is the shape of that seam. **It does not contain the
-adjudication prompt** -- that is backlog task 016, and deliberately not here.
+outputs. This module is the shape of that seam. The prompt that plugs into it
+is :mod:`src.evidence.claude_adjudicator` (backlog task 029, 2026-09-22, which
+superseded task 016); this module still knows nothing about it.
 
 Three properties are enforced rather than documented:
 
@@ -23,13 +24,13 @@ Three properties are enforced rather than documented:
    CHECK constraint several layers later, though the CHECK constraint is there
    too.
 
-**On the shipped adjudicator.** :class:`NullAdjudicator` returns no verdicts.
-It exists so the harness is runnable and testable before task 016 supplies
-something real, and it is honest: an adjudicator that guessed a direction from a
-keyword match would put fabricated judgements in a table whose entire purpose is
-to make judgements reviewable. Registering a real one is
-:func:`register`; running an unregistered one for a one-off is
-``--adjudicator module:attr`` on the CLI.
+**On the null adjudicator.** :class:`NullAdjudicator` returns no verdicts. It
+exists so the harness is runnable and testable without the stochastic part,
+and it is honest: an adjudicator that guessed a direction from a keyword match
+would put fabricated judgements in a table whose entire purpose is to make
+judgements reviewable. The model version registers itself through
+:func:`register` in the package's ``__init__``; running an unregistered one for
+a one-off is ``--adjudicator module:attr`` on the CLI.
 
 Added 2026-08-31 for backlog task 014.
 """

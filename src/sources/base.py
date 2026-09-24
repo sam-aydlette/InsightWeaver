@@ -70,9 +70,11 @@ def normalize_for_hash(text: str) -> str:
     """
     Lowercase, strip punctuation, collapse whitespace.
 
-    Matches ``ArticleDeduplicator._normalize_text`` so that a hash computed at
-    ingestion time and a hash computed later by the deduplicator agree about
-    what counts as "the same text".
+    This is the normalization every stored content hash was computed with. It
+    originally matched the pairwise deduplicator's ``_normalize_text`` so the
+    two agreed about what counts as "the same text"; that module was deleted on
+    2026-09-22 (backlog task 027), and the rule stays exactly as it was because
+    changing it would silently re-identify every observation already stored.
     """
     if not text:
         return ""

@@ -2,13 +2,15 @@
 The existing RSS fetcher, wrapped in the adapter contract.
 
 This module adds *no* behaviour: ``src/rss/fetcher.py`` is not modified and not
-subclassed, and the live pipeline still fetches feeds through
-``fetch_all_active_feeds`` exactly as before. What is new is a second way to
-*read* an RSS feed -- returning :class:`~src.sources.base.RawItem` values
-instead of writing rows -- so that RSS and the Federal Register API are the
-same kind of thing to any caller.
+subclassed. It is a way to *read* an RSS feed -- returning
+:class:`~src.sources.base.RawItem` values instead of writing rows -- so that
+RSS and the Federal Register API are the same kind of thing to any caller.
 
-Added 2026-08-26 for backlog task 005.
+Added 2026-08-26 for backlog task 005 as a second reader beside
+``fetch_all_active_feeds``. That path was closed on 2026-08-31 (task 025) and
+deleted on 2026-09-22 (task 027); since task 028 the same day, ``insightweaver
+ingest`` reads every configured RSS feed through this adapter and the one
+store path.
 """
 
 from __future__ import annotations
@@ -70,6 +72,18 @@ class RSSAdapter:
 
         entries = getattr(feed_data, "entries", None) or []
         feed_info = getattr(feed_data, "feed", None) or {}
+        if not getattr(feed_data, "version", ""):
+            # feedparser leaves ``version`` empty when the document is not a
+            # feed of any kind: a 200 carrying a landing page, a challenge
+            # page, JSON. That is not "a quiet day"; recorded as a success it
+            # would clear the source's error and list it in the brief as a
+            # feed that ran and returned nothing. Raise instead. A feed with
+            # parse warnings (``bozo``) but a recognised version is still a
+            # feed (2026-09-23, backlog task 031 review).
+            problem = getattr(feed_data, "bozo_exception", None)
+            raise SourceUnavailable(
+                self.name, "response is not a feed" + (f": {problem}" if problem else "")
+            )
 
         items: list[RawItem] = []
         skipped = 0

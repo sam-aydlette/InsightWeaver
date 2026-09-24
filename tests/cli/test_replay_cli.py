@@ -20,10 +20,10 @@ from unittest.mock import patch
 import pytest
 
 from src.cli.replay import replay_command
-from src.database.models import Evidence
+from src.database.models import Evidence, Route
 from src.evidence import commit, rebuild
 
-from ..evidence.stubs import KeywordAdjudicator, add_observations, add_watches
+from ..evidence.stubs import KeywordAdjudicator, add_observations, add_routes, add_watches
 
 V1 = "tests.evidence.stubs:make_v1"
 V2 = "tests.evidence.stubs:make_v2"
@@ -52,6 +52,7 @@ def corpus(test_session):
     """
     add_watches(test_session)
     add_observations(test_session)
+    add_routes(test_session)
     commit(test_session, "v1", rebuild(test_session, KeywordAdjudicator("v1")))
     test_session.flush()
     return test_session
@@ -183,12 +184,55 @@ class TestRefusals:
 
 class TestRegisteredInTheApp:
     def test_replay_is_a_top_level_command(self):
-        from src.cli.app import COMMAND_DISPATCH, cli
+        from src.cli.app import cli
 
-        assert COMMAND_DISPATCH["replay"] is replay_command
-        assert "replay" in cli.commands
+        assert cli.commands["replay"] is replay_command
 
     def test_commit_is_a_flag_that_defaults_to_off(self):
         flag = next(p for p in replay_command.params if p.name == "do_commit")
         assert flag.is_flag is True
         assert flag.default is False
+
+
+class TestAnUnroutedCorpusIsRefused:
+    def test_replay_refuses_rather_than_reading_as_no_evidence(
+        self, cli_runner, test_session, corpus
+    ):
+        """
+        With routes cleared, a replay would judge no pair and, with --commit,
+        delete the version's stored evidence. The command names the fix instead.
+        """
+        test_session.query(Route).delete()
+        # Committed, so the harness's rollback on the refusal cannot be what
+        # keeps the evidence; only the command's own behaviour can.
+        test_session.commit()
+
+        with _patch_db(test_session):
+            result = cli_runner.invoke(
+                replay_command, ["--prompt-version", "v1", "--adjudicator", V1, "--commit"]
+            )
+
+        assert result.exit_code != 0
+        assert "nothing is routed" in result.output
+        assert test_session.query(Evidence).count() == 2
+
+
+class TestABoundedReplayCannotBeCommitted:
+    def test_limit_with_commit_is_refused_before_anything_runs(
+        self, cli_runner, test_session, corpus
+    ):
+        """
+        commit makes the stored rows equal the replay. A bounded replay produced
+        rows for part of the corpus, so committing it would delete the rest.
+        """
+        test_session.commit()
+
+        with _patch_db(test_session):
+            result = cli_runner.invoke(
+                replay_command,
+                ["--prompt-version", "v1", "--adjudicator", V1, "--limit", "1", "--commit"],
+            )
+
+        assert result.exit_code != 0
+        assert "--commit with --limit is refused" in result.output
+        assert test_session.query(Evidence).count() == 2

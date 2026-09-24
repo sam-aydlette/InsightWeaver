@@ -20,8 +20,9 @@
 
 version: 1
 
-# When you last sat down with this file. Task 024 turns this into the quarterly
-# review loop; for now it is a date you can read.
+# When you last sat down with this file. The brief prints the days since it and
+# carries a banner past 90 days, or when it is missing (backlog task 031). The
+# review loop that would stamp it is parked (task 024) until watches resolve.
 reviewed: 2026-08-31
 
 decisions:

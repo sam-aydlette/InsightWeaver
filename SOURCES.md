@@ -20,7 +20,7 @@ operator gets actual counsel before anything publishes.
 | **Intergovernmental org** | Public-information output of an intergovernmental organization, retrieved through its own published feed. |
 | **Publisher RSS** | A feed the publisher chose to publish. Offering an RSS feed is an explicit syndication offer for headline, summary and link. It is **not** a licence to republish full text, and InsightWeaver does not: it stores what the feed served and produces analysis over it. |
 | **Publisher RSS — personal use only** | A publisher's own feed, offered on terms that limit use of the feed to personal, non-commercial purposes and ask for attribution. Retrieval and analysis for the private brief are expressly permitted; the licence does **not** reach a published product, and doing so needs the publisher's written permission first. Added 2026-08-27 for the Government Executive Media Group titles, whose terms grant the feeds explicitly and narrowly. |
-| **Commercial wire** | Associated Press and Reuters. Their terms are restrictive about derivative works and redistribution. **They may remain in the personal brief, which is private use. They must not be selected into a beat whose output is published.** |
+| **Commercial wire** | Associated Press and Reuters. Their terms are restrictive about derivative works and redistribution. **They may remain in the personal brief, which is private use. They must not feed anything that is published.** |
 
 ## Rules this file encodes
 
@@ -40,13 +40,12 @@ operator gets actual counsel before anything publishes.
    over a secondary one covering the same fact is correct. Preferring primary sources *as a
    category* leaves the beat unable to see anything that is not a published document. See
    `backlog/009-federal-it-trade-press.md`.
-2. **Commercial wire content must not feed a beat intended for publication.** AP and Reuters are
+2. **Commercial wire content must not feed anything intended for publication.** AP and Reuters are
    tagged `general_news` / `international` in `config/feeds/core.json` and carry no `regulatory`,
    `federal_policy`, `legislative`, `judicial` or `cybersecurity` tag, so the
-   `us-public-sector-compliance` beat's tag selectors do not reach them. This is asserted by
-   `tests/config/test_beats.py::test_resolves_to_a_small_us_federal_feed_set`, which fails if
-   either wire is ever pulled into that beat. If a future beat's selectors do reach them, exclude
-   them explicitly and record the reason here.
+   `us-public-sector-compliance` beat's tag selectors do not reach them. The beat that selected sources and the test that asserted this were deleted on
+   2026-08-31 (backlog task 012); the rule stands and nothing publishes today. If a published
+   output is ever built, exclude them explicitly and record the reason here.
 3. **No HTML scraping adapters exist yet, and none may be added without following this file's
    rules.** When they land: honour `robots.txt`, identify the client honestly in the User-Agent
    with a contact URL, rate-limit conservatively, and never route around an access control.
@@ -63,8 +62,9 @@ operator gets actual counsel before anything publishes.
    *Federal-IT trade press — the detailed basis* below. **Every licence claim there carries the
    URL it was read at, the date, and whether it was confirmed by retrieving that URL**, because a
    quoted licence term with no traceable source is the same defect as a synthesis claim with no
-   citation — and `src/prompts/ANALYSIS_RULES.md`, injected into every synthesis prompt, already
-   requires that a single-source claim "name the source explicitly". Hold a licence claim in this
+   citation. (The analysis rules that required a single-source claim to name its source went with
+   the deleted synthesis product on 2026-08-31; the adjudication prompt in `src/evidence/prompt.py`
+   keeps the rule that a claim the item does not address is not evidence.) Hold a licence claim in this
    file to the standard the tool holds its own output to. Rejecting a source on its terms is a
    normal outcome, and the absence of a source from this file's table is not evidence that nobody
    looked at it.

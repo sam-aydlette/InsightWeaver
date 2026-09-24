@@ -18,6 +18,7 @@ import pytest
 
 from src.cli.watch import _expiry_phrase, watch_command
 from src.database.models import Watch as WatchRow
+from src.database.models import WatchBelief
 
 EXAMPLE_POSITION = Path(__file__).resolve().parents[2] / "config" / "position.example.yaml"
 EXAMPLE_WATCHES = Path(__file__).resolve().parents[2] / "config" / "watches.example.yaml"
@@ -147,8 +148,14 @@ class TestWatchSync:
 class TestNoWriteSeamExists:
     """Invariant 6: the system never authors its own watches."""
 
-    def test_only_list_and_sync_are_registered(self):
-        assert set(watch_command.commands) == {"list", "sync"}
+    def test_only_the_four_operator_commands_are_registered(self):
+        """list and sync (task 013); believe and resolve (task 030). No constructor."""
+        assert set(watch_command.commands) == {"list", "sync", "believe", "resolve"}
+
+    @pytest.mark.parametrize("command", ["believe", "resolve"])
+    def test_the_operator_commands_take_no_argument_describing_a_watch(self, command):
+        names = {p.name for p in watch_command.commands[command].params}
+        assert names.isdisjoint({"claim", "triggers", "so_what", "decision", "expires"})
 
     @pytest.mark.parametrize("forbidden", ["add", "create", "new", "propose", "accept", "edit"])
     def test_no_write_command_exists(self, forbidden):
@@ -176,3 +183,90 @@ class TestExpiryPhrase:
 
     def test_past(self):
         assert "expired 5d ago" in _expiry_phrase(date(2026, 8, 27), date(2026, 9, 1))
+
+
+class TestBelieve:
+    def test_records_a_principal_belief_with_its_note(self, cli_runner, stored_watch):
+        with _patch_db(stored_watch):
+            result = cli_runner.invoke(
+                watch_command, ["believe", "conmon-scope-expands", "0.6", "--note", "memo landed"]
+            )
+
+        assert result.exit_code == 0, result.output
+        assert "belief 0.60 recorded" in result.output
+        row = stored_watch.query(WatchBelief).one()
+        assert (row.belief, row.source, row.note) == (0.6, "principal", "memo landed")
+
+    def test_refuses_without_a_note_and_out_of_range(self, cli_runner, stored_watch):
+        with _patch_db(stored_watch):
+            no_note = cli_runner.invoke(watch_command, ["believe", "conmon-scope-expands", "0.6"])
+            too_big = cli_runner.invoke(
+                watch_command, ["believe", "conmon-scope-expands", "1.6", "--note", "n"]
+            )
+
+        assert no_note.exit_code != 0
+        assert too_big.exit_code != 0
+        assert stored_watch.query(WatchBelief).count() == 0
+
+    def test_refuses_an_unknown_watch(self, cli_runner, stored_watch):
+        with _patch_db(stored_watch):
+            result = cli_runner.invoke(watch_command, ["believe", "nope", "0.5", "--note", "n"])
+
+        assert result.exit_code != 0
+        assert "no watch 'nope'" in result.output
+
+    def test_list_shows_the_current_belief_its_source_and_the_registration(
+        self, cli_runner, stored_watch, tmp_path
+    ):
+        with _patch_db(stored_watch):
+            cli_runner.invoke(
+                watch_command, ["believe", "conmon-scope-expands", "0.6", "--note", "memo"]
+            )
+            result = cli_runner.invoke(watch_command, ["list"])
+
+        assert result.exit_code == 0, result.output
+        assert "belief:   0.60" in result.output
+        assert "(principal, " in result.output
+        assert "registered 0.35" in result.output
+
+
+class TestResolve:
+    def test_grades_once_and_refuses_a_second_time(self, cli_runner, stored_watch):
+        with _patch_db(stored_watch):
+            first = cli_runner.invoke(
+                watch_command,
+                ["resolve", "conmon-scope-expands", "--outcome", "no", "--note", "deviation"],
+            )
+            second = cli_runner.invoke(
+                watch_command,
+                ["resolve", "conmon-scope-expands", "--outcome", "yes", "--note", "changed"],
+            )
+            listing = cli_runner.invoke(watch_command, ["list"])
+
+        assert first.exit_code == 0, first.output
+        assert "resolved no" in first.output
+        assert second.exit_code != 0
+        row = stored_watch.get(WatchRow, "conmon-scope-expands")
+        assert (row.outcome, row.resolution_note) == ("no", "deviation")
+        assert "[resolved no" in listing.output
+
+    def test_list_marks_a_retired_watch(self, cli_runner, stored_watch):
+        from datetime import datetime
+
+        stored_watch.get(WatchRow, "conmon-scope-expands").retired_at = datetime(2026, 8, 30)
+        stored_watch.commit()
+
+        with _patch_db(stored_watch):
+            result = cli_runner.invoke(watch_command, ["list"])
+
+        assert result.exit_code == 0, result.output
+        assert "[retired 2026-08-30]" in result.output
+
+    def test_refuses_an_outcome_outside_yes_no(self, cli_runner, stored_watch):
+        with _patch_db(stored_watch):
+            result = cli_runner.invoke(
+                watch_command,
+                ["resolve", "conmon-scope-expands", "--outcome", "maybe", "--note", "n"],
+            )
+
+        assert result.exit_code != 0

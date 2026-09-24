@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Compliance Weekly</title>
+    <link>https://example.com/compliance-weekly</link>
+    <description>A two-item feed for the brief's end-to-end test (2026-09-22): a reprint of a Federal Register notice under its own title, and an item no watch wants.</description>
+    <item>
+      <title>Traffic and Conduct on the Grounds of Certain National Institute of Standards and Technology Sites</title>
+      <link>https://example.com/compliance-weekly/nist-site-rules</link>
+      <description>By this rule, NIST amends its regulations governing traffic and conduct at its sites in Gaithersburg, Maryland, and Boulder and Fort Collins, Colorado. This rule amends those regulations by removing excessive and redundant restrictions on personal conduct, updating or removing sections with outdated references or requirements, and broadening an exception regarding the use of service dogs. This action is necessary to ensure that NIST's regulations conform to the scope of the underlying statutory authorities and to reduce regulatory complexity, redundancy, and burden. This action is intended to promote statutory conformity, administrative efficiency, and accessibility for people with disabilities, without imposing any new obligations or costs on the public.</description>
+      <pubDate>Fri, 21 Aug 2026 14:30:00 GMT</pubDate>
+      <guid>compliance-weekly-2026-08-21-nist</guid>
+    </item>
+    <item>
+      <title>Persimmons ripen after the first frost</title>
+      <link>https://example.com/compliance-weekly/persimmons</link>
+      <description>Fall fruit guidance for the county extension office: pick after the first frost, and let the astringent varieties soften fully before eating.</description>
+      <pubDate>Thu, 20 Aug 2026 09:00:00 GMT</pubDate>
+      <guid>compliance-weekly-2026-08-20-persimmons</guid>
+    </item>
+  </channel>
+</rss>

@@ -34,6 +34,20 @@ one user, one daily invocation, and the concurrency it cannot handle is concurre
 does not have. Task 020's BLOCKED-ON is cleared; the choice is revisitable before deployment and
 the cost comparison remains unverified, which is recorded rather than resolved.
 
+## ANSWERED 2026-09-22 (the estate plan)
+
+The operator's brief of 2026-09-22 re-expresses this plan with the estate half added; the
+decisions and the fifteen questions it raised are recorded in `docs/PLAN.md`, section 7.
+The ones that bear on tasks in this directory:
+
+- **Laptop, not cloud.** Tasks 019, 020 and 023 are superseded; 018 is rewritten for a laptop.
+  **Q6 below is closed as moot**: there is no mail path for a dead-man's switch to be off.
+- **PIR = Watch.** No `threat` or `indicator` node types; the trigger vocabulary gains a `grid`
+  axis. Tasks 015 and 016 are rescoped into estate Phase 1d.
+- **Belief has one ledger** (`watch_beliefs`, append-only). Task 017's transitions append to it;
+  the `sync_watches` delete becomes a soft retire before 017 lands.
+- **Deterministic brief first**; synthesis is an opt-in pass in Phase 1e. Invariant 4 stands.
+
 ---
 
 ## Q1 -- ANSWERED 2026-08-31: not blocking; SQLite in S3 as the working assumption, revisitable.
@@ -121,7 +135,9 @@ The plan above does **not** archive any of it, and does not port it either. That
 gap, not an oversight -- deciding it needs your view on whether the compliance beat continues to
 exist as a concept under the new architecture, or whether Position + Watches replaces it entirely.
 
-## Q6 -- Dead-man's switch channel. Blocks task 018.
+## Q6 -- CLOSED 2026-09-22 as moot: no mail path exists under the laptop plan. Original text kept.
+
+### Dead-man's switch channel. Blocked task 018.
 
 It must not be SES. SNS to SMS, a CloudWatch alarm to a phone push, or a third-party healthcheck
 service that alarms on a missed heartbeat are the obvious candidates, each with a different failure

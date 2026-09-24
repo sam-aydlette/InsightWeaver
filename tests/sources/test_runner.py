@@ -6,19 +6,21 @@ misconfigured filter or a changed API contract yields an empty fetch, a thin
 brief, and no error.
 """
 
+import asyncio
+import json
 from datetime import datetime
 
 import pytest
 
 from src.database.models import Article, RSSFeed
 from src.sources.base import RawItem, SourceUnavailable
+from src.sources.rss_adapter import RSSAdapter
 from src.sources.runner import (
     ADAPTER_FACTORIES,
     AdapterRunSummary,
     IngestResult,
     build_configured_adapters,
     non_rss_adapter_names,
-    non_rss_source_urls,
     run_adapter,
     run_adapters,
     run_configured_adapters,
@@ -132,6 +134,31 @@ class TestUnreachable:
             assert row.last_error == "HTTP 503"
             assert row.error_count == 1
 
+    async def test_an_empty_fetch_is_recorded_as_a_fetch(self, db_factory):
+        """
+        Zero items from a reachable source is a fact about the window, and the
+        brief prints it as such; it needs the fetch stamp to do so, and an
+        earlier error is over once the source answers (2026-09-22, task 031).
+        """
+
+        def row():
+            with db_factory() as db:
+                r = db.query(RSSFeed).filter(RSSFeed.url == FakeAdapter.source_url).one()
+                return r.last_fetched, r.last_error, r.error_count
+
+        await run_adapter(FakeAdapter([]), SINCE, db_factory=db_factory)
+        stamped, error, count = row()
+        assert stamped is not None, "an empty fetch must stamp the row itself"
+        assert (error, count) == (None, 0)
+
+        await run_adapter(
+            FakeAdapter(SourceUnavailable("Fake Source", "HTTP 503")), SINCE, db_factory=db_factory
+        )
+        assert row()[1:] == ("HTTP 503", 1)
+
+        await run_adapter(FakeAdapter([]), SINCE, db_factory=db_factory)
+        assert row()[1:] == (None, 0), "an answer, even an empty one, ends the error"
+
     async def test_an_unexpected_adapter_bug_is_still_an_outage(self, db_factory):
         result = await run_adapter(
             FakeAdapter(ValueError("adapter bug")), SINCE, db_factory=db_factory
@@ -204,13 +231,6 @@ class TestConfiguredAdapters:
     def test_the_shipped_config_declares_the_federal_register_adapter(self):
         assert non_rss_adapter_names() == {"federal_register"}
 
-    def test_non_rss_urls_are_kept_away_from_the_rss_fetcher(self):
-        urls = non_rss_source_urls()
-
-        assert "https://www.federalregister.gov/api/v1/documents.json" in urls
-        # The Federal Register RSS feed is still RSS and must not be excluded.
-        assert "https://www.federalregister.gov/documents/feeds/public-inspection.xml" not in urls
-
     def test_every_declared_adapter_has_a_factory(self):
         assert non_rss_adapter_names() <= set(ADAPTER_FACTORIES)
 
@@ -234,3 +254,126 @@ class TestConfiguredAdapters:
 
         assert summary.total_sources == 0
         assert summary.alerts == []
+
+
+class ConcurrencyTracker:
+    """How many adapters were mid-``fetch`` at once, the high-water mark of it."""
+
+    def __init__(self) -> None:
+        self.current = 0
+        self.max_seen = 0
+
+    def enter(self) -> None:
+        self.current += 1
+        self.max_seen = max(self.max_seen, self.current)
+
+    def exit(self) -> None:
+        self.current -= 1
+
+
+class TrackedAdapter:
+    """An adapter whose ``fetch`` reports into a shared :class:`ConcurrencyTracker`."""
+
+    category = "federal_policy"
+
+    def __init__(self, name: str, tracker: ConcurrencyTracker):
+        self.name = name
+        self.source_url = f"https://example.gov/api/{name}"
+        self._tracker = tracker
+
+    async def fetch(self, since):
+        self._tracker.enter()
+        try:
+            await asyncio.sleep(0.02)
+        finally:
+            self._tracker.exit()
+        return [item(self.name)]
+
+
+class TestConcurrency:
+    async def test_bounded_concurrency_never_exceeds_the_limit(self, db_factory):
+        tracker = ConcurrencyTracker()
+        adapters = [TrackedAdapter(f"Source {i}", tracker) for i in range(10)]
+
+        summary = await run_adapters(adapters, SINCE, db_factory=db_factory, concurrency=3)
+
+        assert tracker.max_seen == 3
+        assert [r.source for r in summary.results] == [a.name for a in adapters]
+        assert all(r.fetched == 1 for r in summary.results)
+
+    async def test_default_concurrency_of_one_runs_strictly_sequentially(self, db_factory):
+        tracker = ConcurrencyTracker()
+        adapters = [TrackedAdapter(f"Source {i}", tracker) for i in range(10)]
+
+        summary = await run_adapters(adapters, SINCE, db_factory=db_factory)
+
+        assert tracker.max_seen == 1
+        assert [r.source for r in summary.results] == [a.name for a in adapters]
+
+
+class TestIncludeRss:
+    """``build_configured_adapters`` excludes RSS unless asked, then names it right."""
+
+    FEEDS = {
+        "feeds": [
+            {
+                "name": "Regional News",
+                "url": "https://example.com/regional.rss",
+                "applicability": {
+                    "scope": ["always"],
+                    "geo_tags": ["usa"],
+                    "domain_tags": ["general_news", "local"],
+                    "specialty_tags": [],
+                },
+                "relevance_score": 1.0,
+            },
+            {
+                "name": "Federal Register - Documents API",
+                "url": "https://www.federalregister.gov/api/v1/documents.json",
+                "adapter": "federal_register",
+                "applicability": {
+                    "scope": ["always"],
+                    "geo_tags": ["usa"],
+                    "domain_tags": ["federal_policy", "regulatory"],
+                    "specialty_tags": ["cybersecurity", "compliance"],
+                },
+                "relevance_score": 0.95,
+            },
+            {
+                "name": "Untagged Feed",
+                "url": "https://example.com/untagged.rss",
+                "applicability": {
+                    "scope": ["always"],
+                    "geo_tags": ["usa"],
+                    "specialty_tags": [],
+                },
+                "relevance_score": 0.5,
+            },
+        ]
+    }
+
+    @pytest.fixture
+    def feeds_dir(self, tmp_path):
+        (tmp_path / "feeds.json").write_text(json.dumps(self.FEEDS), encoding="utf-8")
+        return tmp_path
+
+    def test_rss_is_excluded_by_default(self, feeds_dir):
+        adapters = build_configured_adapters(feeds_dir)
+
+        assert [a.name for a in adapters] == ["Federal Register - Documents API"]
+
+    def test_include_rss_adds_an_rss_adapter_per_configured_feed(self, feeds_dir):
+        adapters = build_configured_adapters(feeds_dir, include_rss=True)
+
+        rss_adapters = [a for a in adapters if isinstance(a, RSSAdapter)]
+        assert {a.name for a in rss_adapters} == {"Regional News", "Untagged Feed"}
+
+        regional = next(a for a in rss_adapters if a.name == "Regional News")
+        assert regional.source_url == "https://example.com/regional.rss"
+        assert regional.category == "general_news"
+
+    def test_an_rss_feed_with_no_domain_tags_gets_uncategorized(self, feeds_dir):
+        adapters = build_configured_adapters(feeds_dir, include_rss=True)
+
+        untagged = next(a for a in adapters if a.name == "Untagged Feed")
+        assert untagged.category == "uncategorized"

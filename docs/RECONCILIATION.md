@@ -51,3 +51,19 @@ several genuinely careful pieces of engineering -- the offline render path, the 
 the person-tracking boundary. It was wrong because a document of constant length emitted on a fixed
 schedule cannot carry information about whether anything happened. That is a property of the shape,
 not of the implementation quality, which is exactly why better synthesis was never going to fix it.
+
+## Addendum, 2026-09-22: the decision monitor is the plan
+
+The monitoring re-architecture above resolved *which product this is* -- a commitment graph, not
+a briefing generator -- and built its first three tasks. On 2026-09-22 an estate-brief plan was
+written on top of it, reviewed the same afternoon, and cut back: the estate graph and its sensors
+are deferred until a sensor other than the operator exists to write to them, and what remains is
+the **decision monitor** -- Position, watches, deterministic routing, one adjudication call per
+routed pair, a brief run by hand, belief and resolution written only by the operator.
+
+`docs/PLAN.md` is the plan from here. Its section 2 states the product and the property it must
+demonstrate, section 6 lists the changes to existing behaviour, section 7 records the decisions,
+and section 8 records what was cut and what would bring each back. Two of those decisions change
+this note's own claims: there is no notification path and no deployment -- everything runs on
+demand on the operator's laptop and nothing sends anything -- so "the notification is the update
+event" above is now "the brief is the update event, run by hand". The graph is still the artifact.

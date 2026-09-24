@@ -70,7 +70,15 @@ You are working on InsightWeaver, a CLI tool that processes RSS feeds into exami
 4. Epistemic autonomy as the goal -- the tool equips reasoning, does not deliver conclusions.
 5. Honest self-awareness about the tool's own narrative.
 
-**The architectural through-line:** Questions are the join key. Predictions key off Questions. DecisionEvidence keys off Questions. The forecast command is a derived view over the predictions ledger, not a separate engine. There is no "unknown unknowns" bucket -- the tool does not fabricate observables it cannot ground.
+**The architectural through-line** (rewritten 2026-09-22 for the decision monitor, `docs/PLAN.md`;
+Questions, Predictions and Frames were deleted on 2026-08-31): decisions are the root and watches
+are the join key. A Watch is the standing requirement; it names the decision it serves, and a watch
+that names none is refused. Routing is deterministic and selects candidates; adjudication is the one
+model call and produces Evidence keyed to a watch; belief and resolution are written only by the
+operator. The brief is a derived view over evidence, watch state and source state, not a separate
+engine, and every line in it cites the observation hashes it rests on. Silence is reported as
+"nothing routed since", never as nothing. There is no "unknown unknowns" bucket -- the tool does
+not fabricate observables it cannot ground.
 
 Reference `docs/CONCEPTS.md` for the entity-by-entity model.
 
@@ -78,7 +86,8 @@ Input sources arrive through the adapter layer in `src/sources/`, not through RS
 was relaxed deliberately on 2026-08-26 (backlog task 005) because the US public sector compliance
 domain does not publish enough RSS to support a brief: of the eight feeds that beat resolves, two
 carried articles. An adapter changes *ingestion only* -- every adapter emits the same normalized
-article row the RSS path produces, so clustering, frames, questions, predictions and synthesis are
-unaware adapters exist. If a change to ingestion requires editing `src/processors/` or
-`src/prompts/`, the seam is in the wrong place. Every source must have a recorded basis for use in
+item the RSS path produces and stores it through one path, so routing, adjudication and the brief
+are unaware adapters exist. If a change to ingestion requires editing `src/routing/` or
+`src/evidence/`, the seam is in the wrong place. (Reworded 2026-09-22, task 027: the consumers this
+paragraph used to name were deleted.) Every source must have a recorded basis for use in
 `SOURCES.md`; a source with no recorded basis does not ship.

@@ -23,19 +23,20 @@ classifiers = [
 ]
 
 dependencies = [
-    "anthropic>=0.39.0",
-    "aiohttp>=3.10.11",
+    # 1.x: output_config is a named parameter and messages.parse() exists,
+    # which Tier 2's structured output needs (2026-09-22, backlog task 026).
+    "anthropic>=1.7,<2",
     "feedparser>=6.0.11",
     "python-dotenv>=1.0.1",
     "pyyaml>=6.0.2",
-    "rich>=13.9.4",
     "httpx>=0.28.1",
-    "requests>=2.32.3",
     "beautifulsoup4>=4.12.3",
-    "lxml>=5.3.0",
     "sqlalchemy>=2.0.0",
     "pydantic-settings>=2.0.0",
+    "pydantic>=2.0",
     "click>=8.0.0",
+    # Credentials live in the OS keychain (src/config/credentials.py).
+    "keyring>=25.0",
 ]
 
 [project.optional-dependencies]
@@ -44,20 +45,24 @@ dev = [
     "pytest-asyncio>=0.23.0",
     "pytest-mock>=3.12.0",
     "pytest-cov>=4.1.0",
-    "aioresponses>=0.7.6",
     "ruff>=0.8.4",
     "mypy>=1.13.0",
     "pre-commit>=4.0.1",
     "pip-tools>=7.4.1",
+    # Secret scanning, in pre-commit and CI (2026-09-22, backlog task 026).
+    "detect-secrets>=1.5.0",
+    # `make typecheck` needs the PyYAML stubs; pre-commit already installed them
+    # for its own mypy hook, so the gate passed there and failed in a plain venv.
+    "types-PyYAML",
 ]
 
 [project.scripts]
 insightweaver = "src.cli.app:cli"
 
 [project.urls]
-Homepage = "https://github.com/yourusername/insightweaver"
-Repository = "https://github.com/yourusername/insightweaver"
-Issues = "https://github.com/yourusername/insightweaver/issues"
+Homepage = "https://github.com/sam-aydlette/InsightWeaver"
+Repository = "https://github.com/sam-aydlette/InsightWeaver"
+Issues = "https://github.com/sam-aydlette/InsightWeaver/issues"
 
 [tool.setuptools.packages.find]
 where = ["."]
@@ -78,11 +83,6 @@ addopts = [
     "--cov=src",
     "--cov-report=term-missing",
     "--cov-report=html",
-]
-markers = [
-    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
-    "integration: marks tests as integration tests",
-    "unit: marks tests as unit tests",
 ]
 
 [tool.coverage.run]
@@ -181,11 +181,9 @@ ignore_errors = true
 # descriptors mypy reads as their column type, which predates this task.
 [[tool.mypy.overrides]]
 module = [
-    "src.processors.*",
     "src.rss.*",
     "src.matching.*",
     "src.llm.*",
-    "src.feed_manager",
 ]
 ignore_errors = true
 
@@ -194,6 +192,5 @@ module = [
     "src.cli.*",
     "src.utils.*",
     "src.config.*",
-    "src.__main__",
 ]
 ignore_errors = true

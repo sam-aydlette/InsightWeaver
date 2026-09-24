@@ -1,4 +1,4 @@
-.PHONY: help install install-dev test lint format fmt typecheck check pre-commit clean clean-all coverage db-add-watches db-add-observations db-drop-briefing update-deps
+.PHONY: help install install-dev test lint format fmt typecheck check pre-commit clean clean-all coverage db-add-watches db-add-observations db-add-monitor db-drop-briefing update-deps
 
 # Tool resolution (added 2026-08-24).
 # Before this, every recipe called bare `pytest` / `ruff` / `mypy`, which only
@@ -44,8 +44,10 @@ help:
 	@echo "  make check           Run all checks (lint + typecheck + test)"
 	@echo ""
 	@echo "Database:"
+	@echo "  make db-init           Create every table a fresh database lacks (additive, safe)"
 	@echo "  make db-add-watches    Create the watches table (additive, safe)"
 	@echo "  make db-add-observations  Create observations and evidence (additive, safe)"
+	@echo "  make db-add-monitor    Create the decision monitor tables (additive, safe)"
 	@echo "  make db-drop-briefing  Drop the deleted briefing product's tables"
 	@echo "                         (DESTRUCTIVE; captures to a dump first)"
 	@echo ""
@@ -71,6 +73,11 @@ test:
 
 coverage:
 	$(PYTEST) tests/ --cov=src --cov-report=term-missing -v
+
+# Rewrite tests/brief/golden/ from the current renderer. Read the diff before
+# committing it: a golden that changed is the test reporting a change.
+golden:
+	INSIGHTWEAVER_UPDATE_GOLDEN=1 $(PYTEST) tests/brief/test_end_to_end.py -q
 
 lint:
 	$(RUFF) check src/ tests/
@@ -115,6 +122,12 @@ clean-all: clean
 	rm -rf venv/
 	rm -rf .venv/
 
+# A fresh database: every table the models declare, creating what is absent
+# and touching nothing that exists. The additive targets below add columns to
+# older tables and are harmless after this. (2026-09-23, backlog task 033.)
+db-init:
+	$(PYTHON) -m src.database.migrations.create_schema
+
 # Additive: creates the watches table if it is absent and prints that it did
 # nothing if it is not. No --confirm, because nothing here can lose data; the
 # --down direction can, and requires one. (2026-08-31, backlog task 013.)
@@ -126,6 +139,11 @@ db-add-watches:
 # src/database/models.py. (2026-08-31, backlog task 014.)
 db-add-observations:
 	$(PYTHON) -m src.database.migrations.add_observations_and_evidence
+
+# Additive: the decision monitor's tables (routes now; adjudications,
+# watch_beliefs and briefs as tasks 029-031 land). (2026-09-22, backlog task 028.)
+db-add-monitor:
+	$(PYTHON) -m src.database.migrations.add_monitor_tables
 
 # Deliberately does NOT pass --confirm. The migration refuses without it, so
 # running this target prints what it would destroy and stops; the operator types

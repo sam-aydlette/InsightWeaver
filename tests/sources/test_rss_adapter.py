@@ -103,6 +103,37 @@ class TestUnavailable:
         assert "boom" in caught.value.reason
 
 
+class TestNotAFeed:
+    @pytest.mark.parametrize(
+        "content",
+        [
+            b"<html><body><h1>Feed moved</h1></body></html>",
+            b"<!DOCTYPE html><html><head><title>x</title></head><body>Checking your browser<br></body></html>",
+            b'{"error": "not found"}',
+        ],
+        ids=["well-formed html", "html5 page", "json"],
+    )
+    async def test_a_page_that_is_not_a_feed_is_an_error_not_an_empty_result(self, content):
+        """
+        A 200 that parses to no feed at all is unreachable in every sense that
+        matters: recorded as success it would clear the source's error and be
+        listed in the brief as a feed that ran and returned nothing
+        (2026-09-23, backlog task 031 review).
+        """
+        fetcher = RSSFetcher()
+        with mock_get(fetcher, content), pytest.raises(SourceUnavailable, match="not a feed"):
+            await adapter_with(fetcher).fetch(datetime(2020, 1, 1))
+        await fetcher.close()
+
+    async def test_a_feed_with_parse_warnings_but_entries_is_still_a_feed(self):
+        broken = b"<?xml version='1.0'?><rss><channel><item><title>x</title><guid>g</guid></item></channel>"
+        fetcher = RSSFetcher()
+        with mock_get(fetcher, broken):
+            items = await adapter_with(fetcher).fetch(datetime(2020, 1, 1))
+        await fetcher.close()
+        assert [i.guid for i in items] == ["g"]
+
+
 class TestLifecycle:
     async def test_an_injected_fetcher_is_not_closed_by_the_adapter(self, sample_rss_response):
         """The caller owns what the caller made."""

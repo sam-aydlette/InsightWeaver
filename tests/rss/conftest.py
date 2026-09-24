@@ -68,51 +68,6 @@ def empty_rss_response():
 
 
 @pytest.fixture
-def malformed_rss_response():
-    """Malformed RSS content"""
-    return b"<not valid xml"
-
-
-@pytest.fixture
-def mock_rss_feed():
-    """Mock RSSFeed database object"""
-    feed = MagicMock()
-    feed.id = 1
-    feed.name = "Test Feed"
-    feed.url = "https://example.com/feed.rss"
-    feed.category = "news"
-    feed.is_active = True
-    feed.last_fetched = None
-    feed.last_error = None
-    feed.error_count = 0
-    return feed
-
-
-@pytest.fixture
-def mock_inactive_feed():
-    """Mock inactive RSSFeed"""
-    feed = MagicMock()
-    feed.id = 2
-    feed.name = "Inactive Feed"
-    feed.url = "https://example.com/inactive.rss"
-    feed.is_active = False
-    return feed
-
-
-@pytest.fixture
-def mock_feed_with_errors():
-    """Mock RSSFeed with error history"""
-    feed = MagicMock()
-    feed.id = 3
-    feed.name = "Error Feed"
-    feed.url = "https://example.com/error.rss"
-    feed.is_active = True
-    feed.error_count = 9
-    feed.last_error = "Previous error"
-    return feed
-
-
-@pytest.fixture
 def sample_feedparser_entry():
     """Sample feedparser entry object"""
     entry = MagicMock()
@@ -134,28 +89,3 @@ def sample_feedparser_entry_minimal():
     entry.title = "Minimal Article"
     entry.link = "https://example.com/minimal"
     return entry
-
-
-@pytest.fixture
-def mock_http_response_success(sample_rss_response):
-    """Mock successful HTTP response"""
-    response = MagicMock()
-    response.status_code = 200
-    response.content = sample_rss_response
-    response.raise_for_status = MagicMock()
-    return response
-
-
-@pytest.fixture
-def mock_http_response_error():
-    """Mock HTTP error response"""
-    import httpx
-
-    response = MagicMock()
-    response.status_code = 500
-    response.raise_for_status.side_effect = httpx.HTTPStatusError(
-        "Internal Server Error",
-        request=MagicMock(),
-        response=response,
-    )
-    return response

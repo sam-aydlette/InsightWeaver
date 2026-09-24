@@ -1,51 +1,35 @@
 """
-What a matcher is pointed at: entities and probes.
+What a matcher is pointed at: entities.
 
-These two value objects were lifted verbatim from ``src/config/beats.py`` when
-the briefing product was deleted (backlog task 012). The *beat* they used to
-belong to is gone -- a beat was a subject with its own source list, and the new
-shape tracks one operator's decisions instead. What survives is the pair of
-descriptions the deterministic matchers consume:
+This value object was lifted verbatim from ``src/config/beats.py`` when the
+briefing product was deleted (backlog task 012). The *beat* it used to belong
+to is gone -- a beat was a subject with its own source list, and the new shape
+tracks one operator's decisions instead. What survives is the description the
+deterministic matchers consume:
 
 * :class:`CoverageEntity` -- an institution and its surface forms, read by
   :mod:`src.matching.entity_matcher` (Tier 1 routing).
-* :class:`CoverageProbe` -- one thing that actually happened plus the words any
-  report of it would carry, read by :mod:`src.matching.coverage_probe` (the
-  staleness check task 018 needs).
 
-They carry no loader. The JSON beat-file parsing and validation that used to
-build them died with ``src/config/beats.py``; whatever declares an entity or a
-probe in the new shape constructs these directly.
+``CoverageProbe`` and its module :mod:`src.matching.coverage_probe` left with
+backlog task 027 on 2026-09-22: the staleness check in ``docs/PLAN.md`` is a
+query over ``routes`` ("nothing routed for N days"), not a probe match over
+``articles``, and no rewritten task names a probe. See ``backlog/027-sweep.md``
+for the record.
+
+:class:`CoverageEntity` carries no loader. The JSON beat-file parsing and
+validation that used to build it died with ``src/config/beats.py``; whatever
+declares an entity in the new shape constructs it directly.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, timedelta
 
 __all__ = [
     "COVERAGE_KINDS",
-    "DEFAULT_PROBE_WINDOW_DAYS",
     "ENTITY_KINDS",
-    "MIN_PROBE_EVIDENCE",
     "CoverageEntity",
-    "CoverageProbe",
 ]
-
-# How far either side of a probe's date a report of it is still a report of it.
-# Symmetric because coverage runs both ways: a rule is trailed before it lands
-# and analysed for a week after. Fourteen days is the interval the FedRAMP miss
-# was measured over -- "3 incidental mentions and none within two weeks".
-DEFAULT_PROBE_WINDOW_DAYS = 14
-
-# The least evidence a probe may rest on. A probe is a claim that a match means
-# the matcher saw a specific event, and one bare term cannot carry that claim:
-# `FedRAMP` alone is matched by an AWS region-launch post. Two independent
-# pieces of evidence -- two required terms, or one required term plus one
-# `any_of` group -- is the floor. The beat-file loader used to enforce this at
-# parse time; with the loader gone it stands here as the documented floor for
-# whatever constructs probes next.
-MIN_PROBE_EVIDENCE = 2
 
 # The only three things coverage may track, and the plural config key that used
 # to declare each. The mapping is closed on purpose: any other key -- `people`,
@@ -94,49 +78,3 @@ class CoverageEntity:
         for term in (self.name, *self.aliases):
             seen.setdefault(term, None)
         return tuple(seen)
-
-
-@dataclass(frozen=True)
-class CoverageProbe:
-    """
-    One thing that actually happened, used to test whether coverage can see it.
-
-    A probe is not a search. It is a claim of the form "an event of this
-    description occurred on this date, and any report of it would carry these
-    words" -- which makes an unmatched probe a statement about the source list
-    rather than about the phrasing of a query.
-
-    ``terms`` must **all** appear in the same article; each group in ``any_of``
-    contributes one alternative that must appear. The two levels exist because
-    a single distinctive term is too weak to be evidence and a whole headline is
-    too brittle to survive a second outlet's phrasing.
-
-    A term ending in ``*`` is a stem: ``reinstat*`` matches "reinstated" and
-    "reinstatement". Without the marker a term matches whole words only. The
-    marker is explicit rather than implied so that the widening is visible to
-    whoever has to trust the result -- see :mod:`src.matching.coverage_probe`
-    for the matching rules themselves.
-    """
-
-    date: date
-    what: str
-    terms: tuple[str, ...]
-    any_of: tuple[tuple[str, ...], ...] = ()
-    window_days: int = DEFAULT_PROBE_WINDOW_DAYS
-
-    @property
-    def window(self) -> tuple[date, date]:
-        """The inclusive date range in which a report of this event counts."""
-        span = timedelta(days=self.window_days)
-        return self.date - span, self.date + span
-
-    @property
-    def evidence_count(self) -> int:
-        """How many independent things this probe requires of an article."""
-        return len(self.terms) + len(self.any_of)
-
-    def describe(self) -> str:
-        """The probe's requirement, written the way it was declared."""
-        parts = [" AND ".join(self.terms)] if self.terms else []
-        parts.extend("(" + " OR ".join(group) + ")" for group in self.any_of)
-        return " AND ".join(parts)

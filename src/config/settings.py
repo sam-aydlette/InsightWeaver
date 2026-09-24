@@ -10,15 +10,16 @@ load_dotenv()
 class Settings(BaseSettings):
     database_url: str = os.getenv("DATABASE_URL", "sqlite:///./data/insightweaver.db")
 
-    anthropic_api_key: str = os.getenv("ANTHROPIC_API_KEY", "")
+    # ANTHROPIC_API_KEY is no longer read here. The key lives in the OS keychain
+    # and is read by src.config.credentials when a model client is built --
+    # never at import, so nothing that does not call a model needs a keychain.
+    # Removed 2026-09-22 (backlog task 026); there is deliberately no fallback.
 
-    debug: bool = os.getenv("DEBUG", "False").lower() == "true"
-    log_level: str = os.getenv("LOG_LEVEL", "INFO")
-
-    enable_smart_rss_fetch: bool = os.getenv("ENABLE_SMART_RSS_FETCH", "True").lower() == "true"
-    smart_rss_fetch_threshold_minutes: int = int(
-        os.getenv("SMART_RSS_FETCH_THRESHOLD_MINUTES", "60")
-    )
+    # `debug`, `log_level`, `enable_smart_rss_fetch` and
+    # `smart_rss_fetch_threshold_minutes` were removed here on 2026-09-22
+    # (backlog task 027): none had a reader anywhere in src/. The `--debug`
+    # flag runs through src/cli/output.py, which keeps its own state and never
+    # consulted these.
 
     # How similar two observations' MinHash signatures must be before they are
     # treated as the same item published twice. 0.7 was chosen against measured
@@ -38,7 +39,23 @@ class Settings(BaseSettings):
 
     project_root: Path = Path(__file__).parent.parent.parent
     data_dir: Path = project_root / "data"
-    logs_dir: Path = project_root / "src" / "logs"
+
+    # Every outbound model request is written here before it is sent, and its
+    # usage after (src/llm/audit.py). JSON lines, one file per day, gitignored.
+    # Overridable so it can be kept out of a cloud-synced checkout.
+    # (2026-09-22, backlog task 026.)
+    llm_audit_dir: Path = Path(
+        os.getenv("LLM_AUDIT_DIR", str(project_root / "data" / "llm-audit"))
+    ).expanduser()
+
+    # Two named models, one per role, so that no call site picks a model string.
+    # Decided 2026-09-22 (docs/PLAN.md, Q11): Sonnet 5 adjudicates,
+    # Opus 5 writes. A retired model is then a one-line change in one place.
+    llm_triage_model: str = os.getenv("LLM_TRIAGE_MODEL", "claude-sonnet-5")
+    llm_synthesis_model: str = os.getenv("LLM_SYNTHESIS_MODEL", "claude-opus-5")
+
+    # The keychain service every credential is stored under (src/config/credentials.py).
+    keyring_service: str = "insightweaver"
 
     # Position and the watch set are hand-authored and live in the operator's
     # *private* repository -- they name real decisions, deadlines and exposures
@@ -62,7 +79,6 @@ class Settings(BaseSettings):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.data_dir.mkdir(exist_ok=True)
-        self.logs_dir.mkdir(exist_ok=True)
 
 
 settings = Settings()

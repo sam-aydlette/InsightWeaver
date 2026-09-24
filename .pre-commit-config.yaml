@@ -30,13 +30,24 @@ repos:
       - id: mixed-line-ending
         args: ['--fix=lf']
 
+  # Secret scanning (added 2026-09-22, backlog task 026). detect-private-key
+  # above catches PEM blocks only; this catches API keys and tokens. The
+  # baseline is empty: a false positive gets an inline `pragma: allowlist
+  # secret` beside it, so the exception is visible where it is made, and any
+  # other hit fails the commit.
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        args: ['--baseline', '.secrets.baseline']
+        exclude: ^(requirements.*\.txt|\.secrets\.baseline)$
+
   # Type checking with mypy (optional, can be slow)
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: v1.19.1
     hooks:
       - id: mypy
         additional_dependencies:
-          - types-requests
           - types-PyYAML
         args: [--ignore-missing-imports, --show-error-codes]
         # Only check files that are being committed

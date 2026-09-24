@@ -24,6 +24,7 @@ Added 2026-08-26 for backlog task 005.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import Callable, Iterator, Sequence
 from contextlib import AbstractContextManager
@@ -38,7 +39,8 @@ from ..database.connection import get_db
 from ..utils import utcnow
 from .base import SourceAdapter, SourceUnavailable
 from .federal_register import FederalRegisterAdapter, FederalRegisterConfigError
-from .store import ensure_source, source_article_count, store_items
+from .rss_adapter import RSSAdapter
+from .store import ensure_source, record_attempt, source_article_count, store_items
 
 logger = logging.getLogger(__name__)
 
@@ -148,17 +150,21 @@ async def run_adapter(
     except SourceUnavailable as exc:
         result.error = exc.reason
         logger.error(f"SOURCE UNREACHABLE: {adapter.name} - {exc.reason}")
-        _record_error(db_factory, source_id, exc.reason)
+        _record_outcome(db_factory, source_id, exc.reason)
         return result
     except Exception as exc:  # noqa: BLE001 - an adapter bug is still an outage
         result.error = f"unexpected {type(exc).__name__}: {exc}"
         logger.error(f"SOURCE FAILED: {adapter.name} - {result.error}")
-        _record_error(db_factory, source_id, result.error)
+        _record_outcome(db_factory, source_id, result.error)
         return result
 
     result.fetched = len(items)
 
     if not items:
+        # The source ran and answered. Record that, or the brief cannot tell
+        # a source that returned nothing from one that never ran; QUIET names
+        # the former by this timestamp (2026-09-22, backlog task 031).
+        _record_outcome(db_factory, source_id, None)
         if prior_articles > 0:
             result.went_silent = True
             logger.error(
@@ -187,44 +193,60 @@ async def run_adapter(
     return result
 
 
-def _record_error(db_factory: DbFactory, source_id: int, reason: str) -> None:
-    """Write the failure onto the source row so it is visible outside the log."""
+def _record_outcome(db_factory: DbFactory, source_id: int, error: str | None) -> None:
+    """Write the attempt's outcome onto the source row so it is visible outside the log."""
     from ..database.models import RSSFeed
 
     with db_factory() as db:
         row = db.query(RSSFeed).filter(RSSFeed.id == source_id).first()
-        if row is None:
-            return
-        # Column[...] vs value, as in src/sources/store.py.
-        row.last_fetched = utcnow()  # type: ignore[assignment]
-        row.last_error = reason  # type: ignore[assignment]
-        row.error_count = int(row.error_count or 0) + 1  # type: ignore[assignment]
+        if row is not None:
+            record_attempt(row, error=error)
 
 
 async def run_adapters(
     adapters: Sequence[SourceAdapter],
     since: datetime,
     db_factory: DbFactory = get_db,
+    *,
+    concurrency: int = 1,
 ) -> AdapterRunSummary:
-    """Run adapters one after another. Sequential on purpose: these are guests
-    on public APIs and the whole set is a handful of requests."""
-    summary = AdapterRunSummary()
-    for adapter in adapters:
-        summary.results.append(await run_adapter(adapter, since, db_factory=db_factory))
+    """
+    Run adapters, at most ``concurrency`` at a time, and keep their order.
+
+    Sequential was right for two API adapters that are guests on public
+    services. It is not right for dozens of RSS feeds with thirty-second
+    timeouts, so ``ingest`` passes a small bound (2026-09-22, backlog task
+    028). Database work inside :func:`run_adapter` happens between awaits,
+    never across one, so sessions never interleave mid-transaction whatever
+    the bound.
+    """
+    if concurrency < 1:
+        raise ValueError(f"concurrency must be at least 1, got {concurrency}")
+    semaphore = asyncio.Semaphore(concurrency)
+
+    async def one(adapter: SourceAdapter) -> IngestResult:
+        async with semaphore:
+            return await run_adapter(adapter, since, db_factory=db_factory)
+
+    results = await asyncio.gather(*(one(adapter) for adapter in adapters))
+    summary = AdapterRunSummary(results=list(results))
     for line in summary.alerts:
         logger.error(f"SOURCE ALERT: {line}")
     return summary
 
 
-def build_configured_adapters(feeds_dir: Path | str | None = None) -> list[SourceAdapter]:
+def build_configured_adapters(
+    feeds_dir: Path | str | None = None, *, include_rss: bool = False
+) -> list[SourceAdapter]:
     """
-    Instantiate an adapter for every configured non-RSS source.
+    Instantiate an adapter for every configured source.
 
-    RSS feeds were excluded here because ``fetch_all_active_feeds`` owned them.
-    That path was closed on 2026-08-31 (backlog task 025) because it wrote
-    articles without observations; RSS feeds are still excluded from *this*
-    function, which only builds the non-RSS adapters named in config, and are
-    now read through ``src.sources.rss_adapter.RSSAdapter`` instead.
+    Non-RSS sources always; RSS feeds too when ``include_rss`` is set, one
+    :class:`~src.sources.rss_adapter.RSSAdapter` per feed in ``config/feeds/``.
+    RSS was excluded here while ``fetch_all_active_feeds`` owned it; that path
+    was closed on 2026-08-31 (backlog task 025) because it wrote articles
+    without observations, and since 2026-09-22 (task 028) ``ingest`` reads
+    every feed through this function and the one store path.
     """
     adapters: list[SourceAdapter] = []
     for name in sorted(non_rss_adapter_names(feeds_dir)):
@@ -240,23 +262,18 @@ def build_configured_adapters(feeds_dir: Path | str | None = None) -> list[Sourc
             adapters.append(factory())
         except FederalRegisterConfigError as exc:
             raise ValueError(f"adapter '{name}' is configured but unusable: {exc}")
+    if include_rss:
+        for feed in _configured_feeds(feeds_dir):
+            if feed.adapter != "rss":
+                continue
+            category = feed.domain_tags[0] if feed.domain_tags else "uncategorized"
+            adapters.append(RSSAdapter(name=feed.name, url=feed.url, category=category))
     return adapters
 
 
 def non_rss_adapter_names(feeds_dir: Path | str | None = None) -> set[str]:
     """Adapter names other than ``rss`` declared anywhere in ``config/feeds/``."""
     return {feed.adapter for feed in _configured_feeds(feeds_dir) if feed.adapter != "rss"}
-
-
-def non_rss_source_urls(feeds_dir: Path | str | None = None) -> set[str]:
-    """
-    URLs in ``config/feeds/`` that are not RSS.
-
-    ``src/rss/parallel_fetcher.py`` uses this to leave them alone: handing a
-    JSON API endpoint to feedparser would produce a parse failure every run and
-    eventually auto-deactivate the source.
-    """
-    return {feed.url for feed in _configured_feeds(feeds_dir) if feed.adapter != "rss"}
 
 
 def _configured_feeds(feeds_dir: Path | str | None = None) -> Iterator:
@@ -269,13 +286,16 @@ async def run_configured_adapters(
     since: datetime | None = None,
     feeds_dir: Path | str | None = None,
     db_factory: DbFactory = get_db,
+    *,
+    include_rss: bool = False,
+    concurrency: int = 1,
 ) -> AdapterRunSummary:
-    """Run every configured non-RSS source. Used by the pipeline's fetch stage."""
-    adapters = build_configured_adapters(feeds_dir)
+    """Run every configured source (non-RSS only unless ``include_rss``)."""
+    adapters = build_configured_adapters(feeds_dir, include_rss=include_rss)
     if not adapters:
         return AdapterRunSummary()
     window_start = since or (utcnow() - timedelta(days=DEFAULT_LOOKBACK_DAYS))
-    logger.info(
-        f"Running {len(adapters)} non-RSS source adapter(s) since {window_start.isoformat()}"
+    logger.info(f"Running {len(adapters)} source adapter(s) since {window_start.isoformat()}")
+    return await run_adapters(
+        adapters, window_start, db_factory=db_factory, concurrency=concurrency
     )
-    return await run_adapters(adapters, window_start, db_factory=db_factory)

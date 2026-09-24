@@ -67,19 +67,23 @@ if data is None:  # Can this actually be None here?
 
 ## InsightWeaver Patterns
 
-### Async Operations
+### Source adapters are async; everything after ingestion is not
 ```python
-async def fetch_and_process():
-    data = await collector.fetch()  # Await external calls
-    return process(data)            # Sync processing is fine
+class MyAdapter:                      # src/sources/base.py describes the contract
+    async def fetch(self, since):     # raise SourceUnavailable; never return [] for an error
+        ...
 ```
 
-### Claude API Integration
+### The one model call (2026-09-22, backlog task 029)
 ```python
-# Always handle markdown-wrapped JSON
-response = await client.analyze(prompt)
-# Parser handles: ```json {...} ``` and raw JSON
-data = parse_claude_response(response)
+from src.llm.claude_client import ClaudeClient, ModelCallFailed
+
+client = ClaudeClient("triage")       # key from the OS keychain; every request audited
+response = client.analyze(system, user, effort="medium", output_schema=SCHEMA)
+# response.text is JSON constrained by SCHEMA; validate it with pydantic anyway.
+# ModelCallFailed.outcome is "answered", "rejected" or "unavailable"; only an
+# answered failure is a fact about the pair. src/evidence/claude_adjudicator.py
+# is the only caller and should stay the only one.
 ```
 
 ### Database Operations
